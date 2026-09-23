@@ -3,8 +3,8 @@
 
 Usage: merge_docs.py <seed.json> <export dir> > edited.json
 
-The export dir is what `ArtifactData` writes with `out_dir`: one JSON file per
-document under `files/` and `sections/`. The seed comes from parse_docs.py run
+The export dir is what `desk.py export` writes: one JSON file per document
+under `files/` and `sections/`. The seed comes from parse_docs.py run
 against the working tree, so the verbatim originals are always current and an
 untouched section still round-trips byte for byte.
 """
