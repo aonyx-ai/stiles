@@ -3,6 +3,7 @@
 
 Usage:
   desk.py serve [--host 127.0.0.1] [--port 4180] [--docs-url URL]
+                [--preview-dir DIR]
   desk.py seed <seed.json>      create the pages and sections the desk lacks
   desk.py import <export dir>   load a dump, one JSON file per document
   desk.py export <out dir>      dump every collection for merge_docs.py
@@ -10,6 +11,12 @@ Usage:
 The store is SQLite at $DESK_DB, by default under $XDG_STATE_HOME. Every
 document carries a version, and every write to an existing document must name
 the version it read, so an agent never overwrites an edit it has not seen.
+
+With --preview-dir, the desk mirrors the repository there: `docs/` is a copy,
+and every other top-level entry links back to the checkout, because the site
+imports examples from outside `docs/`. Each change is written into the copy
+shortly after it lands. Run the docs site from `<preview-dir>/docs` to see
+edits rendered before they reach the working tree.
 """
 
 import argparse
@@ -17,6 +24,7 @@ from contextlib import closing
 import json
 import os
 import pathlib
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -27,6 +35,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 HERE = pathlib.Path(__file__).resolve().parent
+DOCS = HERE.parent
+PREVIEW_SKIP = ("node_modules", "build", ".docusaurus", "tools")
+PREVIEW_SETTLE = 0.4
 PAGE = HERE / "desk.html"
 COLLECTIONS = ("files", "sections", "facts")
 SEED_SKIP = ("original", "originalText", "originalPreamble")
@@ -139,6 +150,24 @@ def transact(db, writes):
         raise
     db.execute("commit")
     return results
+
+
+def run_sync(db_path, *flags):
+    """Runs sync_docs.sh against the store at db_path."""
+    with tempfile.TemporaryDirectory(prefix="docs-desk-") as work:
+        env = {
+            **os.environ,
+            "DESK_DB": str(db_path),
+            "WORK": work,
+            "PATH": f"{pathlib.Path(sys.executable).parent}:{os.environ.get('PATH', '')}",
+        }
+        return subprocess.run(
+            ["bash", str(HERE / "sync_docs.sh"), *flags],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
 
 
 class Hub:
@@ -262,23 +291,9 @@ class Handler(BaseHTTPRequestHandler):
         if not self.sync_lock.acquire(blocking=False):
             return self.send(409, {"error": "sync_running"})
         try:
-            with tempfile.TemporaryDirectory(prefix="docs-desk-") as work:
-                env = {
-                    **os.environ,
-                    "DESK_DB": str(self.db_path),
-                    "WORK": work,
-                    "PATH": f"{pathlib.Path(sys.executable).parent}:{os.environ.get('PATH', '')}",
-                }
-                try:
-                    done = subprocess.run(
-                        ["bash", str(HERE / "sync_docs.sh"), *(["--check"] if check else [])],
-                        env=env,
-                        capture_output=True,
-                        text=True,
-                        timeout=120,
-                    )
-                except subprocess.TimeoutExpired:
-                    return self.send(504, {"error": "sync_timed_out"})
+            done = run_sync(self.db_path, *(["--check"] if check else []))
+        except subprocess.TimeoutExpired:
+            return self.send(504, {"error": "sync_timed_out"})
         finally:
             self.sync_lock.release()
         self.send(
@@ -310,11 +325,51 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
 
+def preview(hub, db_path, mirror):
+    """Keeps the copy at mirror/docs equal to the tree plus the desk's edits.
+
+    Each burst of changes gets one render, after the burst settles, so typing
+    does not queue a render per keystroke.
+    """
+    mirror.mkdir(parents=True, exist_ok=True)
+    for entry in DOCS.parent.iterdir():
+        link = mirror / entry.name
+        if entry.name not in (DOCS.name, ".git") and not link.is_symlink():
+            link.symlink_to(entry)
+    target = mirror / DOCS.name
+    shutil.copytree(
+        DOCS, target, dirs_exist_ok=True, ignore=shutil.ignore_patterns(*PREVIEW_SKIP)
+    )
+    modules = target / "node_modules"
+    if not modules.exists():
+        modules.symlink_to(DOCS / "node_modules")
+
+    after = hub.seq
+    while True:
+        try:
+            done = run_sync(db_path, f"--out={target}")
+            if done.returncode:
+                print(f"preview render failed:\n{done.stderr}", file=sys.stderr)
+        except subprocess.TimeoutExpired:
+            print("preview render timed out", file=sys.stderr)
+        seq = after
+        while seq == after:
+            seq, _ = hub.wait(after, 3600)
+        time.sleep(PREVIEW_SETTLE)
+        after = hub.seq
+
+
 def serve(args, db_path):
     connect(db_path).close()
     Handler.db_path = db_path
     Handler.hub = Hub()
     Handler.docs_url = args.docs_url
+    if args.preview_dir:
+        threading.Thread(
+            target=preview,
+            args=(Handler.hub, db_path, args.preview_dir.resolve()),
+            daemon=True,
+        ).start()
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     server.daemon_threads = True
     print(f"desk on http://{args.host}:{args.port}, store {db_path}", file=sys.stderr)
@@ -381,6 +436,7 @@ def main():
     serving.add_argument("--host", default="127.0.0.1")
     serving.add_argument("--port", type=int, default=4180)
     serving.add_argument("--docs-url", help="the running docs site, for previews")
+    serving.add_argument("--preview-dir", type=pathlib.Path, help="where to render edits")
     commands.add_parser("seed").add_argument("seed")
     commands.add_parser("import").add_argument("dir")
     commands.add_parser("export").add_argument("dir")

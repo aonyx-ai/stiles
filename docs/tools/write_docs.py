@@ -6,7 +6,9 @@ each file whose sections carry edits. A section nobody touched is emitted from
 its verbatim `original`, so an unedited file is byte-identical to what it was;
 only an edited file is rewritten at all.
 
-Pass --check to compare against what is on disk instead of writing.
+Pass --check to compare against what is on disk instead of writing. Pass
+--out=DIR to write into a copy of the docs tree instead: every page whose copy
+differs from its rendered text is written there, edited or not.
 """
 
 import json
@@ -145,6 +147,8 @@ def render_file(record, sections):
 def main():
     argv = [item for item in sys.argv[1:] if not item.startswith("--")]
     check = "--check" in sys.argv
+    out = next((item[6:] for item in sys.argv if item.startswith("--out=")), None)
+    root = pathlib.Path(out) if out else DOCS
     payload = json.loads(pathlib.Path(argv[0]).read_text() if argv else sys.stdin.read())
 
     by_file = {}
@@ -154,8 +158,11 @@ def main():
     changed, identical, mismatched = [], [], []
     for record in payload["files"]:
         text = render_file(record, by_file.get(record["id"], []))
-        path = DOCS / record["path"]
-        if text == record["originalText"]:
+        path = root / record["path"]
+        baseline = record["originalText"]
+        if out:
+            baseline = path.read_text() if path.exists() else None
+        if text == baseline:
             identical.append(record["path"])
             continue
         if check:
