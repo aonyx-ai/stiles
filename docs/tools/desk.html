@@ -58,7 +58,7 @@
   .meta p { margin: 2px 0; }
   details.links { margin: 6px 0 18px; font-size: 13px; }
   details.links summary { cursor: pointer; color: var(--muted); }
-  textarea { resize: none; overflow: hidden; }
+  textarea { resize: none; overflow: hidden; field-sizing: content; }
   textarea.code, details.links textarea { font: 13.5px/1.55 ui-monospace, SFMono-Regular, monospace; }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
     padding: 14px 16px 12px; margin: 14px 0; }
@@ -276,20 +276,14 @@ function showConflict(editor) {
       $("button", { onclick: () => { editor.conflict = null; flush(editor, true).then(renderPage); } }, "Keep mine")));
 }
 
-function grow(area) {
-  area.style.height = "auto";
-  area.style.height = `${area.scrollHeight + 2}px`;
-}
-
 function field(editor, name, value, attrs = {}, multiline = false) {
   const shown = name in editor.pending ? editor.pending[name] : value ?? "";
   const el = multiline ? $("textarea", { rows: 1, spellcheck: "true", ...attrs }) : $("input", attrs);
   el.value = shown;
   el.dataset.doc = `${editor.collection}/${editor.id}`;
   el.dataset.field = name;
-  el.addEventListener("input", () => { stage(editor, { [name]: el.value }); if (multiline) grow(el); });
+  el.addEventListener("input", () => stage(editor, { [name]: el.value }));
   el.addEventListener("blur", () => flush(editor));
-  if (multiline) requestAnimationFrame(() => grow(el));
   return el;
 }
 
