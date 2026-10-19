@@ -194,7 +194,11 @@ fn materialize(source: &GitLintSource, staging: &Path) -> anyhow::Result<()> {
         &gix::progress::Discard,
         &gix::progress::Discard,
         &AtomicBool::default(),
-        gix::worktree::state::checkout::Options::default(),
+        gix::worktree::state::checkout::Options::new(gix::filter::plumbing::Pipeline::new(
+            Default::default(),
+            repository.object_hash(),
+            Default::default(),
+        )),
     )
     .context("failed to write the working tree")?;
 
