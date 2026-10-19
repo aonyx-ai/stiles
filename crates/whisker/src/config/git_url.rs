@@ -38,8 +38,8 @@ impl GitUrl {
     /// # Errors
     ///
     /// Returns an error if git cannot read the text as a remote. The error
-    /// names the fault and never quotes the remote, because gitoxide's own
-    /// parse error carries the text in full, credentials and all.
+    /// never quotes the remote, because gitoxide's own parse error carries
+    /// the text in full, credentials and all.
     ///
     /// # Examples
     ///
@@ -47,27 +47,11 @@ impl GitUrl {
     /// let url = GitUrl::new("https://github.com/aonyx-ai/whisker-aonyx-rules")?;
     /// ```
     pub fn new(url: impl AsRef<str>) -> anyhow::Result<Self> {
-        match gix::url::parse(url.as_ref()) {
-            Ok(url) => Ok(Self(url)),
-            Err(gix::url::parse::Error::Utf8 { .. }) => {
-                anyhow::bail!("the git remote is not valid UTF-8")
-            }
-            Err(gix::url::parse::Error::Url { .. }) => {
-                anyhow::bail!("cannot read the git remote as a URL")
-            }
-            Err(gix::url::parse::Error::TooLong { .. }) => {
-                anyhow::bail!("the git remote names a host that is too long")
-            }
-            Err(gix::url::parse::Error::MissingRepositoryPath { .. }) => {
-                anyhow::bail!("the git remote names no repository")
-            }
-            Err(gix::url::parse::Error::RelativeUrl { .. }) => {
-                anyhow::bail!("the git remote is relative")
-            }
-            Err(gix::url::parse::Error::InvalidRemoteHelperName { .. }) => {
-                anyhow::bail!("the git remote names an invalid transport")
-            }
-        }
+        // gitoxide's error renders the remote it rejected, so none of it
+        // crosses into whisker's error.
+        gix::url::parse(url.as_ref())
+            .map(Self)
+            .map_err(|_| anyhow::anyhow!("cannot read the git remote"))
     }
 
     /// Returns the remote in the form the transport reads
@@ -257,9 +241,18 @@ mod tests {
         let error = GitUrl::new("").expect_err("the remote should be rejected");
 
         assert!(
-            error.to_string().contains("names no repository"),
+            error.to_string().contains("cannot read the git remote"),
             "unexpected: {error:#}"
         );
+    }
+
+    #[test]
+    fn new_with_a_bad_remote_never_quotes_its_credentials() {
+        let error = GitUrl::new("https://secret@example.com:99999/rules")
+            .expect_err("the remote should be rejected");
+
+        let shown = format!("{error:?} {error:#}");
+        assert!(!shown.contains("secret"), "{shown}");
     }
 
     #[test]
