@@ -154,8 +154,9 @@ impl WhiskerConfig {
             .marker(REPOSITORY_MARKER)
             .or_start();
 
-        let project: Project<ConfigTable> =
-            Project::builder().application(APPLICATION).load(&search)?;
+        let project: Project<ConfigTable> = Project::builder()
+            .application(APPLICATION.parse()?)
+            .load(&search)?;
 
         let root = project.root().clone();
 
