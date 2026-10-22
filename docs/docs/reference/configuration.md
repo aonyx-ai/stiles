@@ -67,7 +67,7 @@ ignore = [
 ]
 ```
 
-## [[lints]]
+## [[lints]] {#lints}
 
 You can load multiple lints, each is defined through a `[[lints]]` section. To
 define the lints, you either list a path or a git repository.
@@ -147,4 +147,4 @@ looking at a directory containing a `.git` directory.
 
 [adopt-rules-gradually]: /docs/how-to/adopt-rules-gradually
 [shared-rules]: /docs/how-to/shared-rules
-[writing-a-rule]: /authoring/how-to/writing-a-rule
+[writing-a-rule]: /authoring/how-to/write-a-rule

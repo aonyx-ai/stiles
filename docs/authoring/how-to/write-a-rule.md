@@ -5,6 +5,10 @@ goal: take a reader from nothing to their own rule running in their project.
 non-goal: explaining the boundary or the pipeline. both have their own pages.
 -->
 
+You start in an empty directory and finish with your own rule running in your
+project. The guide follows the `doc_summary_break` example, which flags a doc
+comment whose summary line has no blank line after it.
+
 ## start from an example
 
 <!--
@@ -12,14 +16,17 @@ where do I begin. doc_summary_break, or custom_lint for the same shape with more
 comments.
 -->
 
-## what a crate holds
+Copy
+[`examples/doc_summary_break`](https://github.com/aonyx-ai/whisker/tree/main/examples/doc_summary_break)
+from the Whisker repository into your project, for example to
+`lints/doc_summary_break`. It is a complete rule crate with tests, and the rest
+of this guide explains it.
 
-<!--
-what does the manifest look like. a cdylib plus the two whisker deps at a tag,
-and why default-features = false.
-how do I match the whisker I run. pin both crates to the release you installed,
-and the compiler is not compared.
--->
+[`examples/custom_lint`](https://github.com/aonyx-ai/whisker/tree/main/examples/custom_lint)
+has the same files and structure, with more comments. Start there if you prefer
+comments to code.
+
+## what a crate holds
 
 ```toml title="lints/doc_summary_break/Cargo.toml"
 [package]
@@ -36,13 +43,6 @@ crate-type = ["cdylib"]
 ```
 
 ## hook a node kind
-
-<!--
-how does my code get called. one method per node kind, returning diagnostics,
-every other kind defaulting to nothing.
-what bites me next. passes hold state so each file gets a fresh one, and a
-supertype beats hooking every kind under it.
--->
 
 ```rust
 impl RustLintPass for DocSummaryBreak {
@@ -63,11 +63,6 @@ impl RustLintPass for DocSummaryBreak {
 
 ## declare and export the rule
 
-<!--
-what makes a rule nameable in a config. a RuleId, DeclaresRules, and
-export_lints! taking a list.
--->
-
 ```rust
 const RULE_ID: RuleId = RuleId::new("lint.doc-summary-break");
 
@@ -81,13 +76,6 @@ whisker_rust::export_lints![DocSummaryBreak];
 ```
 
 ## test it
-
-<!--
-how do I know it works. whisker-testing parse, execute and assert_diagnostic,
-with no project and no toolchain.
-how do I test a type-aware rule. build the decorations yourself rather than
-running a toolchain.
--->
 
 ```rust
 use whisker_rust::RustLintPassAdapter;
@@ -111,11 +99,6 @@ fn a_second_line_against_the_summary_is_flagged() {
 
 ## run it
 
-<!--
-how do I use it for real. a [[lints]] path entry and whisker check.
-what if it will not load. match the pin, and the boundary page is the reason.
--->
-
 ```toml title=".config/whisker.toml"
 [[lints]]
 path = "lints/doc_summary_break"
@@ -126,13 +109,6 @@ whisker check .
 ```
 
 ## give the rule options
-
-<!--
-how does a rule learn what it cannot read off the source. a rules.options table,
-read in configure.
-why does None versus empty matter. a rule with a default worth keeping can tell
-them apart.
--->
 
 ```toml title=".config/whisker.toml"
 [rules.options."lint.repeated-primitive-params"]
@@ -154,3 +130,11 @@ impl RustLintPass for RepeatedPrimitiveParams {
 <!--
 where now. api, configuration, shared-rules, prebuilt archives.
 -->
+
+- [API reference](/authoring/reference/api) for every type and trait used here.
+- [Configuration](/docs/reference/configuration#lints) for the other ways to
+  name a rule source.
+- [Shared rules](/docs/how-to/shared-rules) to use your rules in more than one
+  project.
+- [Prebuilt archives](/authoring/reference/prebuilt-archives) so the people who
+  use your rules download them compiled.

@@ -78,22 +78,21 @@ lint to a version that did commit a `Cargo.lock`.
 <!--
 what happened. whisker pointed rust-analyzer at the path you named and it found
 no cargo project there. the cause line reads "discover a Cargo project at".
-what do I do. run whisker from inside the project, or name the project
-directory on the command line.
+what do I do. run whisker from inside the project, or name the project directory
+on the command line.
 why does whisker need one. rust-analyzer loads the nearest workspace and runs
 its build scripts before it can answer anything about a type.
 -->
 
-## no decoration provider covers this file, so semantic rules cannot run
+Whisker needs to load your Cargo project before it can check anything, and it
+found no project at the path you gave it. The cause below the error reads
+`discover a Cargo project at <path>`.
 
-<!--
-what happened. the file passed discovery, but no provider could analyze it, so
-whisker refuses rather than report it clean.
-which reason is mine. the error names the provider and the gap, and a help line
-names the fix. whisker prints each distinct fix once, after the per-file errors.
-what if it says no decoration providers were configured. nothing analyzable is
-loaded at all, which is the same refusal with no provider to name.
--->
+Run Whisker from inside your project, or pass the project directory:
+`whisker check path/to/project`. Without a path, Whisker uses the current
+directory.
+
+## no decoration provider covers this file, so semantic rules cannot run
 
 | Reason                                 | `help:` line                                                                             |
 | -------------------------------------- | ---------------------------------------------------------------------------------------- |

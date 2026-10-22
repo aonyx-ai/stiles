@@ -29,11 +29,6 @@ tar -xzf whisker-0.1.0-rc.4-aarch64-apple-darwin.tar.gz
 
 ## From source
 
-<!--
-what if my platform has no archive. cargo install --git --locked, and
-rust-toolchain.toml pulling the nightly.
--->
-
 If your platform has no archive, you want to install an unreleased version, or
 you don't want to install binary files from the internet, you can easily build
 Whisker from source. The easiest method is to use `cargo install` pointed at the

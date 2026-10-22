@@ -9,41 +9,29 @@ Whisker has a fairly simple algorithm to discover which files to lint. However,
 sometimes it may include or skip a file unexpectedly. Refer to this page to find
 out how Whisker discovers files.
 
-## which files whisker collects
+## Included files
 
-<!--
-what decides collection. the extension picks the grammar, and rust support
-covers .rs.
-what about every other file. nothing at all. a walk passes over a file with no
-grammar in silence, so a repository full of yaml produces no mention of yaml.
-is being collected enough. no, and this is the part that bites. a file whisker
-did collect can still turn out to be one no provider can analyze, which is an
-error. a file it never collected cannot.
--->
+Whisker walks through the files or directories you list in its `check`
+arguments. Every file with an extension supported by Whisker is checked.
+Anything else is always ignored.
 
-## what the walk skips
+If it turns out that an included file cannot be parsed by one of Whisker's
+language adapters, Whisker will throw an error.
 
-<!--
-which rules apply and where does each come from. six rows, from the walk itself
-to whisker.toml.
-do these apply without git. yes. an ignore file still describes what its tree
-generates.
--->
+## Ignored files
 
-| Skipped                                 | Source                 |
-| --------------------------------------- | ---------------------- |
-| Hidden files and directories            | The walk               |
-| Anything a `.gitignore` excludes        | The repository         |
-| Anything an `.ignore` excludes          | The repository         |
-| Anything `.git/info/exclude` excludes   | The repository         |
-| Anything your global gitignore excludes | Your git configuration |
-| Anything an `ignore` pattern excludes   | `.config/whisker.toml` |
+There are several reasons Whisker might ignore a file:
 
-## paths you name
+| Skipped                      | Source                 |
+| ---------------------------- | ---------------------- |
+| Hidden files and directories | The walk               |
+| `./.gitignore`               | The repository         |
+| `./.ignore`                  | The repository         |
+| `./.git/info/exclude`        | The repository         |
+| global gitignore             | Your git configuration |
+| `ignore` patterns            | `.config/whisker.toml` |
 
-<!--
-can I force one file. a named path is always checked, and ignores still apply
-below a named directory.
-why did whisker refuse my file outright. a parse with the wrong grammar finds
-nothing and reports it clean.
--->
+## Checking specific files
+
+You can override the ignore rules above by passing a specific file to
+`whisker check`.

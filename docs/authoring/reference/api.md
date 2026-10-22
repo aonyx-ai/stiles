@@ -5,13 +5,9 @@ goal: send a rule author to the right crate's own documentation.
 non-goal: duplicating any of it here.
 -->
 
-## the table
+The API documentation for each Whisker crate is on docs.rs.
 
-<!--
-which crate holds what. three rows, whisker-rust, whisker-types and
-whisker-testing, each naming its main items.
-which version should I read. the same tag as the whisker you run.
--->
+## the table
 
 | Crate                              | Holds                                                                                               |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------- |

@@ -1,22 +1,16 @@
 # Publish prebuilt archives
 
 <!--
-goal: let a publisher of rules ship them compiled, so no consumer pays the build.
-non-goal: what a consumer sees when an archive is missing or broken. that is
-the reference page of the same name in the usage tree.
+goal: let a publisher of rules ship them compiled, so no consumer pays the
+build.
+non-goal: what a consumer sees when an archive is missing or broken. that is the
+reference page of the same name in the usage tree.
 -->
+
+The maintainer of a rules repository can publish the rules compiled, so the
+projects that use them download a library and skip the build.
 
 ## the archive
-
-<!--
-what must I name the file. the four rows of the table.
-what is `<tag>` made of. the two fingerprints, the protocol, and the triple. no
-compiler, so one archive serves every whisker built from the same boundary.
-whose tag is it. the consumer's, not yours. `whisker abi` prints it, so publish
-one archive per tag you mean to serve.
-what may the archive hold. regular files at the root only. whisker passes over
-anything else, so a library in a subdirectory is a library nobody loads.
--->
 
 | Part     | Value                                               |
 | -------- | --------------------------------------------------- |
@@ -33,6 +27,10 @@ what else do I owe consumers. a committed lockfile, because a git entry builds
 with --locked. without one every consumer's build fails, archives or not.
 -->
 
+Commit `Cargo.lock`. Whisker always builds a git entry with `--locked`, so
+without a committed lockfile every consumer's build fails, whether or not you
+publish archives.
+
 ## when the tag moves
 
 <!--
@@ -42,3 +40,17 @@ either one wants a fresh archive.
 why does a bad archive fail loudly. a library that fails the handshake carries a
 tag that misdescribes it, so whisker ends the run rather than quietly compiling.
 -->
+
+| Event                                                  | New archive needed   |
+| ------------------------------------------------------ | -------------------- |
+| Any Whisker release before 1.0                         | Yes                  |
+| A Whisker release after 1.0 that changes the boundary  | Yes                  |
+| A new commit in your rules repository                  | Yes, for that commit |
+| A consumer moves to a Whisker that prints the same tag | No                   |
+
+The tag carries both fingerprints and the protocol version, so it changes
+whenever the boundary does.
+
+When a library from an archive fails the handshake, Whisker ends the run with an
+error. The archive's tag matched this Whisker, so a failed handshake means the
+archive is broken.

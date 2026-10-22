@@ -50,15 +50,6 @@ output or behavior:
 
 ## What ends a run early
 
-<!--
-why does whisker stop at the first failure. the causes below change which files
-get inspected, so a report that carried on would cover a different set.
-how do I see every failure at once. --keep-going reports each one and carries
-on, and the run still exits 1.
-why is an empty run the exception. the check for it runs before the first file
-and never consults --keep-going.
--->
-
 | Cause                                 | Default      | With `--keep-going`     |
 | ------------------------------------- | ------------ | ----------------------- |
 | A directory Whisker cannot read       | Ends the run | Reported, run continues |
@@ -96,3 +87,11 @@ stdout or stderr. diagnostics, errors, notes and help lines all go to stderr.
 whisker abi is the exception and prints its tag to stdout, which is what makes
 it usable in a shell substitution.
 -->
+
+| Command         | stdout  | stderr                                       |
+| --------------- | ------- | -------------------------------------------- |
+| `whisker check` | Nothing | Diagnostics, errors, notes and `help:` lines |
+| `whisker abi`   | The tag | Errors only                                  |
+
+Because `whisker abi` writes its tag to stdout, you can use it in a shell
+substitution, for example `tag=$(whisker abi)`.

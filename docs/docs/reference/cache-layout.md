@@ -5,33 +5,31 @@ goal: let someone find, inspect, or delete what whisker cached.
 non-goal: justifying the pin model. pinning-and-trust does that.
 -->
 
-## the layout
+Whisker keeps a cache of shared rules.
 
-<!--
-where is the root and what lives under it. WHISKER_CACHE_DIR else the XDG
-directory, then the two paths.
-why does the remote directory look like that. a readable name plus a digest,
-because two remotes can share a last segment.
-can I trust a directory I find. assembled beside the destination and renamed, so
-one that exists is whole.
--->
+## Location and layout
 
-| Path                                     | Holds                                                                |
-| ---------------------------------------- | -------------------------------------------------------------------- |
-| `<cache>/git/<remote>/<rev>/`            | A checkout of the pinned commit, and cargo's target directory for it |
-| `<cache>/prebuilt/<remote>/<rev>/<tag>/` | Libraries unpacked from a published archive                          |
+By default, Whisker finds its caches according to these rules, taking the first
+matching option:
 
-## clearing it
+1. `$WHISKER_CACHE_DIR`
+2. `${XDG_CACHE_HOME}/whisker`, if `$XDG_CACHE_HOME` is set to an absolute path.
+   Relative paths are ignored.
+3. `~/.cache/whisker`
 
-<!--
-how do I force a fresh look. one row per intent, each naming the directory to
-delete.
-why does my project still compile after its rules start publishing. unpacked
-libraries, then a checkout, then the remote.
-why is a checkout never refreshed. a commit hash names an immutable tree.
--->
+For most users, that means you'll find your cache in `~/.cache/whisker`.
 
-| To force                            | Delete                             |
-| ----------------------------------- | ---------------------------------- |
-| A fresh look for published archives | `<cache>/prebuilt/<remote>/<rev>/` |
-| A fresh fetch and compile           | `<cache>/git/<remote>/<rev>/`      |
+Whisker keeps the following things in its cache:
+
+| Path                             | Holds                                                             |
+| -------------------------------- | ----------------------------------------------------------------- |
+| `git/<remote>/<rev>/`            | A checkout of the pinned commit, including cargo target directory |
+| `prebuilt/<remote>/<rev>/<tag>/` | Libraries unpacked from a published archive                       |
+
+## Clearing caches
+
+To force a fresh look for published archives, or refresh the downloaded
+published archives, clear `prebuilt/<remote>/<rev>/`.
+
+To force a fresh git fetch and compile of shared rules, clear
+`git/<remote>/<rev>/`.
