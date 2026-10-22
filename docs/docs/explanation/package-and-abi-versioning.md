@@ -9,8 +9,8 @@ non-goal: whether a pinned repository is safe to run. pinning-and-trust owns
 that, and a version match is not a trust decision.
 
 what binds them: why is my rules pin tied to my whisker at all. a rules
-repository ships plugins, and a plugin only loads into a whisker that lays the
-boundary types out the same way.
+repository ships plugins, and a plugin only loads into the whisker it was built
+for.
 what is compared: what actually has to match. a protocol version and two
 fingerprints of whisker's own source. the compiler is not one of them, so any
 rustc can have built either side.

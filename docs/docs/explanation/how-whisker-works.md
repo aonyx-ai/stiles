@@ -10,10 +10,11 @@ architecture and the authoring pages own.
 ## What a run does
 
 <!--
-the order: what happens when I run whisker check. resolve the configured
-sources, get their rules from the cache, a prebuilt archive, or a compile, load
-the project through the language's tooling, then discover, parse, check
-coverage, and run the rules file by file, and report once at the end.
+the order: what happens when I run whisker check. read the configuration. get
+the rules for each lints entry from the cache, a prebuilt archive, or a compile,
+and fetch any git pin the cache lacks. discover the files. load the project
+through the language's tooling. then, file by file, parse it, make sure the
+tooling knows it, and run the rules. report once at the end.
 where the cost sits: which steps reach the network or a toolchain, and which
 happen once per run rather than per file. rules are fetched and built once per
 pin and reused after that.
@@ -37,15 +38,12 @@ whisker's own process, prebuilt or compiled. pinning and trust has the rest.
 
 <!--
 the tooling: how does whisker know about types. before it checks any file, it
-loads the project through the language's own tooling, which for rust today is
-rust-analyzer over the cargo workspace.
+loads the project through the language's own tooling.
 a project it understands: what can whisker check. only code that tooling places
 in a project, so a stray file is outside it.
-what loading does: why a check can run my code. it does what the tooling does
-to understand the project, which for rust runs build scripts and lets cargo
-fetch dependencies.
-what it sees: what do rules know about. what the tooling sees and no more, so
-rust counts cfg(test) code and gets no facts about proc-macro output.
+what loading does: why a check can run my code. it does what the tooling does to
+understand the project, including any build steps.
+what it sees: what do rules know about. what the tooling sees and no more.
 the cost: why a small check on a big project is slow to start. loading the
 project is paid once per run, before the first file.
 -->

@@ -18,8 +18,8 @@ part of it.
 neither is trust: what have we actually established. two compatibility checks
 and no trust decision, said outright.
 where trust comes from: what decides it then. the configuration. a named
-repository runs unsandboxed in-process, and dlopen runs initializers before the
-handshake reads anything.
+repository runs unsandboxed in-process, and opening its library runs some of its
+code before the handshake reads anything.
 the instruction: what do I do with that. pin what you would run as a build
 script, and read the diff when you move a pin.
 -->
