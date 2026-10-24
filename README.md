@@ -54,7 +54,7 @@ The [documentation][docs] covers the rest:
 
 - [Install Whisker][install] — release archives, the GitHub Actions action,
   and building from source.
-- [Runs and outcomes][checking] — what ends a run, and what fails it.
+- [Command line][checking] — what ends a run, and what fails it.
 - [Configuration][configuration] — every key of `.config/whisker.toml`.
 - [Write a rule][custom-lints] — hook a node kind, test it, and give it
   options.
@@ -80,7 +80,7 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 
-[checking]: https://aonyx-ai.github.io/whisker/docs/reference/runs-and-outcomes
+[checking]: https://aonyx-ai.github.io/whisker/docs/reference/command-line
 [configuration]: https://aonyx-ai.github.io/whisker/docs/reference/configuration
 [custom-lints]: https://aonyx-ai.github.io/whisker/authoring/how-to/write-a-rule
 [docs]: https://aonyx-ai.github.io/whisker/
