@@ -12,6 +12,7 @@ mod diagnostic;
 mod file_path;
 mod language;
 mod lint_pass;
+mod lint_pass_adapter;
 mod location;
 mod panic;
 pub mod plugin;

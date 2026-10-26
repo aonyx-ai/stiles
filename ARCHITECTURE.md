@@ -83,18 +83,24 @@ whisker generates, and a decoration provider that talks to the toolchain.
 ### The lint pass trait
 
 A tree-sitter grammar ships a machine-readable description of its node
-types. Whisker keeps a copy of Rust's at
-`crates/whisker-rust/src/node-types.json`. A build script generates from
-it a trait with one method per named node kind, plus the dispatch that
-routes a node to its method. Rules hook the constructs they care
-about by name. Grammars also group node kinds into supertypes, so a rule
-can hook every expression at once.
+types. Each language crate keeps a copy of its grammars' descriptions, such
+as `crates/whisker-rust/src/node-types.json`. Its build script calls
+`whisker_codegen::build_language`, which generates a trait with one method
+per named node kind, plus the dispatch that routes a node to its method.
+Rules hook the constructs they care about by name. Grammars also group node
+kinds into supertypes, so a rule can hook every expression at once.
 
-The copy tracks the grammar by hand. A grammar update changes the trait
-once someone refreshes the copy, and a renamed node then breaks
-compilation at every rule that hooked it. Until the refresh, the parser
-and the trait describe different grammars, and a rule that hooked the old
-name stops firing.
+A language may need more than one grammar. TypeScript parses `.tsx` files
+with a grammar that reads JSX and cannot read the angle-bracket type
+assertion, so its trait comes from the union of both grammars' node kinds.
+One rule then runs on either kind of file.
+
+A copy tracks its grammar until someone refreshes it. A renamed node then
+breaks compilation at every rule that hooked it. Until the refresh, the
+parser and the trait describe different grammars, and a rule that hooked
+the old name stops firing. whisker-typescript has a test that fails when its
+copies differ from the grammar crate it links. whisker-rust still tracks its
+copy by hand.
 
 ### The decoration provider
 
@@ -114,10 +120,37 @@ signatures, resolved types, ADT flags, and import sources. The set belongs
 to the provider, and a rule that needs a decoration on another node kind
 needs a change to whisker-rust.
 
-The provider and the syntax tree keep separate parses of the same file, so
-byte offsets tie them together. The provider compares the text the
-database holds with the text the pipeline parsed, and declines the file
-when they differ.
+TypeScript's provider uses [tsrs][tsrs], a Rust port of the TypeScript 7
+checker, as a library. A TypeScript file belongs to the project of the
+`tsconfig.json` nearest it, and the command loads each such project once.
+The provider attaches the checker's rendering of the type of every
+identifier it can type. A file the project leaves out gets the gap that
+names its remedy, as for Rust.
+
+A provider and the syntax tree keep separate parses of the same file, so
+byte offsets tie them together. Each provider compares the text it analyzed
+with the text the pipeline parsed, and declines the file when they differ.
+
+### Adding a language
+
+The platform does not change for a new language. These places do:
+
+- `whisker_types::Language` gains a variant, and `from_extension` maps the
+  language's extensions to it.
+- A new language crate keeps its grammars' `node-types.json`, calls
+  `whisker_codegen::build_language` from its build script, and defines its
+  adapter with `whisker_types::lint_pass_adapter!`. Its
+  `LANGUAGE_FINGERPRINT` joins the visitor fingerprint with the identity of
+  each decoration type it defines.
+- A decoration provider behind the crate's default `provider` feature, so a
+  plugin can build without it.
+- whisker-plugin's `export_lints!` gains a group for the language, and its
+  `LANGUAGE_FINGERPRINT` joins the new crate's.
+- The check command picks the grammar per file and loads the provider when
+  discovery finds a file in the language.
+
+A new variant breaks every `match` on `Language` that has no arm for it, so
+the compiler lists the places that still need one.
 
 The rust-analyzer stack sits behind the crate's default `provider`
 feature. A lint crate switches it off and depends on the generated trait,
@@ -386,5 +419,6 @@ loaded lints together.
 
 [discovery]: https://aonyx-ai.github.io/whisker/docs/reference/file-discovery
 [ra]: https://rust-analyzer.github.io/
+[tsrs]: https://github.com/oxc-project/tsrs
 [rules]: https://github.com/aonyx-ai/whisker-aonyx-rules
 [ts]: https://tree-sitter.github.io/tree-sitter/
