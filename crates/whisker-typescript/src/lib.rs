@@ -26,7 +26,7 @@ pub use language_fingerprint::LANGUAGE_FINGERPRINT;
 #[cfg(feature = "provider")]
 pub use provider::TypeScriptDecorationProvider;
 
-include!(concat!(env!("OUT_DIR"), "/typescript_lint_pass.rs"));
+include!(concat!(env!("OUT_DIR"), "/lint_pass.rs"));
 
 /// Returns the tree-sitter grammar for TypeScript files without JSX
 ///

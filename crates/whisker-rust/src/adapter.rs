@@ -1,81 +1,15 @@
-use whisker_types::{
-    BoxedLintPass, Checked, Configured, DecoratedNode, Language, LintPass, Panic, RuleOptions,
-    boxed_lint_pass,
-};
+use crate::RustLintPass;
 
-use crate::{RustLintPass, dispatch};
-
-/// Bridges a [`RustLintPass`] into the platform's [`LintPass`] trait
-///
-/// This adapter wraps any implementation of the generated `RustLintPass`
-/// trait so it can be passed to the whisker-core pipeline as a
-/// `Box<dyn LintPass>`. The adapter delegates `check_node` to the
-/// generated `dispatch` function, which routes each node to the
-/// appropriate typed method based on its kind.
-///
-/// The adapter is also the plugin's edge. A rule may panic, and a panic
-/// must not unwind into the host. Each call therefore runs under
-/// [`Panic::catch`] and comes back as a value. A rule keeps writing plain
-/// Rust and returning std's `Vec`; the copy into the list that crosses the
-/// boundary happens here.
-///
-/// # Examples
-///
-/// ```ignore
-/// struct MyLint;
-/// impl RustLintPass for MyLint {
-///     fn check_function_item(&mut self, node: &DecoratedNode) -> Vec<Diagnostic> {
-///         // ...
-///     }
-/// }
-///
-/// let pass: Box<dyn LintPass> = Box::new(RustLintPassAdapter::new(MyLint));
-/// pipeline.run(path, &providers, &mut vec![pass])?;
-/// ```
-pub struct RustLintPassAdapter<P: RustLintPass> {
-    inner: P,
-}
-
-impl<P: RustLintPass> RustLintPassAdapter<P> {
-    /// Wraps a `RustLintPass` implementation for use with the pipeline
-    pub fn new(pass: P) -> Self {
-        Self { inner: pass }
-    }
-
-    /// Wraps a rule and boxes it for the plugin boundary
-    ///
-    /// This is what a factory written by whisker-plugin's `export_lints!`
-    /// hands back to whisker: a pass behind a stabby box and a stabby
-    /// vtable, which the host calls without knowing the rule's type.
-    pub fn boxed(pass: P) -> BoxedLintPass
-    where
-        P: 'static,
-    {
-        boxed_lint_pass(Self::new(pass))
-    }
-}
-
-impl<P: RustLintPass> LintPass for RustLintPassAdapter<P> {
-    extern "C" fn language(&self) -> Language {
-        Language::Rust
-    }
-
-    extern "C" fn configure(&mut self, options: &RuleOptions) -> Configured {
-        Panic::catch(|| self.inner.configure(options)).into()
-    }
-
-    extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-        Panic::catch(|| dispatch(&mut self.inner, node))
-            .map(|found| found.into_iter().collect())
-            .into()
-    }
-}
+whisker_types::lint_pass_adapter!(RustLintPassAdapter, RustLintPass, crate::dispatch, Rust);
 
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
-    use whisker_types::{DecoratedTree, Diagnostic, RuleId, Severity};
+    use whisker_types::{
+        DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic, RuleId, RuleOptions,
+        Severity,
+    };
 
     use super::*;
 

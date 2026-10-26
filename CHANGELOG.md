@@ -112,6 +112,11 @@ and this project adheres to
   `Cargo.toml`. A TypeScript file belongs to the project of the
   `tsconfig.json` nearest it, so a repository can hold several, and each file
   reaches only its own project's provider.
+- A language crate builds its lint pass trait with
+  `whisker_codegen::build_language` and defines its adapter with
+  `whisker_types::lint_pass_adapter!`, so the Rust and TypeScript crates share
+  that code and a new language writes it once. ARCHITECTURE.md lists what a
+  new language adds.
 
 - The Linux binaries are built on Ubuntu 22.04, so they need glibc 2.35 rather
   than 2.39. The 2.39 floor refused Ubuntu 22.04 LTS and Debian 12.

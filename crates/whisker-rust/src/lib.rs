@@ -10,7 +10,7 @@ pub use language_fingerprint::LANGUAGE_FINGERPRINT;
 pub use provider::RustDecorationProvider;
 pub use whisker_types::RuleId;
 
-include!(concat!(env!("OUT_DIR"), "/rust_lint_pass.rs"));
+include!(concat!(env!("OUT_DIR"), "/lint_pass.rs"));
 
 /// Returns the tree-sitter language for Rust
 pub fn language() -> tree_sitter::Language {

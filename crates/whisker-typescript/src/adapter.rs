@@ -1,111 +1,20 @@
-use whisker_types::{
-    BoxedLintPass, Checked, Configured, DecoratedNode, Language, LintPass, Panic, RuleOptions,
-    boxed_lint_pass,
-};
+use crate::TypeScriptLintPass;
 
-use crate::{TypeScriptLintPass, dispatch};
-
-/// Bridges a [`TypeScriptLintPass`] into the platform's [`LintPass`] trait
-///
-/// This adapter wraps any implementation of the generated
-/// `TypeScriptLintPass` trait so it can be passed to the whisker-core
-/// pipeline as a `Box<dyn LintPass>`. It names its language as
-/// [`Language::TypeScript`], so the walker hands it TypeScript and TSX
-/// trees and never a tree of another language. The adapter delegates
-/// `check_node` to the generated `dispatch` function, which routes each
-/// node to the appropriate typed method based on its kind.
-///
-/// The adapter is also the plugin's edge. A rule may panic, and a panic
-/// must not unwind into the host. Each call therefore runs under
-/// [`Panic::catch`] and comes back as a value. A rule keeps writing plain
-/// Rust and returning std's `Vec`; the copy into the list that crosses the
-/// boundary happens here.
-///
-/// # Examples
-///
-/// ```ignore
-/// struct MyLint;
-/// impl TypeScriptLintPass for MyLint {
-///     fn check_function_declaration(&mut self, node: &DecoratedNode) -> Vec<Diagnostic> {
-///         // ...
-///     }
-/// }
-///
-/// let pass: Box<dyn LintPass> = Box::new(TypeScriptLintPassAdapter::new(MyLint));
-/// pipeline.run(path, &providers, &mut vec![pass])?;
-/// ```
-pub struct TypeScriptLintPassAdapter<P: TypeScriptLintPass> {
-    inner: P,
-}
-
-impl<P: TypeScriptLintPass> TypeScriptLintPassAdapter<P> {
-    /// Wraps a `TypeScriptLintPass` implementation for use with the pipeline
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use whisker_types::{Language, LintPass};
-    /// use whisker_typescript::{TypeScriptLintPass, TypeScriptLintPassAdapter};
-    ///
-    /// struct Quiet;
-    /// impl TypeScriptLintPass for Quiet {}
-    ///
-    /// let pass = TypeScriptLintPassAdapter::new(Quiet);
-    ///
-    /// assert_eq!(pass.language(), Language::TypeScript);
-    /// ```
-    pub fn new(pass: P) -> Self {
-        Self { inner: pass }
-    }
-
-    /// Wraps a rule and boxes it for the plugin boundary
-    ///
-    /// A factory that whisker-plugin's `export_lints!` writes hands this back
-    /// to whisker. It is a pass behind a stabby box and a stabby vtable, which
-    /// the host calls without knowing the rule's type.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use whisker_types::{Language, LintPass};
-    /// use whisker_typescript::{TypeScriptLintPass, TypeScriptLintPassAdapter};
-    ///
-    /// struct Quiet;
-    /// impl TypeScriptLintPass for Quiet {}
-    ///
-    /// let pass = TypeScriptLintPassAdapter::boxed(Quiet);
-    ///
-    /// assert_eq!(pass.language(), Language::TypeScript);
-    /// ```
-    pub fn boxed(pass: P) -> BoxedLintPass
-    where
-        P: 'static,
-    {
-        boxed_lint_pass(Self::new(pass))
-    }
-}
-
-impl<P: TypeScriptLintPass> LintPass for TypeScriptLintPassAdapter<P> {
-    extern "C" fn language(&self) -> Language {
-        Language::TypeScript
-    }
-
-    extern "C" fn configure(&mut self, options: &RuleOptions) -> Configured {
-        Panic::catch(|| self.inner.configure(options)).into()
-    }
-
-    extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-        Panic::catch(|| dispatch(&mut self.inner, node))
-            .map(|found| found.into_iter().collect())
-            .into()
-    }
-}
+whisker_types::lint_pass_adapter!(
+    TypeScriptLintPassAdapter,
+    TypeScriptLintPass,
+    crate::dispatch,
+    TypeScript
+);
 
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
-    use whisker_types::{DecoratedTree, Diagnostic, RuleId, Severity};
+    use whisker_types::{
+        DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic, RuleId, RuleOptions,
+        Severity,
+    };
 
     use super::*;
 
