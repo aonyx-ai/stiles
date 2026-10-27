@@ -125,7 +125,7 @@ tsrs_ast = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd55
 tsrs_astnav = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
 tsrs_checker = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
 tsrs_compiler = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
-tsrs_core = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
+tsrs_core = { git = "https://github.com/oxc-project/tsrs", rev = "4a61321929d0d62b86c5fb35f15bfa1607e03b50" }
 tsrs_module = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
 tsrs_tsoptions = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
 tsrs_vfs = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
