@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{env, fs, io};
 
@@ -16,8 +17,10 @@ pub const FINGERPRINT_FILE: &str = "visitor_fingerprint.rs";
 /// relative to the crate's manifest directory. The function merges them,
 /// generates `<language>LintPass` and its `dispatch` function into
 /// [`LINT_PASS_FILE`], and writes `VISITOR_FINGERPRINT` into
-/// [`FINGERPRINT_FILE`], both in `OUT_DIR`. It also tells cargo to rerun the
-/// build script when a grammar's file changes.
+/// [`FINGERPRINT_FILE`], both in `OUT_DIR`. It writes the directives that
+/// tell cargo to rerun the build script when a grammar's file changes to
+/// `cargo`. A build script passes its standard output, where cargo reads
+/// them.
 ///
 /// The fingerprint covers the generated code alone. It joins the plugin
 /// handshake through the language crate's `LANGUAGE_FINGERPRINT`. A plugin
@@ -28,21 +31,25 @@ pub const FINGERPRINT_FILE: &str = "visitor_fingerprint.rs";
 ///
 /// Returns an error if cargo did not set `CARGO_MANIFEST_DIR` or `OUT_DIR`,
 /// if a `node-types.json` cannot be read or parsed, or if a generated file
-/// cannot be written.
+/// cannot be written. Returns an error too if `cargo` refuses a directive.
 ///
 /// # Examples
 ///
 /// ```no_run
-/// whisker_codegen::build_language("Rust", &["src/node-types.json"])?;
+/// whisker_codegen::build_language("Rust", &["src/node-types.json"], &mut std::io::stdout())?;
 /// # Ok::<(), std::io::Error>(())
 /// ```
-pub fn build_language(language: &str, node_types: &[&str]) -> io::Result<()> {
+pub fn build_language(
+    language: &str,
+    node_types: &[&str],
+    cargo: &mut impl Write,
+) -> io::Result<()> {
     let manifest_dir = cargo_directory("CARGO_MANIFEST_DIR")?;
     let out_dir = cargo_directory("OUT_DIR")?;
 
     let mut grammars = Vec::with_capacity(node_types.len());
     for relative in node_types {
-        println!("cargo::rerun-if-changed={relative}");
+        writeln!(cargo, "cargo::rerun-if-changed={relative}")?;
         let path = manifest_dir.join(relative);
         let text = fs::read_to_string(&path).map_err(|error| {
             io::Error::new(error.kind(), format!("read {}: {error}", path.display()))

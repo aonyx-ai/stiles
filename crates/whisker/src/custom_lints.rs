@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use anyhow::Context as _;
+use bon::bon;
 use libloading::Library;
 use whisker_core::Lint;
 use whisker_types::plugin::{AbiVersion, LintPassFactory, PluginDeclaration, construct};
@@ -21,6 +22,7 @@ mod handshake;
 mod prebuilt;
 
 pub use abi_tag::AbiTag;
+pub use prebuilt::PrebuiltNotice;
 
 /// The lint passes loaded from the project's configured custom lint crates
 ///
@@ -38,8 +40,13 @@ pub struct CustomLints {
     lints: Vec<LoadedLint>,
 }
 
+#[bon]
 impl CustomLints {
     /// Compiles, loads, and validates every configured custom lint crate
+    ///
+    /// A git source may come from prebuilt libraries. Whatever the reader
+    /// should hear about that lookup goes into `notices`, which the caller
+    /// keeps whether or not the load succeeds.
     ///
     /// # Errors
     ///
@@ -48,14 +55,15 @@ impl CustomLints {
     /// declaration, fails the ABI handshake, or exports no lints. It also
     /// returns one if a lint declares no rule, or if two lints declare one
     /// rule for one language.
-    pub fn load(config: &WhiskerConfig) -> anyhow::Result<Self> {
+    #[builder]
+    pub fn load(config: &WhiskerConfig, notices: &mut Vec<PrebuiltNotice>) -> anyhow::Result<Self> {
         let host = AbiIdentity::host();
         let mut lints = Vec::new();
 
         for Resolved {
             directory,
             contents,
-        } in configured_sources(config, &AbiTag::host())?
+        } in configured_sources(config, &AbiTag::host(), notices)?
         {
             let loaded = match contents {
                 Contents::Sources(locking) => {
@@ -281,7 +289,11 @@ enum Locking {
 /// Returns an error if an entry does not exist, is not a directory, holds
 /// no `Cargo.toml`, cannot be fetched, or resolves to the same directory
 /// as an earlier entry.
-fn configured_sources(config: &WhiskerConfig, tag: &AbiTag) -> anyhow::Result<Vec<Resolved>> {
+fn configured_sources(
+    config: &WhiskerConfig,
+    tag: &AbiTag,
+    notices: &mut Vec<PrebuiltNotice>,
+) -> anyhow::Result<Vec<Resolved>> {
     let mut sources = Vec::new();
     let mut seen = HashSet::new();
 
@@ -291,7 +303,7 @@ fn configured_sources(config: &WhiskerConfig, tag: &AbiTag) -> anyhow::Result<Ve
                 path.resolve(config.root()),
                 Contents::Sources(Locking::Unlocked),
             ),
-            LintSource::Git(git) => resolve_git(git, tag)?,
+            LintSource::Git(git) => resolve_git(git, tag, notices)?,
         };
 
         anyhow::ensure!(
@@ -348,7 +360,11 @@ fn configured_sources(config: &WhiskerConfig, tag: &AbiTag) -> anyhow::Result<Ve
 ///
 /// Returns an error if no cache location can be determined, or if the
 /// source has to be fetched and cannot be.
-fn resolve_git(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<(PathBuf, Contents)> {
+fn resolve_git(
+    source: &GitLintSource,
+    tag: &AbiTag,
+    notices: &mut Vec<PrebuiltNotice>,
+) -> anyhow::Result<(PathBuf, Contents)> {
     if let Some(directory) = prebuilt::cached(source, tag)? {
         return Ok((directory, Contents::Libraries));
     }
@@ -357,7 +373,7 @@ fn resolve_git(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<(PathBuf,
         return Ok((directory, Contents::Sources(Locking::Locked)));
     }
 
-    if let Some(directory) = prebuilt::fetch(source, tag)? {
+    if let Some(directory) = prebuilt::fetch(source, tag, notices)? {
         return Ok((directory, Contents::Libraries));
     }
 
@@ -626,7 +642,7 @@ mod tests {
     }
 
     fn directories(config: &WhiskerConfig) -> anyhow::Result<Vec<PathBuf>> {
-        let sources = configured_sources(config, &AbiTag::host())?;
+        let sources = configured_sources(config, &AbiTag::host(), &mut Vec::new())?;
 
         Ok(sources
             .into_iter()
@@ -743,7 +759,8 @@ mod tests {
         package(root.path(), "no_todo");
         let config = config_with(root.path(), vec![LintPath::new("no_todo")]);
 
-        let sources = configured_sources(&config, &AbiTag::host()).expect("should resolve");
+        let sources =
+            configured_sources(&config, &AbiTag::host(), &mut Vec::new()).expect("should resolve");
 
         assert_eq!(
             sources.first().map(|source| source.contents),
@@ -757,7 +774,11 @@ mod tests {
         let root = tempfile::tempdir().expect("temporary directory should be created");
         let config = config_with(root.path(), Vec::new());
 
-        let lints = CustomLints::load(&config).expect("should load");
+        let lints = CustomLints::load()
+            .config(&config)
+            .notices(&mut Vec::new())
+            .call()
+            .expect("should load");
 
         let passes = lints
             .instantiate(&RuleOptions::default())

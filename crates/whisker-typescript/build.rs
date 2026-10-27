@@ -8,6 +8,7 @@ fn main() {
     whisker_codegen::build_language(
         "TypeScript",
         &["src/typescript-node-types.json", "src/tsx-node-types.json"],
+        &mut std::io::stdout(),
     )
     .expect("failed to generate the TypeScript lint pass");
 }
