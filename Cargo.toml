@@ -121,11 +121,11 @@ tree-sitter-typescript = "0.23"
 # TypeScript 7 checker, so analysis runs in whisker's process with no
 # Node.js or Go toolchain. tsrs publishes no crates, so the crates are
 # pinned to one commit; a bump is a deliberate change to the checker.
-tsrs_astnav = { git = "https://github.com/oxc-project/tsrs", rev = "0d3458e53f914d91865be4a838b4c15464ecfc61" }
-tsrs_compiler = { git = "https://github.com/oxc-project/tsrs", rev = "0d3458e53f914d91865be4a838b4c15464ecfc61" }
-tsrs_core = { git = "https://github.com/oxc-project/tsrs", rev = "0d3458e53f914d91865be4a838b4c15464ecfc61" }
-tsrs_tsoptions = { git = "https://github.com/oxc-project/tsrs", rev = "0d3458e53f914d91865be4a838b4c15464ecfc61" }
-tsrs_vfs = { git = "https://github.com/oxc-project/tsrs", rev = "0d3458e53f914d91865be4a838b4c15464ecfc61" }
+tsrs_astnav = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
+tsrs_compiler = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
+tsrs_core = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
+tsrs_tsoptions = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
+tsrs_vfs = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
 whisker-core = { path = "crates/whisker-core", version = "=0.1.0" }
 whisker-macros = { path = "crates/whisker-macros", version = "=0.1.0" }
 whisker-codegen = { path = "crates/whisker-codegen", version = "=0.1.0" }
