@@ -95,32 +95,32 @@ directory.
 ## failed to load the TypeScript project for analysis
 
 <!--
-what happened. a TypeScript file has no tsconfig.json at or above it, or the
-tsconfig.json it has cannot be read. the cause line names the file or the
-configuration.
-what do I do. give the file a project, install what the configuration extends,
-or exclude the file from whisker.
+what happened. the tsconfig.json above a TypeScript file cannot be read. the
+cause line names the configuration.
+what do I do. install what the configuration extends, or exclude the file from
+whisker.
 why does whisker need one. the checker reads the configuration to know which
 files make up the program and how to type them.
 -->
 
 Whisker checks each TypeScript file as part of the project of the
-`tsconfig.json` nearest it. The cause below the error says what went wrong:
+`tsconfig.json` nearest it, and it could not load that project. The cause
+below the error reads `parse <tsconfig.json>` and names a package. Install
+the project's dependencies, because the configuration extends them.
 
-| Cause                                      | Fix                                                                        |
-| ------------------------------------------ | -------------------------------------------------------------------------- |
-| `discover a TypeScript project for <file>` | Add a `tsconfig.json` above the file, or exclude the file from whisker     |
-| `parse <tsconfig.json>`, naming a package  | Install the project's dependencies, because its configuration extends them |
+A TypeScript file with no `tsconfig.json` above it does not stop the check.
+Whisker reports it as a file no provider covers, below.
 
 To exclude files, add them to the `ignore` patterns in `.config/whisker.toml`.
 
 ## no decoration provider covers this file, so semantic rules cannot run
 
-| Reason                                 | `help:` line                                                                             |
-| -------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Outside the loaded root                | check the file from inside its own project, or exclude it from whisker                   |
-| Nothing loaded reaches it              | reference the file from a source the toolchain already loads, or exclude it from whisker |
-| The toolchain excludes it              | remove the file from the toolchain's exclusion list, or exclude it from whisker          |
-| Text differs from the toolchain's copy | re-run whisker                                                                           |
+| Reason                                 | `help:` line                                                                                                      |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Outside the loaded root                | check the file from inside its own project, or exclude it from whisker                                            |
+| Nothing loaded reaches it              | reference the file from a source the toolchain already loads, or exclude it from whisker                          |
+| The toolchain excludes it              | remove the file from the toolchain's exclusion list, or exclude it from whisker                                   |
+| Text differs from the toolchain's copy | re-run whisker                                                                                                    |
+| No project file above it               | add the project file the toolchain reads, such as tsconfig.json, at or above the file, or exclude it from whisker |
 
 [ignore]: /docs/reference/configuration#ignore

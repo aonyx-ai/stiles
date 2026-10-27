@@ -60,7 +60,18 @@ pub struct TypeScriptDecorationProvider {
 
 impl TypeScriptDecorationProvider {
     /// Identifies this provider in diagnostics
-    const NAME: ProviderName = ProviderName("typescript");
+    ///
+    /// A host that reports a gap for a TypeScript file on the provider's
+    /// behalf, such as a file no project holds, names the provider with it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use whisker_typescript::TypeScriptDecorationProvider;
+    ///
+    /// assert_eq!(TypeScriptDecorationProvider::NAME.0, "typescript");
+    /// ```
+    pub const NAME: ProviderName = ProviderName("typescript");
 
     /// Loads the TypeScript project that holds `path`
     ///

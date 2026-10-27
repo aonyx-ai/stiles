@@ -33,6 +33,12 @@ pub enum CoverageGap {
     /// The text whisker parsed differs from the text the toolchain
     /// analyzed, so byte offsets from one do not address the other
     StaleSource,
+    /// No project file sits at or above the file, so the toolchain has no
+    /// project to analyze it in
+    ///
+    /// A TypeScript file needs a `tsconfig.json` at or above it. A file
+    /// without one reports this gap, and the rest of the run goes on.
+    NoProject,
 }
 
 impl CoverageGap {
@@ -62,6 +68,9 @@ impl CoverageGap {
                 "remove the file from the toolchain's exclusion list, or exclude it from whisker"
             }
             Self::StaleSource => "re-run whisker",
+            Self::NoProject => {
+                "add the project file the toolchain reads, such as tsconfig.json, at or above the file, or exclude it from whisker"
+            }
         }
     }
 }
@@ -87,6 +96,9 @@ impl std::fmt::Display for CoverageGap {
             Self::StaleSource => {
                 f.write_str("the text whisker parsed differs from the text the toolchain analyzed")
             }
+            Self::NoProject => {
+                f.write_str("no project file at or above the file names a project to analyze it in")
+            }
         }
     }
 }
@@ -109,6 +121,18 @@ mod tests {
 
         assert!(message.contains("/ws"), "unexpected message: {message}");
         assert!(message.contains("exclude"), "unexpected message: {message}");
+    }
+
+    #[test]
+    fn display_with_no_project_names_the_missing_project_file() {
+        let gap = CoverageGap::NoProject;
+
+        let message = gap.to_string();
+
+        assert!(
+            message.contains("no project file"),
+            "unexpected message: {message}"
+        );
     }
 
     #[test]
@@ -153,6 +177,7 @@ mod tests {
             CoverageGap::Unreachable { root: root() },
             CoverageGap::ExcludedByToolchain { root: root() },
             CoverageGap::StaleSource,
+            CoverageGap::NoProject,
         ];
 
         for gap in &gaps {
@@ -170,6 +195,15 @@ mod tests {
         let help = gap.help();
 
         assert!(help.contains("exclusion list"), "unexpected help: {help}");
+    }
+
+    #[test]
+    fn help_with_no_project_suggests_a_project_file() {
+        let gap = CoverageGap::NoProject;
+
+        let help = gap.help();
+
+        assert!(help.contains("tsconfig.json"), "unexpected help: {help}");
     }
 
     #[test]
