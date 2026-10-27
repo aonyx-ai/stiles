@@ -51,9 +51,9 @@ flowchart LR
    on a node is the one rules see.
 3. **Execute.** A depth-first walk over the named nodes offers every node
    to every lint pass and collects the diagnostics they return.
-4. **Report.** After the last file, the command renders every diagnostic to
-   stderr with its span, its supporting annotations, and its suggested
-   fixes.
+4. **Report.** After the last file, the command writes every diagnostic to
+   stdout, rendered with its span, its supporting annotations, and its
+   suggested fixes, or as one JSON object per line with `--json`.
 
 The pipeline is synchronous and handles one file at a time. The command
 loads the provider once per run and constructs a fresh set of lint passes

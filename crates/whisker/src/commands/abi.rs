@@ -1,3 +1,4 @@
+use anyhow::Context as _;
 use clawless::prelude::*;
 
 use crate::custom_lints::AbiTag;
@@ -7,8 +8,12 @@ use crate::custom_lints::AbiTag;
 pub struct AbiArgs {}
 
 #[command]
-pub async fn abi(_args: AbiArgs, _context: Context) -> CommandResult {
-    println!("{}", AbiTag::host());
+pub async fn abi(_args: AbiArgs, context: Context) -> CommandResult {
+    context
+        .output()
+        .artifact(AbiTag::host().to_string())
+        .await
+        .context("failed to report the ABI tag")?;
 
     Ok(())
 }

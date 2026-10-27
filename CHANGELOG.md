@@ -12,6 +12,13 @@ and this project adheres to
 
 ### Added
 
+- `--json` writes each diagnostic of `whisker check` as one JSON object per
+  line, with the rule, severity, message, file, byte offsets, line, and
+  column. `whisker abi --json` writes the tag as a JSON string. `--verbose`
+  names each file as whisker checks it, and `--quiet` hides the `help:`
+  lines. All three flags were in the help before, and none of them did
+  anything.
+
 - `DecoratedNode` is `Copy`. A rule reading a node out of the vector that
   `named_children` returns no longer clones borrowed data. The
   plugin ABI tag does not move, so every published archive still loads.
@@ -43,6 +50,10 @@ and this project adheres to
   A directory may also hold a cargo workspace.
 
 ### Changed
+
+- `whisker check` writes its diagnostics and `help:` lines to stdout. Errors
+  stay on stderr. A script that read the report from stderr reads stdout
+  now, and with `--json` stdout holds nothing but JSON.
 
 - The values a plugin exchanges with whisker are laid out by [stabby][stabby]:
   `Diagnostic`, `Span`, `FilePath`, `Location`, `Suggestion`, `RuleId`,
@@ -127,6 +138,10 @@ and this project adheres to
 - Whisker lists its subcommands in a stable order.
 
 ### Removed
+
+- `whisker check` no longer accepts trailing arguments. It discarded them,
+  and the help called them arguments for the analysis pipeline, which
+  takes none.
 
 - Whisker no longer reads `.whisker.toml`. Move it to `.config/whisker.toml`.
   Whisker says nothing about the old name, so a project that misses this runs
