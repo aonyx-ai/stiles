@@ -25,7 +25,7 @@ and this project adheres to
 
 - A pull request that moves a plugin boundary fingerprint without raising
   `ABI_VERSION` fails CI. `crates/whisker-plugin/abi-surface.toml` records
-  the boundary, and `just check-abi` compares it with the record on `main`.
+  the boundary, and `rakko check-abi` compares it with the record on `main`.
 
 - The TypeScript provider records more than the type text. `ResolvedType`
   holds the primitive a type comes down to and the type alias the source

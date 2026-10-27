@@ -2,7 +2,6 @@
 extends: default
 
 ignore: |
-  .flox/cache/*
   docs/node_modules/*
   target/*
 
@@ -11,4 +10,4 @@ rules:
     min-spaces-from-content: 1
   line-length:
     ignore: |
-      .github/workflows/*
+      .github/**

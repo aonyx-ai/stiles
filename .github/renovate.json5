@@ -3,11 +3,6 @@
   extends: ["github>aonyx-ai/renovate-config"],
   packageRules: [
     {
-      matchPackageNames: ["rust"],
-      matchDepTypes: ["toolchain"],
-      schedule: ["on the first day of the month"],
-    },
-    {
       // The tsrs crates come from one repository at one commit, and they
       // build only together. Renovate otherwise opens one pull request per
       // crate, and each one moves a single crate to a commit the others are

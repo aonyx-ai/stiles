@@ -49,13 +49,9 @@ whisker_rust::export_lints![DocSummaryBreak];
 /// the first line of a block is a summary. The caller decides whether what
 /// comes back is a doc line at all.
 fn get_next_doc_line<'a>(node: &DecoratedNode<'a>) -> Option<DecoratedNode<'a>> {
-    let Some(parent) = node.parent() else {
-        return None;
-    };
+    let parent = node.parent()?;
     let lines = parent.named_children();
-    let Some(at) = lines.iter().position(|line| line.id() == node.id()) else {
-        return None;
-    };
+    let at = lines.iter().position(|line| line.id() == node.id())?;
 
     if at > 0 && is_doc_line(&lines[at - 1]) {
         return None;
