@@ -54,7 +54,7 @@ mod fingerprint;
 
 pub use abi_version::AbiVersion;
 pub use declaration::PluginDeclaration;
-pub use factory::{Constructed, Factories, LintPassFactory, Loaded, Plugin, construct, factory};
+pub use factory::{Constructed, ExportedLint, LintPassFactory, Loaded, Plugin, construct, factory};
 pub use fingerprint::stable_fingerprint;
 
 /// The version of the plugin declaration protocol this crate speaks
@@ -75,9 +75,9 @@ pub use fingerprint::stable_fingerprint;
 /// ```
 /// use whisker_types::plugin::{ABI_VERSION, AbiVersion};
 ///
-/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 2 });
+/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 3 });
 /// ```
-pub const ABI_VERSION: AbiVersion = AbiVersion { major: 0, minor: 2 };
+pub const ABI_VERSION: AbiVersion = AbiVersion { major: 0, minor: 3 };
 
 /// A fingerprint of how this crate lays out the plugin boundary
 ///
@@ -136,6 +136,7 @@ pub const TYPES_FINGERPRINT: u64 = stable_fingerprint(&[
     <Panic as IStable>::ID,
     <LintPassFactory as IStable>::ID,
     <Plugin as IStable>::ID,
+    <ExportedLint as IStable>::ID,
     <BoxedLintPass as IStable>::ID,
     <Diagnostic as IStable>::ID,
     <Span as IStable>::ID,

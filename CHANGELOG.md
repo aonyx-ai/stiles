@@ -19,6 +19,10 @@ and this project adheres to
   lines. All three flags were in the help before, and none of them did
   anything.
 
+- `whisker rules` lists the rules the configured lints declare, the languages
+  each runs on, and whether the project's `[rules]` turn it off. With
+  `--json` it writes one object per rule.
+
 - A pull request that moves a plugin boundary fingerprint without raising
   `ABI_VERSION` fails CI. `crates/whisker-plugin/abi-surface.toml` records
   the boundary, and `just check-abi` compares it with the record on `main`.
@@ -58,6 +62,12 @@ and this project adheres to
 - `whisker check` writes its diagnostics and `help:` lines to stdout. Errors
   stay on stderr. A script that read the report from stderr reads stdout
   now, and with `--json` stdout holds nothing but JSON.
+
+- A plugin declares the rules of each lint it exports, not of the whole
+  library, and the plugin ABI moves to 0.3. Rebuild every plugin. Each pass
+  now reads only the options of its own rules. Whisker refuses two lints
+  that declare one rule for one language, a lint that declares no rules,
+  and a diagnostic under a rule its pass did not declare.
 
 - The values a plugin exchanges with whisker are laid out by [stabby][stabby]:
   `Diagnostic`, `Span`, `FilePath`, `Location`, `Suggestion`, `RuleId`,

@@ -101,6 +101,37 @@ impl RuleOptions {
             .map(|candidate| candidate.values().map(str::to_owned).collect())
     }
 
+    /// Returns the part of the table that configures one of `rules`
+    ///
+    /// Whisker hands each pass only the options of the rules it declares,
+    /// so a pass never reads an entry meant for another rule.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use whisker_types::{RuleId, RuleOption, RuleOptions};
+    ///
+    /// let options = RuleOptions::new(vec![
+    ///     RuleOption::new("lint.a".into(), "names".into(), vec!["x".into()]),
+    ///     RuleOption::new("lint.b".into(), "names".into(), vec!["y".into()]),
+    /// ]);
+    ///
+    /// let only_a = options.for_rules(&[RuleId::new("lint.a")]);
+    ///
+    /// assert_eq!(only_a.options().len(), 1);
+    /// assert_eq!(only_a.options()[0].rule(), "lint.a");
+    /// ```
+    pub fn for_rules(&self, rules: &[RuleId]) -> Self {
+        Self {
+            options: self
+                .options
+                .iter()
+                .filter(|option| rules.iter().any(|rule| rule.as_str() == option.rule()))
+                .cloned()
+                .collect(),
+        }
+    }
+
     /// Returns every option in the table
     ///
     /// # Examples
@@ -192,6 +223,33 @@ mod tests {
                 Vec::new(),
             ),
         ])
+    }
+
+    #[test]
+    fn for_rules_with_no_rules_keeps_nothing() {
+        let options = RuleOptions::new(vec![RuleOption::new(
+            "lint.a".into(),
+            "names".into(),
+            Vec::new(),
+        )]);
+
+        let kept = options.for_rules(&[]);
+
+        assert!(kept.options().is_empty());
+    }
+
+    #[test]
+    fn for_rules_keeps_the_options_of_the_named_rules_in_order() {
+        let options = RuleOptions::new(vec![
+            RuleOption::new("lint.a".into(), "first".into(), Vec::new()),
+            RuleOption::new("lint.b".into(), "skipped".into(), Vec::new()),
+            RuleOption::new("lint.a".into(), "second".into(), Vec::new()),
+        ]);
+
+        let kept = options.for_rules(&[RuleId::new("lint.a")]);
+
+        let names: Vec<&str> = kept.options().iter().map(RuleOption::name).collect();
+        assert_eq!(names, ["first", "second"]);
     }
 
     #[test]

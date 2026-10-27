@@ -31,13 +31,12 @@ pub fn write_mismatched_lint_package(directory: &Path, name: &str) {
     .expect("the manifest should be written");
     std::fs::write(
         directory.join("src").join("lib.rs"),
-        r#"use whisker_types::plugin::{AbiVersion, Factories, Loaded, Plugin, PluginDeclaration};
+        r#"use whisker_types::plugin::{AbiVersion, Loaded, Plugin, PluginDeclaration};
 
 /// Exports nothing, because the handshake refuses this library first
 extern "C" fn load() -> Loaded {
     Loaded::Ok(Plugin {
-        factories: Factories::new(),
-        rules: std::iter::empty().collect(),
+        lints: std::iter::empty().collect(),
     })
 }
 

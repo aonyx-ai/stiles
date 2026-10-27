@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 use anyhow::Context as _;
 use clawless::prelude::*;
-use whisker_core::Pipeline;
-use whisker_types::{Diagnostic, LintPass, RuleOptions, UncoveredFile};
+use whisker_core::{Lint, Pipeline};
+use whisker_types::{Diagnostic, RuleOptions, UncoveredFile};
 
 use self::check_outcome::CheckOutcome;
 use self::error_recovery::{ErrorRecovery, Walk};
@@ -51,7 +51,7 @@ pub struct CheckArgs {
 fn create_lint_passes(
     custom_lints: &CustomLints,
     options: &RuleOptions,
-) -> anyhow::Result<Vec<Box<dyn LintPass>>> {
+) -> anyhow::Result<Vec<Lint<'static>>> {
     custom_lints.instantiate(options)
 }
 

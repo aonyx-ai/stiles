@@ -5,8 +5,9 @@ use std::process::{Command, Stdio};
 
 use anyhow::Context as _;
 use libloading::Library;
+use whisker_core::Lint;
 use whisker_types::plugin::{AbiVersion, LintPassFactory, PluginDeclaration, construct};
-use whisker_types::{BoxedLintPass, LintPass, Panic, RuleId, RuleOptions};
+use whisker_types::{BoxedLintPass, Language, LintPass, Panic, RuleId, RuleOptions};
 
 use self::handshake::AbiIdentity;
 use crate::config::{GitLintSource, LintSource, WhiskerConfig};
@@ -34,8 +35,7 @@ pub use abi_tag::AbiTag;
 /// silently does nothing looks exactly like configuration that works, and
 /// `--keep-going` governs per-file walk errors, not a broken setup.
 pub struct CustomLints {
-    factories: Vec<LintPassFactory>,
-    declared: Vec<RuleId>,
+    lints: Vec<LoadedLint>,
 }
 
 impl CustomLints {
@@ -45,11 +45,12 @@ impl CustomLints {
     ///
     /// Returns an error if a configured source cannot be resolved, is
     /// configured twice, fails to build, does not export a plugin
-    /// declaration, fails the ABI handshake, or exports no lints.
+    /// declaration, fails the ABI handshake, or exports no lints. It also
+    /// returns one if a lint declares no rule, or if two lints declare one
+    /// rule for one language.
     pub fn load(config: &WhiskerConfig) -> anyhow::Result<Self> {
         let host = AbiIdentity::host();
-        let mut factories = Vec::new();
-        let mut declared = Vec::new();
+        let mut lints = Vec::new();
 
         for Resolved {
             directory,
@@ -71,26 +72,23 @@ impl CustomLints {
                 }),
             }?;
 
-            factories.extend(loaded.factories);
-            declared.extend(loaded.rules);
+            lints.extend(loaded.lints);
         }
 
-        Ok(Self {
-            factories,
-            declared,
-        })
+        refuse_shared_rules(&lints)?;
+
+        Ok(Self { lints })
     }
 
     /// Constructs one fresh pass per loaded custom lint
     ///
-    /// Every pass runs. A plugin declares the rules it can report, not
-    /// which pass reports which, so a rule a project turned off is
-    /// dropped from the report rather than never looked for.
+    /// Every pass runs, and a rule a project turned off is dropped from the
+    /// report rather than never looked for. One pass may report several
+    /// rules, and only some of them may be off.
     ///
-    /// Every pass is configured before it is returned, and each one gets
-    /// the whole table for the same reason: whisker cannot tell which of
-    /// a plugin's rules a given pass reports, so the pass reads its own
-    /// entry.
+    /// Every pass is configured before it is returned. Each one reads only
+    /// the options of the rules it declares, so a pass never sees an entry
+    /// meant for another rule. The walk holds each pass to those rules.
     ///
     /// # Errors
     ///
@@ -98,16 +96,17 @@ impl CustomLints {
     /// it reads the table. The plugin caught the panic at its boundary and
     /// handed it back. A pass that cannot be built or configured is a
     /// broken setup rather than a file to skip.
-    pub fn instantiate(&self, options: &RuleOptions) -> anyhow::Result<Vec<Box<dyn LintPass>>> {
-        self.factories
+    pub fn instantiate(&self, options: &RuleOptions) -> anyhow::Result<Vec<Lint<'static>>> {
+        self.lints
             .iter()
-            .map(|factory| {
-                let constructed: Result<BoxedLintPass, Panic> = construct(factory).into();
+            .map(|lint| {
+                let constructed: Result<BoxedLintPass, Panic> = construct(&lint.factory).into();
                 let pass = constructed.context("a lint pass panicked while it was constructed")?;
                 let mut pass: Box<dyn LintPass> = Box::new(pass);
-                let configured: Result<(), Panic> = pass.configure(options).into();
+                let configured: Result<(), Panic> =
+                    pass.configure(&options.for_rules(&lint.rules)).into();
                 configured.context("a lint pass panicked while reading the project's options")?;
-                Ok(pass)
+                Ok(Lint::new(pass, lint.rules.clone()))
             })
             .collect()
     }
@@ -119,15 +118,89 @@ impl CustomLints {
     /// single file, and a name matching none of them is a mistake it can
     /// report rather than a filter that quietly admits everything.
     ///
-    /// A plugin declares the rules of the whole library, not of one pass.
-    /// That is enough to refuse a name nothing reports, and not enough to
-    /// hand one pass the options meant for it.
     pub fn declared(&self) -> BTreeSet<String> {
-        self.declared
+        self.lints
             .iter()
+            .flat_map(|lint| &lint.rules)
             .map(|rule| rule.as_str().to_owned())
             .collect()
     }
+
+    /// Returns every declared rule with the languages it runs on, by name
+    ///
+    /// One rule may run on several languages, each through a lint of its
+    /// own, so a rule appears once with every language it covers.
+    pub fn rules(&self) -> Vec<DeclaredRule> {
+        let mut rules: Vec<DeclaredRule> = Vec::new();
+
+        for lint in &self.lints {
+            for rule in &lint.rules {
+                match rules.iter_mut().find(|known| known.rule == *rule) {
+                    Some(known) => known.languages.push(lint.language),
+                    None => rules.push(DeclaredRule {
+                        rule: *rule,
+                        languages: vec![lint.language],
+                    }),
+                }
+            }
+        }
+
+        rules.sort_by(|one, other| one.rule.as_str().cmp(other.rule.as_str()));
+        rules
+    }
+}
+
+/// A rule a loaded plugin declares, and the languages it runs on
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub struct DeclaredRule {
+    /// The rule's id
+    pub rule: RuleId,
+    /// The languages a lint reports the rule on, in load order
+    pub languages: Vec<Language>,
+}
+
+/// One lint a plugin exported, as whisker keeps it
+///
+/// The library it came from stays with it, so an error about the lint can
+/// say where to look.
+struct LoadedLint {
+    factory: LintPassFactory,
+    language: Language,
+    rules: Vec<RuleId>,
+    library: PathBuf,
+}
+
+/// Refuses two lints that declare one rule for one language
+///
+/// Whisker routes options, switches, and listings by rule id and language.
+/// Two lints under one id on one language would split each of those
+/// between them, and the cause is almost always a rule copied and renamed
+/// in one place only. The check spans every plugin, because two
+/// repositories of rules can collide as easily as one.
+///
+/// # Errors
+///
+/// Returns an error that names the rule, the language, and both libraries.
+fn refuse_shared_rules(lints: &[LoadedLint]) -> anyhow::Result<()> {
+    for (index, lint) in lints.iter().enumerate() {
+        for other in &lints[index + 1..] {
+            if lint.language != other.language {
+                continue;
+            }
+            let Some(shared) = lint.rules.iter().find(|rule| other.rules.contains(rule)) else {
+                continue;
+            };
+            anyhow::bail!(
+                "two lints declare `{shared}` for {}: one in {}, one in {}. A rule id names one \
+                 lint per language, so rename one of them",
+                lint.language,
+                lint.library.display(),
+                other.library.display(),
+            );
+        }
+    }
+
+    Ok(())
 }
 
 /// A resolved lint source, ready to load
@@ -340,8 +413,7 @@ fn load_libraries(libraries: &[PathBuf], host: &AbiIdentity) -> anyhow::Result<L
     for library in libraries {
         let loaded = load_library(library, host)
             .with_context(|| format!("failed to load {}", library.display()))?;
-        all.factories.extend(loaded.factories);
-        all.rules.extend(loaded.rules);
+        all.lints.extend(loaded.lints);
     }
 
     Ok(all)
@@ -350,8 +422,7 @@ fn load_libraries(libraries: &[PathBuf], host: &AbiIdentity) -> anyhow::Result<L
 /// What one library, or a directory of them, contributed
 #[derive(Default)]
 struct Loaded {
-    factories: Vec<LintPassFactory>,
-    rules: Vec<RuleId>,
+    lints: Vec<LoadedLint>,
 }
 
 /// Compiles the packages at `directory` and returns every library built
@@ -440,13 +511,13 @@ fn build(
 /// declaration, fails the ABI handshake, or exports no lints.
 ///
 /// [`RuleId`]: whisker_types::RuleId
-fn load_library(library: &Path, host: &AbiIdentity) -> anyhow::Result<Loaded> {
+fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loaded> {
     // SAFETY: opening a library runs its initializers, which is unsound
     // for any library whose initializers are. Whisker opens only what a
     // project's configuration names, which the project already trusts to
     // run as a lint.
-    let library = unsafe { Library::new(library) }
-        .with_context(|| format!("failed to open {}", library.display()))?;
+    let library = unsafe { Library::new(library_path) }
+        .with_context(|| format!("failed to open {}", library_path.display()))?;
 
     let declaration =
         // SAFETY: the symbol's type is checked before the value is used.
@@ -486,18 +557,31 @@ fn load_library(library: &Path, host: &AbiIdentity) -> anyhow::Result<Loaded> {
     let load = unsafe { (&raw const (*declaration).load).read() };
     let loaded: Result<_, Panic> = load().into();
     let loaded = loaded.context("the plugin panicked while listing what it exports")?;
-    let factories: Vec<LintPassFactory> = loaded.factories.into_iter().collect();
-    let rules: Vec<RuleId> = loaded.rules.into_iter().collect();
+    let lints: Vec<LoadedLint> = loaded
+        .lints
+        .into_iter()
+        .map(|lint| LoadedLint {
+            factory: lint.factory,
+            language: lint.language,
+            rules: lint.rules.into_iter().collect(),
+            library: library_path.to_path_buf(),
+        })
+        .collect();
 
     anyhow::ensure!(
-        !factories.is_empty(),
+        !lints.is_empty(),
         "the plugin exported no lints; a plugin that does nothing looks exactly like one that \
          works, so this is treated as a mistake"
+    );
+    anyhow::ensure!(
+        lints.iter().all(|lint| !lint.rules.is_empty()),
+        "the plugin exported a lint that declares no rules; whisker refuses every diagnostic \
+         such a lint reports, so give it a `DeclaresRules` implementation that names them"
     );
 
     std::mem::forget(library);
 
-    Ok(Loaded { factories, rules })
+    Ok(Loaded { lints })
 }
 
 /// Reads the protocol version at the head of a plugin declaration
@@ -679,21 +763,92 @@ mod tests {
         assert!(passes.is_empty());
     }
 
+    /// Describes a lint whose factory is never called
+    fn loaded_lint(language: Language, rules: &[&'static str], library: &str) -> LoadedLint {
+        LoadedLint {
+            factory: whisker_types::plugin::factory(|| {
+                Panic::catch(|| -> BoxedLintPass { unreachable!("never built") }).into()
+            }),
+            language,
+            rules: rules.iter().map(|rule| RuleId::new(rule)).collect(),
+            library: PathBuf::from(library),
+        }
+    }
+
+    #[test]
+    fn refuse_shared_rules_with_one_rule_on_two_languages_succeeds() {
+        let lints = [
+            loaded_lint(Language::Rust, &["lint.a"], "rust.so"),
+            loaded_lint(Language::TypeScript, &["lint.a"], "typescript.so"),
+        ];
+
+        let refused = refuse_shared_rules(&lints);
+
+        assert!(refused.is_ok());
+    }
+
+    #[test]
+    fn refuse_shared_rules_with_one_rule_twice_on_one_language_names_both_libraries() {
+        let lints = [
+            loaded_lint(Language::Rust, &["lint.a", "lint.b"], "first.so"),
+            loaded_lint(Language::Rust, &["lint.b"], "second.so"),
+        ];
+
+        let error = refuse_shared_rules(&lints).expect_err("should refuse");
+
+        let message = error.to_string();
+        assert!(message.contains("`lint.b`"), "{message}");
+        assert!(message.contains("first.so"), "{message}");
+        assert!(message.contains("second.so"), "{message}");
+    }
+
+    #[test]
+    fn rules_lists_each_rule_once_with_its_languages() {
+        let lints = CustomLints {
+            lints: vec![
+                loaded_lint(Language::Rust, &["lint.b", "lint.a"], "rust.so"),
+                loaded_lint(Language::TypeScript, &["lint.a"], "typescript.so"),
+            ],
+        };
+
+        let rules = lints.rules();
+
+        assert_eq!(
+            rules,
+            [
+                DeclaredRule {
+                    rule: RuleId::new("lint.a"),
+                    languages: vec![Language::Rust, Language::TypeScript],
+                },
+                DeclaredRule {
+                    rule: RuleId::new("lint.b"),
+                    languages: vec![Language::Rust],
+                },
+            ]
+        );
+    }
+
     #[test]
     fn trait_send() {
         fn assert_send<T: Send>() {}
         assert_send::<CustomLints>();
+        assert_send::<DeclaredRule>();
+        assert_send::<LoadedLint>();
     }
 
     #[test]
     fn trait_sync() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<CustomLints>();
+        assert_sync::<DeclaredRule>();
+        assert_sync::<LoadedLint>();
     }
 
     #[test]
     fn trait_unpin() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<CustomLints>();
+        assert_unpin::<DeclaredRule>();
+        assert_unpin::<LoadedLint>();
     }
 }

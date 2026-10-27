@@ -1,8 +1,33 @@
-use whisker_types::{DecoratedNode, DecoratedTree, Diagnostic, LintPass, Panic};
+use whisker_types::{
+    Checked, Configured, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, RuleOptions,
+};
 
-use crate::PassPanic;
+use crate::Lint;
 
 /// Walks a decorated syntax tree and collects diagnostics from lint passes
+///
+/// This is [`walk_lints`] for passes that no plugin declared, such as a
+/// rule's own tests run. It accepts any rule a pass reports.
+///
+/// # Errors
+///
+/// Returns a [`PassPanic`] when a pass panics, naming the node it was
+/// checking. The walk stops there, for the reason that type gives.
+///
+/// [`PassPanic`]: crate::PassPanic
+pub fn walk(
+    tree: &DecoratedTree,
+    passes: &mut [Box<dyn LintPass>],
+) -> anyhow::Result<Vec<Diagnostic>> {
+    let mut lints: Vec<Lint<'_>> = passes
+        .iter_mut()
+        .map(|pass| Lint::unchecked(Box::new(BorrowedPass(pass))))
+        .collect();
+
+    walk_lints(tree, &mut lints)
+}
+
+/// Walks a decorated syntax tree and collects diagnostics from lints
 ///
 /// Performs a depth-first traversal of all named nodes, calling each lint
 /// pass for every node visited. Only the passes whose language is the
@@ -11,35 +36,55 @@ use crate::PassPanic;
 /// # Errors
 ///
 /// Returns a [`PassPanic`] when a pass panics, naming the node it was
-/// checking. The walk stops there, for the reason that type gives.
-pub fn walk(
-    tree: &DecoratedTree,
-    passes: &mut [Box<dyn LintPass>],
-) -> Result<Vec<Diagnostic>, PassPanic> {
-    let mut passes: Vec<&mut Box<dyn LintPass>> = passes
+/// checking, and an [`UndeclaredRule`] when a pass reports a rule its
+/// plugin did not declare for it. The walk stops at either one, for the
+/// reasons those types give.
+///
+/// [`PassPanic`]: crate::PassPanic
+/// [`UndeclaredRule`]: crate::UndeclaredRule
+pub fn walk_lints(tree: &DecoratedTree, lints: &mut [Lint<'_>]) -> anyhow::Result<Vec<Diagnostic>> {
+    let mut lints: Vec<&mut Lint<'_>> = lints
         .iter_mut()
-        .filter(|pass| pass.language() == tree.language())
+        .filter(|lint| lint.language() == tree.language())
         .collect();
     let mut diagnostics = Vec::new();
-    visit_node(&tree.root_node(), &mut passes, &mut diagnostics)?;
+    visit_node(&tree.root_node(), &mut lints, &mut diagnostics)?;
     Ok(diagnostics)
+}
+
+/// Lends a caller's pass to [`walk`]
+///
+/// A [`Lint`] owns a box, and the caller of `walk` keeps its passes, so
+/// this forwards each call to the borrowed one.
+struct BorrowedPass<'pass>(&'pass mut Box<dyn LintPass>);
+
+impl LintPass for BorrowedPass<'_> {
+    extern "C" fn language(&self) -> Language {
+        self.0.language()
+    }
+
+    extern "C" fn configure(&mut self, options: &RuleOptions) -> Configured {
+        self.0.configure(options)
+    }
+
+    extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+        self.0.check_node(node)
+    }
 }
 
 fn visit_node(
     node: &DecoratedNode<'_>,
-    passes: &mut [&mut Box<dyn LintPass>],
+    lints: &mut [&mut Lint<'_>],
     diagnostics: &mut Vec<Diagnostic>,
-) -> Result<(), PassPanic> {
+) -> anyhow::Result<()> {
     if node.is_named() {
-        for pass in passes.iter_mut() {
-            let checked: Result<_, Panic> = pass.check_node(node).into();
-            let found = checked.map_err(|panic| PassPanic::new(node.kind(), node.span(), panic))?;
-            diagnostics.extend(found);
+        for lint in lints.iter_mut() {
+            diagnostics.extend(lint.check_node(node)?);
         }
     }
 
     for child in node.named_children() {
-        visit_node(&child, passes, diagnostics)?;
+        visit_node(&child, lints, diagnostics)?;
     }
 
     Ok(())
@@ -52,9 +97,18 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use stabby::vec;
-    use whisker_types::{Checked, Configured, DecoratedTree, Language, RuleOptions};
+    use whisker_types::{Panic, RuleId};
 
     use super::*;
+    use crate::{PassPanic, UndeclaredRule};
+
+    /// Pairs `pass` with the rules it may report
+    fn lint(pass: impl LintPass + 'static, rules: &[&'static str]) -> Lint<'static> {
+        Lint::new(
+            Box::new(pass),
+            rules.iter().map(|rule| RuleId::new(rule)).collect(),
+        )
+    }
 
     fn parse_rust(source: &str) -> DecoratedTree {
         let mut parser = tree_sitter::Parser::new();
@@ -91,13 +145,13 @@ mod tests {
     }
 
     impl NodeCounter {
-        fn boxed(language: Language) -> (Box<dyn LintPass>, Arc<AtomicUsize>) {
+        fn boxed(language: Language) -> (Lint<'static>, Arc<AtomicUsize>) {
             let visited = Arc::new(AtomicUsize::new(0));
             let pass = Self {
                 language,
                 visited: Arc::clone(&visited),
             };
-            (Box::new(pass), visited)
+            (lint(pass, &[]), visited)
         }
     }
 
@@ -114,6 +168,24 @@ mod tests {
             self.visited.fetch_add(1, Ordering::Relaxed);
             Checked::Ok(vec::Vec::new())
         }
+    }
+
+    #[test]
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<BorrowedPass<'_>>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<BorrowedPass<'_>>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<BorrowedPass<'_>>();
     }
 
     #[test]
@@ -145,8 +217,8 @@ mod tests {
 
         COUNT.store(0, Ordering::Relaxed);
         let tree = parse_rust("fn main() {}");
-        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(Counter)];
-        walk(&tree, &mut passes).expect("should walk");
+        let mut passes = vec![lint(Counter, &[])];
+        walk_lints(&tree, &mut passes).expect("should walk");
 
         assert!(COUNT.load(Ordering::Relaxed) > 0);
     }
@@ -154,8 +226,8 @@ mod tests {
     #[test]
     fn walk_on_empty_source_returns_empty() {
         let tree = parse_rust("");
-        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(CounterPass(0))];
-        let diagnostics = walk(&tree, &mut passes).expect("should walk");
+        let mut passes = vec![lint(CounterPass(0), &[])];
+        let diagnostics = walk_lints(&tree, &mut passes).expect("should walk");
         assert!(diagnostics.is_empty());
     }
 
@@ -197,8 +269,8 @@ mod tests {
 
         NESTED_COUNT.store(0, Ordering::Relaxed);
         let tree = parse_rust("fn main() { let x = 1; }");
-        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(KindCounter)];
-        walk(&tree, &mut passes).expect("should walk");
+        let mut passes = vec![lint(KindCounter, &[])];
+        walk_lints(&tree, &mut passes).expect("should walk");
 
         let count = NESTED_COUNT.load(Ordering::Relaxed);
         assert!(count > 1, "should visit multiple nested nodes, got {count}");
@@ -226,8 +298,8 @@ mod tests {
 
         DEEP_COUNT.store(0, Ordering::Relaxed);
         let tree = parse_rust("fn f() { if true { if true { if true { let x = 1; } } } }");
-        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(DepthCounter)];
-        walk(&tree, &mut passes).expect("should walk");
+        let mut passes = vec![lint(DepthCounter, &[])];
+        walk_lints(&tree, &mut passes).expect("should walk");
 
         let count = DEEP_COUNT.load(Ordering::Relaxed);
         assert!(
@@ -277,8 +349,8 @@ mod tests {
         PASS_B.store(0, Ordering::Relaxed);
 
         let tree = parse_rust("fn a() {} fn b() {}");
-        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(CounterA), Box::new(CounterB)];
-        walk(&tree, &mut passes).expect("should walk");
+        let mut passes = vec![lint(CounterA, &[]), lint(CounterB, &[])];
+        walk_lints(&tree, &mut passes).expect("should walk");
 
         let a = PASS_A.load(Ordering::Relaxed);
         let b = PASS_B.load(Ordering::Relaxed);
@@ -293,7 +365,7 @@ mod tests {
         let tree = parse_rust("fn a() {}");
         let mut passes = vec![rust, typescript];
 
-        walk(&tree, &mut passes).expect("should walk");
+        walk_lints(&tree, &mut passes).expect("should walk");
 
         assert!(rust_visited.load(Ordering::Relaxed) > 0);
         assert_eq!(typescript_visited.load(Ordering::Relaxed), 0);
@@ -306,7 +378,7 @@ mod tests {
         let tree = parse_typescript("function a(): void {}");
         let mut passes = vec![rust, typescript];
 
-        walk(&tree, &mut passes).expect("should walk");
+        walk_lints(&tree, &mut passes).expect("should walk");
 
         assert_eq!(rust_visited.load(Ordering::Relaxed), 0);
         assert!(typescript_visited.load(Ordering::Relaxed) > 0);
@@ -341,9 +413,11 @@ mod tests {
         }
 
         let tree = parse_rust("fn main() {}");
-        let mut passes: Vec<Box<dyn LintPass>> =
-            vec![Box::new(WarnOnFn("pass.a")), Box::new(WarnOnFn("pass.b"))];
-        let diagnostics = walk(&tree, &mut passes).expect("should walk");
+        let mut passes = vec![
+            lint(WarnOnFn("pass.a"), &["pass.a"]),
+            lint(WarnOnFn("pass.b"), &["pass.b"]),
+        ];
+        let diagnostics = walk_lints(&tree, &mut passes).expect("should walk");
 
         assert_eq!(diagnostics.len(), 2);
         assert_eq!(diagnostics[0].rule_id(), RuleId::new("pass.a"));
@@ -380,8 +454,8 @@ mod tests {
 
         let source = "fn main() { let x = 42; }";
         let tree = parse_rust(source);
-        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(SpanChecker)];
-        let diagnostics = walk(&tree, &mut passes).expect("should walk");
+        let mut passes = vec![lint(SpanChecker, &["test"])];
+        let diagnostics = walk_lints(&tree, &mut passes).expect("should walk");
 
         for diag in &diagnostics {
             assert!(diag.span().start() <= diag.span().end());
@@ -438,14 +512,61 @@ mod tests {
 
         AFTER_PANIC.store(0, Ordering::Relaxed);
         let tree = parse_rust("fn main() { let x = 1; }");
-        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(PanicOnFn), Box::new(CountAfter)];
+        let mut passes = vec![lint(PanicOnFn, &[]), lint(CountAfter, &[])];
 
-        let error = walk(&tree, &mut passes).expect_err("the panic should end the walk");
+        let error = walk_lints(&tree, &mut passes).expect_err("the panic should end the walk");
 
+        let error = error
+            .downcast_ref::<PassPanic>()
+            .expect("should be a PassPanic");
         assert_eq!(error.kind(), "function_item");
         assert_eq!(error.span().start(), 0);
         assert_eq!(error.panic().message(), "no functions");
         assert_eq!(AFTER_PANIC.load(Ordering::Relaxed), 1);
+    }
+
+    /// A rule outside the pass's declaration stops the walk and names itself
+    ///
+    /// The diagnostic would otherwise slip past every switch and option a
+    /// project sets by rule id.
+    #[test]
+    fn walk_with_an_undeclared_rule_stops_and_names_it() {
+        use whisker_types::Severity;
+
+        struct Mislabeled;
+        impl LintPass for Mislabeled {
+            extern "C" fn language(&self) -> Language {
+                Language::Rust
+            }
+
+            extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+                Configured::Ok(())
+            }
+
+            extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+                let found = match node.kind() == "function_item" {
+                    true => vec![Diagnostic::new(
+                        RuleId::new("pass.copied"),
+                        Severity::Warn,
+                        "found fn".into(),
+                        node.span(),
+                    )],
+                    false => Vec::new(),
+                };
+                Checked::Ok(found.into_iter().collect())
+            }
+        }
+
+        let tree = parse_rust("fn main() {}");
+        let mut passes = vec![lint(Mislabeled, &["pass.declared"])];
+
+        let error = walk_lints(&tree, &mut passes).expect_err("the stray rule should end the walk");
+
+        let error = error
+            .downcast_ref::<UndeclaredRule>()
+            .expect("should be an UndeclaredRule");
+        assert_eq!(error.rule(), RuleId::new("pass.copied"));
+        assert_eq!(error.span().start(), 0);
     }
 
     mod prop {
@@ -497,14 +618,13 @@ mod tests {
 
                 let tree = parse_rust(&source);
 
-                let mut single_pass: Vec<Box<dyn LintPass>> =
-                    vec![Box::new(CountAll)];
-                let single_count = walk(&tree, &mut single_pass).expect("should walk").len();
+                let mut single_pass = vec![lint(CountAll, &["test"])];
+                let single_count = walk_lints(&tree, &mut single_pass).expect("should walk").len();
 
-                let mut multi_passes: Vec<Box<dyn LintPass>> = (0..num_passes)
-                    .map(|_| Box::new(CountAll) as Box<dyn LintPass>)
+                let mut multi_passes: Vec<Lint<'static>> = (0..num_passes)
+                    .map(|_| lint(CountAll, &["test"]))
                     .collect();
-                let multi_count = walk(&tree, &mut multi_passes).expect("should walk").len();
+                let multi_count = walk_lints(&tree, &mut multi_passes).expect("should walk").len();
 
                 prop_assert_eq!(multi_count, single_count * num_passes);
             }

@@ -230,13 +230,18 @@ reads. `enable` and `disable` filter the diagnostics that reach the
 report. `[rules.options."<rule>"]` holds the options that rule reads, each
 a list of names.
 
-Whisker hands the whole table to every pass. A plugin declares the rules
-of the library, not of one pass, so whisker cannot tell which pass reports
-which rule and cannot cut the table down before it hands it over. A pass
-looks its own entry up under the id it already holds as a constant. That
-is also why an option name is never checked: nothing declares the options
-a rule reads. A rule name is checked, against the same declared set that
-`enable` and `disable` are checked against.
+A plugin declares the rules of each lint it exports, with the language
+the lint runs on. Whisker therefore hands each pass only the options of
+its own rules. An option name is never checked, because nothing declares
+the options a rule reads. A rule name is checked, against the same
+declared set that `enable` and `disable` are checked against.
+
+The declaration is also a promise that whisker holds a pass to. Two lints
+that declare one rule for one language are refused at load, across every
+plugin. A pass that reports a rule it did not declare ends the run, the
+way a panic does, because that diagnostic would slip past every switch
+and option a project sets by rule id. `whisker rules` lists what the
+loaded plugins declare.
 
 ## Prebuilt lints
 
@@ -312,8 +317,8 @@ version through a raw pointer, and only a matching version licenses a
 reference to the whole struct. It then compares two fingerprints: one for
 whisker-types and one that whisker-plugin joins from every language crate.
 The first mismatch refuses the library with an error that says what to
-rebuild. Only then does the loader ask the plugin for its factories and its
-rules.
+rebuild. Only then does the loader ask the plugin for its lints: a factory,
+a language, and the declared rules of each.
 
 The handshake guards against silence. A plugin built against drifted
 source would mostly work, and rules fail open, so a wrong answer would
@@ -387,7 +392,7 @@ strategy. Every allocation that crosses is stabby's and carries the
 function that frees it, so a plugin may set its own `#[global_allocator]`.
 
 The loader keeps every library loaded for the life of the process. The
-factories a plugin hands over and every `RuleId` it mints point into the
+lints a plugin hands over and every `RuleId` it mints point into the
 library's image.
 
 ## Workspace layout

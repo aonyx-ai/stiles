@@ -16,7 +16,12 @@
 /// decides the adapter that bridges a lint to [`LintPass`], and so the
 /// language whisker runs it on. One type may appear in more than one
 /// group: a rule that reads only comments can implement several language
-/// traits and run on each. The rule names it declares are reported once.
+/// traits and run on each.
+///
+/// Each lint carries the language of its group and the rule names its
+/// [`DeclaresRules`] implementation returns. Whisker refuses two lints that
+/// declare one rule for one language, and it ends a run in which a pass
+/// reports a rule it did not declare.
 ///
 /// The macro writes the `whisker_plugin_declaration` static that whisker's
 /// loader looks up, filling in the handshake constants of the whisker
@@ -31,6 +36,7 @@
 /// the listing of the factories, or in a rule's declaration. It comes back
 /// to whisker as a value rather than unwinding across the boundary.
 ///
+/// [`DeclaresRules`]: crate::DeclaresRules
 /// [`LintPass`]: whisker_types::LintPass
 /// [`Panic::catch`]: crate::Panic::catch
 /// [`RustLintPass`]: whisker_rust::RustLintPass
@@ -51,25 +57,34 @@ macro_rules! export_lints {
         #[doc(hidden)]
         extern "C" fn __whisker_load() -> $crate::Loaded {
             $crate::Panic::catch(|| {
-                let mut factories = $crate::Factories::new();
-                let mut rules = ::std::vec::Vec::new();
+                let mut lints = ::std::vec::Vec::new();
                 $($(
-                    factories.push($crate::factory(|| {
-                        $crate::Panic::catch(|| $crate::__adapter!($language)($lint)).into()
-                    }));
-                    for rule in $crate::DeclaresRules::rules(&$lint) {
-                        if !rules.contains(&rule) {
-                            rules.push(rule);
-                        }
-                    }
+                    lints.push($crate::ExportedLint {
+                        factory: $crate::factory(|| {
+                            $crate::Panic::catch(|| $crate::__adapter!($language)($lint)).into()
+                        }),
+                        language: $crate::__language!($language),
+                        rules: $crate::DeclaresRules::rules(&$lint).into_iter().collect(),
+                    });
                 )+)+
                 $crate::Plugin {
-                    factories,
-                    rules: rules.into_iter().collect(),
+                    lints: lints.into_iter().collect(),
                 }
             })
             .into()
         }
+    };
+}
+
+/// Names the language of one group
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __language {
+    (rust) => {
+        $crate::Language::Rust
+    };
+    (typescript) => {
+        $crate::Language::TypeScript
     };
 }
 
@@ -178,7 +193,7 @@ mod tests {
     }
 
     fn built(index: usize) -> BoxedLintPass {
-        let constructed: Result<_, Panic> = loaded().factories[index].call().into();
+        let constructed: Result<_, Panic> = loaded().lints[index].factory.call().into();
 
         constructed.expect("construction should not panic")
     }
@@ -244,19 +259,46 @@ mod tests {
     }
 
     #[test]
-    fn load_yields_each_declared_rule_once_in_order() {
-        let rules = loaded().rules;
+    fn load_carries_the_rules_of_each_lint() {
+        let lints = loaded().lints;
 
-        assert_eq!(rules.len(), 3);
-        assert_eq!(rules[0], RuleId::new("test.flag-every-function"));
-        assert_eq!(rules[1], RuleId::new("test.flag-every-comment"));
-        assert_eq!(rules[2], RuleId::new("test.quiet"));
+        let rules: Vec<Vec<RuleId>> = lints
+            .iter()
+            .map(|lint| lint.rules.iter().copied().collect())
+            .collect();
+
+        assert_eq!(
+            rules,
+            [
+                vec![RuleId::new("test.flag-every-function")],
+                vec![RuleId::new("test.flag-every-comment")],
+                vec![RuleId::new("test.flag-every-comment")],
+                vec![RuleId::new("test.quiet")],
+            ]
+        );
     }
 
     #[test]
-    fn load_yields_one_factory_per_listed_lint() {
-        let factories = loaded().factories;
+    fn load_tags_each_lint_with_its_group_language() {
+        let lints = loaded().lints;
 
-        assert_eq!(factories.len(), 4);
+        let languages: Vec<Language> = lints.iter().map(|lint| lint.language).collect();
+
+        assert_eq!(
+            languages,
+            [
+                Language::Rust,
+                Language::Rust,
+                Language::TypeScript,
+                Language::TypeScript
+            ]
+        );
+    }
+
+    #[test]
+    fn load_yields_one_lint_per_listed_entry() {
+        let lints = loaded().lints;
+
+        assert_eq!(lints.len(), 4);
     }
 }

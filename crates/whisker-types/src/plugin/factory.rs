@@ -1,6 +1,6 @@
 use stabby::{result, vec};
 
-use crate::{BoxedLintPass, Panic, RuleId};
+use crate::{BoxedLintPass, Language, Panic, RuleId};
 
 /// Constructs one fresh lint pass
 ///
@@ -16,12 +16,6 @@ pub type LintPassFactory =
 
 /// What a [`LintPassFactory`] hands back: a pass, or the panic that stopped it
 pub type Constructed = result::Result<BoxedLintPass, Panic>;
-
-/// Every factory a plugin exports, in the order it named its lints
-///
-/// The list is stabby's, because the plugin allocates it and whisker
-/// frees it.
-pub type Factories = vec::Vec<LintPassFactory>;
 
 /// Returns the factory that runs `build`
 ///
@@ -43,24 +37,41 @@ pub fn construct(factory: &LintPassFactory) -> Constructed {
     factory.call()
 }
 
-/// Everything a plugin exports, handed over in one call
+/// One lint a plugin exports, described before it is built
 ///
-/// The factories and the rule list travel together, because building
-/// either runs plugin code and one call is the whole boundary. A plugin
-/// that gains something else to declare puts it here rather than on a
-/// second function.
+/// Whisker reads the language and the rules without running the factory.
+/// It knows every rule of every loaded plugin before the first file, so it
+/// can refuse a configured rule name that nothing reports, list the rules,
+/// and refuse two lints that report one rule on one language. The walk
+/// also holds each pass to its own rules: a diagnostic under any other id
+/// ends the run.
 #[stabby::stabby]
-pub struct Plugin {
-    /// A factory for every lint the plugin exports
-    pub factories: Factories,
+pub struct ExportedLint {
+    /// Builds a fresh pass of the lint
+    pub factory: LintPassFactory,
 
-    /// Every rule the plugin can report
+    /// The language whose trees the pass inspects
+    pub language: Language,
+
+    /// Every rule the pass can report
     ///
     /// A project names the rules it runs, and whisker refuses a name that
-    /// no loaded plugin declares. A misspelled name would otherwise
-    /// disable nothing and report nothing, which reads like a rule that
-    /// found no fault.
+    /// no loaded lint declares. A misspelled name would otherwise disable
+    /// nothing and report nothing, which reads like a rule that found no
+    /// fault.
     pub rules: vec::Vec<RuleId>,
+}
+
+/// Everything a plugin exports, handed over in one call
+///
+/// Building the list runs plugin code, and one call is the whole
+/// boundary. A plugin that gains something else to declare puts it here
+/// rather than on a second function. The list is stabby's, because the
+/// plugin allocates it and whisker frees it.
+#[stabby::stabby]
+pub struct Plugin {
+    /// Every lint the plugin exports, in the order it named them
+    pub lints: vec::Vec<ExportedLint>,
 }
 
 /// What [`PluginDeclaration::load`] hands back: the plugin, or the panic that stopped it
@@ -101,10 +112,9 @@ mod tests {
 
     #[test]
     fn a_factory_builds_a_pass_the_host_can_configure() {
-        let mut factories = Factories::new();
-        factories.push(quiet());
+        let factory = quiet();
 
-        let built: Result<_, Panic> = factories[0].call().into();
+        let built: Result<_, Panic> = factory.call().into();
 
         let mut pass = built.expect("construction should not panic");
         let configured: Result<(), Panic> = pass.configure(&RuleOptions::default()).into();
@@ -115,20 +125,23 @@ mod tests {
     fn trait_send() {
         fn assert_send<T: Send>() {}
         assert_send::<LintPassFactory>();
-        assert_send::<Factories>();
+        assert_send::<ExportedLint>();
+        assert_send::<Plugin>();
     }
 
     #[test]
     fn trait_sync() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<LintPassFactory>();
-        assert_sync::<Factories>();
+        assert_sync::<ExportedLint>();
+        assert_sync::<Plugin>();
     }
 
     #[test]
     fn trait_unpin() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<LintPassFactory>();
-        assert_unpin::<Factories>();
+        assert_unpin::<ExportedLint>();
+        assert_unpin::<Plugin>();
     }
 }
