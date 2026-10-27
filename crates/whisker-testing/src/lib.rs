@@ -275,7 +275,9 @@ mod tests {
     #[test]
     fn execute_with_no_passes_returns_empty() {
         let tree = parse("fn main() {}", Language::Rust);
+
         let diagnostics = execute(&tree, &mut Vec::new());
+
         assert!(diagnostics.is_empty());
     }
 

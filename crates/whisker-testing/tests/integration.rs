@@ -170,7 +170,9 @@ fn empty_source_produces_no_diagnostics() {
         adapt(MacroInvocationFinder),
         adapt(BoolParamFinder),
     ];
+
     let diagnostics = execute(&tree, &mut passes);
+
     assert_no_diagnostics(&diagnostics);
 }
 

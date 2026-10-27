@@ -245,7 +245,9 @@ mod tests {
             "test error".into(),
             Span::new(PathBuf::from("test.rs"), 0, 12),
         );
+
         let output = render_to_string(&[diag], &test_source()).unwrap();
+
         assert!(
             output.contains("error"),
             "output should contain 'error': {output}"
@@ -258,7 +260,9 @@ mod tests {
             Span::new(PathBuf::from("test.rs"), 3, 7),
             "defined here".into(),
         ));
+
         let output = render_to_string(&[diag], &test_source()).unwrap();
+
         assert!(
             output.contains("defined here"),
             "output should contain origin message: {output}"
@@ -271,7 +275,9 @@ mod tests {
             Span::new(PathBuf::from("test.rs"), 3, 7),
             "also here".into(),
         ));
+
         let output = render_to_string(&[diag], &test_source()).unwrap();
+
         assert!(
             output.contains("also here"),
             "output should contain related message: {output}"
@@ -285,7 +291,9 @@ mod tests {
             "pub fn".into(),
             "make it public".into(),
         ));
+
         let output = render_to_string(&[diag], &test_source()).unwrap();
+
         assert!(
             output.contains("make it public"),
             "output should contain suggestion message: {output}"
@@ -299,7 +307,9 @@ mod tests {
             "pub fn".into(),
             "make it public".into(),
         ));
+
         let output = render_to_string(&[diag], &test_source()).unwrap();
+
         assert!(
             output.contains("pub fn"),
             "output should contain replacement: {output}"
@@ -320,7 +330,9 @@ mod tests {
             "second".into(),
             Span::new(PathBuf::from("test.rs"), 3, 7),
         );
+
         let output = render_to_string(&[d1, d2], &test_source()).unwrap();
+
         let missing: Vec<&str> = ["first", "second"]
             .into_iter()
             .filter(|message| !output.contains(message))
