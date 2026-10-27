@@ -28,6 +28,42 @@ pre-commit:
 check-dependencies:
     cargo deny check bans licenses sources
 
+# Fail when the plugin boundary moved and its ABI version did not
+check-abi base="main":
+    #!/usr/bin/env -S bash -euo pipefail
+    # `crates/whisker-plugin/abi-surface.toml` records the boundary, and a
+    # test in whisker-plugin keeps it equal to the code. A pull request that
+    # changes the boundary therefore changes the record too, so the record
+    # alone proves nothing. This compares it with the record on `base`: a
+    # moved fingerprint needs a raised version, and from 1.0 a raised major.
+    record=crates/whisker-plugin/abi-surface.toml
+    git fetch --quiet origin "{{ base }}"
+    if ! before="$(git show "FETCH_HEAD:${record}" 2>/dev/null)"; then
+        echo "{{ base }} has no ${record}, so there is nothing to compare"
+        exit 0
+    fi
+    after="$(cat "${record}")"
+    value() { sed -n "s/^$1 = \"\(.*\)\"$/\1/p" <<< "$2"; }
+    if [ "$(value types-fingerprint "${before}")" = "$(value types-fingerprint "${after}")" ] &&
+        [ "$(value language-fingerprint "${before}")" = "$(value language-fingerprint "${after}")" ]; then
+        echo "the plugin boundary did not move"
+        exit 0
+    fi
+    IFS=. read -r old_major old_minor <<< "$(value version "${before}")"
+    IFS=. read -r new_major new_minor <<< "$(value version "${after}")"
+    if [ "${new_major}" -lt "${old_major}" ] ||
+        { [ "${new_major}" -eq "${old_major}" ] && [ "${new_minor}" -le "${old_minor}" ]; }; then
+        echo "the plugin boundary moved, but ABI_VERSION did not rise above ${old_major}.${old_minor}." >&2
+        echo "Raise ABI_VERSION in crates/whisker-types/src/plugin.rs." >&2
+        exit 1
+    fi
+    if [ "${old_major}" -ge 1 ] && [ "${new_major}" -eq "${old_major}" ]; then
+        echo "a fingerprinted type changed, which refuses every plugin of ABI ${old_major}." >&2
+        echo "Raise the major of ABI_VERSION, not the minor." >&2
+        exit 1
+    fi
+    echo "the plugin boundary moved, and ABI_VERSION rose from ${old_major}.${old_minor} to ${new_major}.${new_minor}"
+
 # Check that a lint crate's view of each language crate builds without its provider
 check-features:
     cargo check -p whisker-rust --no-default-features

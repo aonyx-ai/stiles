@@ -19,6 +19,10 @@ and this project adheres to
   lines. All three flags were in the help before, and none of them did
   anything.
 
+- A pull request that moves a plugin boundary fingerprint without raising
+  `ABI_VERSION` fails CI. `crates/whisker-plugin/abi-surface.toml` records
+  the boundary, and `just check-abi` compares it with the record on `main`.
+
 - `DecoratedNode` is `Copy`. A rule reading a node out of the vector that
   `named_children` returns no longer clones borrowed data. The
   plugin ABI tag does not move, so every published archive still loads.

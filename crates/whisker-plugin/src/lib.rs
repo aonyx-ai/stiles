@@ -57,6 +57,31 @@ pub const LANGUAGE_FINGERPRINT: u64 = stable_fingerprint(&[
 mod tests {
     use super::*;
 
+    /// Returns the text `abi-surface.toml` must hold for this build
+    fn abi_surface() -> String {
+        format!(
+            "# The plugin boundary as this commit builds it. A test in whisker-plugin\n\
+             # fails when these values differ from the code, and `just check-abi`\n\
+             # fails when a fingerprint moves and the version does not.\n\
+             version = \"{ABI_VERSION}\"\n\
+             types-fingerprint = \"{TYPES_FINGERPRINT:016x}\"\n\
+             language-fingerprint = \"{LANGUAGE_FINGERPRINT:016x}\"\n"
+        )
+    }
+
+    #[test]
+    fn abi_surface_matches_the_record() {
+        let recorded = include_str!("../abi-surface.toml");
+
+        let surface = abi_surface();
+
+        assert_eq!(
+            recorded, surface,
+            "the plugin boundary differs from crates/whisker-plugin/abi-surface.toml. \
+             If a fingerprint moved, raise ABI_VERSION. Then write this into the file:\n{surface}"
+        );
+    }
+
     #[test]
     fn language_fingerprint_covers_every_language() {
         let rust_alone = stable_fingerprint(&[whisker_rust::LANGUAGE_FINGERPRINT]);
