@@ -10,7 +10,7 @@ use tempfile::TempDir;
 mod unreadable;
 
 #[cfg(unix)]
-use unreadable::make_unreadable;
+use self::unreadable::make_unreadable;
 
 /// Source that trips none of the lints the CLI runs
 const CLEAN_SOURCE: &str = "pub fn answer() -> u32 {\n    42\n}\n";

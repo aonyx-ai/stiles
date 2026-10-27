@@ -11,9 +11,9 @@ mod resolved_type;
 mod string_union;
 mod type_text;
 
-pub use fn_signature::{FnSignature, Parameter};
-pub use import_source::ImportSource;
-pub use primitive::Primitive;
-pub use resolved_type::ResolvedType;
-pub use string_union::StringUnion;
-pub use type_text::TypeText;
+pub use self::fn_signature::{FnSignature, Parameter};
+pub use self::import_source::ImportSource;
+pub use self::primitive::Primitive;
+pub use self::resolved_type::ResolvedType;
+pub use self::string_union::StringUnion;
+pub use self::type_text::TypeText;

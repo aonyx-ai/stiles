@@ -12,9 +12,11 @@ mod fixture_repository;
 #[path = "support/mismatched_plugin.rs"]
 mod mismatched_plugin;
 
-use fake_github::{Answer, FakeGitHub};
-use fixture_repository::{FixtureRepository, Standalone, git, write_lint_package, write_lockfile};
-use mismatched_plugin::write_mismatched_lint_package;
+use self::fake_github::{Answer, FakeGitHub};
+use self::fixture_repository::{
+    FixtureRepository, Standalone, git, write_lint_package, write_lockfile,
+};
+use self::mismatched_plugin::write_mismatched_lint_package;
 
 /// Source that trips the fixture lint and nothing whisker ships
 const TODO_SOURCE: &str = "pub fn later() {\n    todo!()\n}\n";

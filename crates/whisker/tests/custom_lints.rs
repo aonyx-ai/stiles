@@ -10,8 +10,8 @@ mod configurable_plugin;
 #[path = "support/other_protocol_plugin.rs"]
 mod other_protocol_plugin;
 
-use configurable_plugin::write_configurable_lint_package;
-use other_protocol_plugin::write_other_protocol_lint_package;
+use self::configurable_plugin::write_configurable_lint_package;
+use self::other_protocol_plugin::write_other_protocol_lint_package;
 
 /// Source that trips the example lint and none of the built-ins
 const TODO_SOURCE: &str = "pub fn later() {\n    todo!()\n}\n";

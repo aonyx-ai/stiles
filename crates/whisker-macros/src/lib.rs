@@ -48,7 +48,7 @@ use syn::{DeriveInput, parse_macro_input};
 pub fn derive_decoration(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    decoration::expand(&input)
+    self::decoration::expand(&input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

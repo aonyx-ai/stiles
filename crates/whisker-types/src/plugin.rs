@@ -52,10 +52,12 @@ mod declaration;
 mod factory;
 mod fingerprint;
 
-pub use abi_version::AbiVersion;
-pub use declaration::PluginDeclaration;
-pub use factory::{Constructed, ExportedLint, LintPassFactory, Loaded, Plugin, construct, factory};
-pub use fingerprint::stable_fingerprint;
+pub use self::abi_version::AbiVersion;
+pub use self::declaration::PluginDeclaration;
+pub use self::factory::{
+    Constructed, ExportedLint, LintPassFactory, Loaded, Plugin, construct, factory,
+};
+pub use self::fingerprint::stable_fingerprint;
 
 /// The version of the plugin declaration protocol this crate speaks
 ///

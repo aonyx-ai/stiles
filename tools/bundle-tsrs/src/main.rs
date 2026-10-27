@@ -138,14 +138,14 @@ fn bundle(arguments: &Arguments) -> Result<()> {
         Some(script) => {
             fs::copy(script, out.join("build.rs"))
                 .with_context(|| format!("failed to copy {}", script.display()))?;
-            manifest::BuildScript::Present
+            self::manifest::BuildScript::Present
         }
-        None => manifest::BuildScript::Absent,
+        None => self::manifest::BuildScript::Absent,
     };
 
     write(&out.join("src/lib.rs"), &root_module(&crates, &revision))
         .context("failed to write the root module")?;
-    let manifest = manifest::render(&manifest::Bundle {
+    let manifest = self::manifest::render(&self::manifest::Bundle {
         name,
         revision: &revision,
         packages: &packages,

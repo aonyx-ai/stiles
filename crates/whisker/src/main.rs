@@ -9,12 +9,12 @@ use clawless::output::OutputFlags;
 use clawless::resolved_leaf::ResolvedLeaf;
 
 fn main() -> ProcessExit {
-    let app = OutputFlags::augment_command(commands::clawless_init())
+    let app = OutputFlags::augment_command(self::commands::clawless_init())
         .name("whisker")
         .version(env!("CARGO_PKG_VERSION"));
     let app = with_subcommands_in_order(app);
 
-    let exit = match commands::clawless_resolve(app.get_matches()) {
+    let exit = match self::commands::clawless_resolve(app.get_matches()) {
         ResolvedLeaf::Command { matches, exec } => {
             clawless::runner::CommandRunner::run(matches, exec)
         }
