@@ -1,3 +1,4 @@
+use bon::bon;
 use stabby::option;
 use whisker_macros::Decoration;
 
@@ -24,8 +25,10 @@ pub struct FnSignature {
     return_mode: ReturnMode,
 }
 
+#[bon]
 impl FnSignature {
     /// Creates a function signature
+    #[builder(start_fn = builder)]
     pub fn new(
         return_type: Option<ResolvedType>,
         error_type: Option<ErrorType>,

@@ -1,5 +1,7 @@
 use std::fmt;
 
+use bon::bon;
+
 use super::digest::digest;
 use super::handshake::AbiIdentity;
 
@@ -30,11 +32,12 @@ const TARGET: &str = env!("WHISKER_TARGET");
 /// A small digest suffices here. The handshake still decides whether a
 /// library loads, so a collision costs one wasted download.
 ///
-/// The name is a contract with publishers, and [`AbiTag::new`] carries a
+/// The name is a contract with publishers, and [`AbiTag::builder`] carries a
 /// test that pins it.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct AbiTag(String);
 
+#[bon]
 impl AbiTag {
     /// Returns the tag of the whisker binary that is running
     ///
@@ -44,7 +47,10 @@ impl AbiTag {
     /// println!("this whisker loads lints tagged {}", AbiTag::host());
     /// ```
     pub fn host() -> Self {
-        Self::new(&AbiIdentity::host(), TARGET)
+        Self::builder()
+            .identity(&AbiIdentity::host())
+            .target(TARGET)
+            .build()
     }
 
     /// Returns the tag of a whisker with `identity` running on `target`
@@ -52,6 +58,7 @@ impl AbiTag {
     /// A newline separates the values, and each fingerprint occupies a
     /// fixed width. Two different identities therefore cannot produce one
     /// input to the digest.
+    #[builder]
     pub(super) fn new(identity: &AbiIdentity, target: &str) -> Self {
         let AbiIdentity {
             abi_version,
@@ -102,7 +109,10 @@ mod tests {
     /// it knows to republish.
     #[test]
     fn new_is_stable_across_releases() {
-        let tag = AbiTag::new(&identity(), "aarch64-apple-darwin");
+        let tag = AbiTag::builder()
+            .identity(&identity())
+            .target("aarch64-apple-darwin")
+            .build();
 
         assert_eq!(tag.to_string(), "b7d58f06e26e0a22-aarch64-apple-darwin");
     }
@@ -120,8 +130,14 @@ mod tests {
         };
 
         assert_eq!(
-            AbiTag::new(&identity(), "x86_64-unknown-linux-gnu"),
-            AbiTag::new(&other, "x86_64-unknown-linux-gnu")
+            AbiTag::builder()
+                .identity(&identity())
+                .target("x86_64-unknown-linux-gnu")
+                .build(),
+            AbiTag::builder()
+                .identity(&other)
+                .target("x86_64-unknown-linux-gnu")
+                .build()
         );
     }
 
@@ -141,8 +157,14 @@ mod tests {
         };
 
         assert_ne!(
-            AbiTag::new(&first, "x86_64-unknown-linux-gnu"),
-            AbiTag::new(&second, "x86_64-unknown-linux-gnu")
+            AbiTag::builder()
+                .identity(&first)
+                .target("x86_64-unknown-linux-gnu")
+                .build(),
+            AbiTag::builder()
+                .identity(&second)
+                .target("x86_64-unknown-linux-gnu")
+                .build()
         );
     }
 
@@ -154,8 +176,14 @@ mod tests {
         };
 
         assert_ne!(
-            AbiTag::new(&identity(), "x86_64-unknown-linux-gnu"),
-            AbiTag::new(&other, "x86_64-unknown-linux-gnu")
+            AbiTag::builder()
+                .identity(&identity())
+                .target("x86_64-unknown-linux-gnu")
+                .build(),
+            AbiTag::builder()
+                .identity(&other)
+                .target("x86_64-unknown-linux-gnu")
+                .build()
         );
     }
 
@@ -167,8 +195,14 @@ mod tests {
         };
 
         assert_ne!(
-            AbiTag::new(&identity(), "x86_64-unknown-linux-gnu"),
-            AbiTag::new(&other, "x86_64-unknown-linux-gnu")
+            AbiTag::builder()
+                .identity(&identity())
+                .target("x86_64-unknown-linux-gnu")
+                .build(),
+            AbiTag::builder()
+                .identity(&other)
+                .target("x86_64-unknown-linux-gnu")
+                .build()
         );
     }
 
@@ -180,16 +214,28 @@ mod tests {
         };
 
         assert_ne!(
-            AbiTag::new(&identity(), "x86_64-unknown-linux-gnu"),
-            AbiTag::new(&other, "x86_64-unknown-linux-gnu")
+            AbiTag::builder()
+                .identity(&identity())
+                .target("x86_64-unknown-linux-gnu")
+                .build(),
+            AbiTag::builder()
+                .identity(&other)
+                .target("x86_64-unknown-linux-gnu")
+                .build()
         );
     }
 
     #[test]
     fn new_separates_platforms() {
         assert_ne!(
-            AbiTag::new(&identity(), "aarch64-apple-darwin"),
-            AbiTag::new(&identity(), "x86_64-unknown-linux-gnu")
+            AbiTag::builder()
+                .identity(&identity())
+                .target("aarch64-apple-darwin")
+                .build(),
+            AbiTag::builder()
+                .identity(&identity())
+                .target("x86_64-unknown-linux-gnu")
+                .build()
         );
     }
 
@@ -211,8 +257,14 @@ mod tests {
         };
 
         assert_ne!(
-            AbiTag::new(&first, "aarch64-apple-darwin"),
-            AbiTag::new(&second, "aarch64-apple-darwin")
+            AbiTag::builder()
+                .identity(&first)
+                .target("aarch64-apple-darwin")
+                .build(),
+            AbiTag::builder()
+                .identity(&second)
+                .target("aarch64-apple-darwin")
+                .build()
         );
     }
 

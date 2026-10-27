@@ -1,3 +1,4 @@
+use bon::bon;
 use stabby::abi::StableLike;
 use stabby::str::Str;
 
@@ -36,8 +37,10 @@ pub struct DecoratedNode<'a> {
     decorations: DecorationLookup<'a>,
 }
 
+#[bon]
 impl<'a> DecoratedNode<'a> {
     /// Creates a decorated node wrapping a tree-sitter node
+    #[builder(start_fn = builder)]
     pub fn new(
         node: tree_sitter::Node<'a>,
         source: &'a str,

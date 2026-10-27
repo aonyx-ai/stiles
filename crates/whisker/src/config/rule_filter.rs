@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use bon::bon;
 use whisker_types::RuleId;
 
 /// Which of a source's rules a project runs
@@ -26,6 +27,7 @@ pub enum RuleFilter {
     Except(BTreeSet<String>),
 }
 
+#[bon]
 impl RuleFilter {
     /// Builds the filter that `enable` and `disable` describe
     ///
@@ -33,6 +35,7 @@ impl RuleFilter {
     ///
     /// Returns an error if both name something, because a project that
     /// says which rules run has already said which do not.
+    #[builder]
     pub fn new(enable: Vec<String>, disable: Vec<String>) -> anyhow::Result<Self> {
         match (enable.is_empty(), disable.is_empty()) {
             (true, true) => Ok(Self::All),
@@ -117,14 +120,22 @@ mod tests {
 
     #[test]
     fn admits_everything_when_nothing_is_named() {
-        let filter = RuleFilter::new(Vec::new(), Vec::new()).expect("should build");
+        let filter = RuleFilter::builder()
+            .enable(Vec::new())
+            .disable(Vec::new())
+            .build()
+            .expect("should build");
 
         assert!(filter.admits(&rule("lint.anything")));
     }
 
     #[test]
     fn admits_only_an_enabled_rule() {
-        let filter = RuleFilter::new(names(&["lint.wanted"]), Vec::new()).expect("should build");
+        let filter = RuleFilter::builder()
+            .enable(names(&["lint.wanted"]))
+            .disable(Vec::new())
+            .build()
+            .expect("should build");
 
         assert!(filter.admits(&rule("lint.wanted")));
         assert!(!filter.admits(&rule("lint.other")));
@@ -132,7 +143,11 @@ mod tests {
 
     #[test]
     fn admits_everything_but_a_disabled_rule() {
-        let filter = RuleFilter::new(Vec::new(), names(&["lint.noisy"])).expect("should build");
+        let filter = RuleFilter::builder()
+            .enable(Vec::new())
+            .disable(names(&["lint.noisy"]))
+            .build()
+            .expect("should build");
 
         assert!(!filter.admits(&rule("lint.noisy")));
         assert!(filter.admits(&rule("lint.other")));
@@ -140,14 +155,22 @@ mod tests {
 
     #[test]
     fn named_returns_nothing_for_an_unfiltered_project() {
-        let filter = RuleFilter::new(Vec::new(), Vec::new()).expect("should build");
+        let filter = RuleFilter::builder()
+            .enable(Vec::new())
+            .disable(Vec::new())
+            .build()
+            .expect("should build");
 
         assert!(filter.named().is_empty());
     }
 
     #[test]
     fn named_returns_the_rules_a_project_wrote() {
-        let filter = RuleFilter::new(Vec::new(), names(&["lint.noisy"])).expect("should build");
+        let filter = RuleFilter::builder()
+            .enable(Vec::new())
+            .disable(names(&["lint.noisy"]))
+            .build()
+            .expect("should build");
 
         assert_eq!(filter.named().len(), 1);
         assert!(filter.named().contains("lint.noisy"));
@@ -155,7 +178,11 @@ mod tests {
 
     #[test]
     fn validate_accepts_a_name_a_lint_declares() {
-        let filter = RuleFilter::new(Vec::new(), names(&["lint.known"])).expect("should build");
+        let filter = RuleFilter::builder()
+            .enable(Vec::new())
+            .disable(names(&["lint.known"]))
+            .build()
+            .expect("should build");
         let declared = BTreeSet::from(["lint.known".to_owned()]);
 
         filter.validate(&declared).expect("should accept");
@@ -163,7 +190,11 @@ mod tests {
 
     #[test]
     fn validate_refuses_a_name_no_lint_declares() {
-        let filter = RuleFilter::new(Vec::new(), names(&["lint.typo"])).expect("should build");
+        let filter = RuleFilter::builder()
+            .enable(Vec::new())
+            .disable(names(&["lint.typo"]))
+            .build()
+            .expect("should build");
         let declared = BTreeSet::from(["lint.known".to_owned()]);
 
         let error = filter.validate(&declared).expect_err("should fail");
@@ -174,15 +205,22 @@ mod tests {
 
     #[test]
     fn validate_accepts_an_unfiltered_project() {
-        let filter = RuleFilter::new(Vec::new(), Vec::new()).expect("should build");
+        let filter = RuleFilter::builder()
+            .enable(Vec::new())
+            .disable(Vec::new())
+            .build()
+            .expect("should build");
 
         filter.validate(&BTreeSet::new()).expect("should accept");
     }
 
     #[test]
     fn new_with_both_lists_returns_error() {
-        let error =
-            RuleFilter::new(names(&["lint.a"]), names(&["lint.b"])).expect_err("should fail");
+        let error = RuleFilter::builder()
+            .enable(names(&["lint.a"]))
+            .disable(names(&["lint.b"]))
+            .build()
+            .expect_err("should fail");
 
         assert!(format!("{error:#}").contains("both"), "{error:#}");
     }

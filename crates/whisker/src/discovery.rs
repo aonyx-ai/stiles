@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Context as _;
+use bon::bon;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore::{DirEntry, Match, WalkBuilder};
 use whisker_types::Language;
@@ -37,6 +38,7 @@ pub struct Discovery {
     errors: Vec<anyhow::Error>,
 }
 
+#[bon]
 impl Discovery {
     /// Discovers the files to lint beneath `path`
     ///
@@ -66,12 +68,17 @@ impl Discovery {
     ///
     /// ```ignore
     /// let config = WhiskerConfig::load(Path::new("."))?;
-    /// let discovery = Discovery::run(Path::new("."), &config, WalkErrorPolicy::Fail)?;
+    /// let discovery = Discovery::run()
+    ///     .path(Path::new("."))
+    ///     .config(&config)
+    ///     .on_error(WalkErrorPolicy::Fail)
+    ///     .call()?;
     ///
     /// for file in discovery.files() {
     ///     println!("{}", file.display());
     /// }
     /// ```
+    #[builder]
     pub fn run(
         path: &Path,
         config: &WhiskerConfig,
@@ -312,7 +319,10 @@ mod tests {
             .map(|pattern| IgnorePattern::new(*pattern))
             .collect();
 
-        WhiskerConfig::new(ProjectRoot::new(root), patterns, Vec::new())
+        WhiskerConfig::builder()
+            .root(ProjectRoot::new(root))
+            .ignore(patterns)
+            .build()
     }
 
     /// Returns the discovered files as slash-separated paths relative to `root`
@@ -419,7 +429,11 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..");
         let config = WhiskerConfig::load(&root).expect("whisker's own configuration should load");
 
-        let discovery = Discovery::run(&root, &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(&root)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         let files = discovered(&discovery, &root);
@@ -459,7 +473,11 @@ mod tests {
         assert_stored_out_of_order(directory.path());
         let config = config(directory.path(), &[]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(
@@ -486,7 +504,11 @@ mod tests {
         ]);
         let config = config(directory.path(), &["/examples/"]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(
@@ -500,7 +522,11 @@ mod tests {
         let directory = tree(&["src/main.rs", "examples/demo/src/main.rs"]);
         let config = config(directory.path(), &["examples/"]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
@@ -513,7 +539,11 @@ mod tests {
             .expect("ignore file should be written");
         let config = config(directory.path(), &[]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
@@ -524,7 +554,11 @@ mod tests {
         let directory = tree(&["examples/demo.rs", "examples/keep.rs", "src/main.rs"]);
         let config = config(directory.path(), &["examples/", "!examples/keep.rs"]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
@@ -543,7 +577,11 @@ mod tests {
         let config = config(directory.path(), &["examples/"]);
         let target = directory.path().join("examples");
 
-        let discovery = Discovery::run(&target, &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(&target)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, &target), ["demo.rs"]);
@@ -555,7 +593,11 @@ mod tests {
         let config = config(directory.path(), &[]);
         let target = directory.path().join("LICENSE");
 
-        let error = Discovery::run(&target, &config, WalkErrorPolicy::Fail)
+        let error = Discovery::run()
+            .path(&target)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect_err("discovery should fail");
 
         assert!(
@@ -578,7 +620,11 @@ mod tests {
         std::os::unix::fs::symlink(directory.path().join("src").join("main.rs"), &link)
             .expect("symlink should be created");
 
-        let error = Discovery::run(&link, &config, WalkErrorPolicy::Fail)
+        let error = Discovery::run()
+            .path(&link)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect_err("discovery should fail");
 
         assert!(
@@ -598,9 +644,17 @@ mod tests {
         let config = config(directory.path(), &["{a,b"]);
         let target = directory.path().join("src").join("main.rs");
 
-        let error = Discovery::run(&target, &config, WalkErrorPolicy::Fail)
+        let error = Discovery::run()
+            .path(&target)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect_err("discovery should fail");
-        let over_directory = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let over_directory = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect_err("discovery should fail");
 
         assert!(
@@ -616,7 +670,11 @@ mod tests {
         let config = config(directory.path(), &["examples/", "*.rs"]);
         let target = directory.path().join("examples").join("demo.rs");
 
-        let discovery = Discovery::run(&target, &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(&target)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovery.files(), vec![target]);
@@ -631,7 +689,11 @@ mod tests {
             .expect("gitignore should be written");
         let target = directory.path().join("generated").join("schema.rs");
 
-        let discovery = Discovery::run(&target, &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(&target)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(
@@ -646,7 +708,11 @@ mod tests {
         let config = config(directory.path(), &[]);
         let target = directory.path().join("Cargo.toml");
 
-        let error = Discovery::run(&target, &config, WalkErrorPolicy::Fail)
+        let error = Discovery::run()
+            .path(&target)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect_err("discovery should fail");
 
         assert!(
@@ -668,7 +734,11 @@ mod tests {
         std::os::unix::fs::symlink(directory.path().join("data"), &link)
             .expect("symlink should be created");
 
-        let discovery = Discovery::run(&link, &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(&link)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovery.files(), vec![link]);
@@ -690,7 +760,11 @@ mod tests {
         .expect("exclude file should be written");
         let config = config(directory.path(), &[]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
@@ -703,7 +777,11 @@ mod tests {
             .expect("gitignore should be written");
         let config = config(directory.path(), &[]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
@@ -714,7 +792,11 @@ mod tests {
         let directory = tree(&["src/main.rs", ".cache/build.rs"]);
         let config = config(directory.path(), &[]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
@@ -725,7 +807,11 @@ mod tests {
         let directory = tree(&["examples/demo.rs", "examples/keep.rs", "src/main.rs"]);
         let config = config(directory.path(), &["examples/*.rs", "!examples/keep.rs"]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(
@@ -739,7 +825,11 @@ mod tests {
         let directory = tree(&["src/main.rs", "README.md", "Cargo.toml", "LICENSE"]);
         let config = config(directory.path(), &[]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
@@ -750,12 +840,12 @@ mod tests {
         let directory = tempfile::tempdir().expect("temporary directory should be created");
         let config = config(directory.path(), &[]);
 
-        let error = Discovery::run(
-            &directory.path().join("missing"),
-            &config,
-            WalkErrorPolicy::Fail,
-        )
-        .expect_err("discovery should fail");
+        let error = Discovery::run()
+            .path(&directory.path().join("missing"))
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
+            .expect_err("discovery should fail");
 
         assert!(
             format!("{error:#}").contains("failed to resolve"),
@@ -768,7 +858,11 @@ mod tests {
         let directory = tree(&["src/main.rs", "src/lib.rs"]);
         let config = config(directory.path(), &["vendor/", "*.py"]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(
@@ -784,7 +878,11 @@ mod tests {
         let config = config(directory.path(), &["crates/app/src/generated.rs"]);
         let target = directory.path().join("crates").join("app");
 
-        let discovery = Discovery::run(&target, &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(&target)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, &target), ["src/main.rs"]);
@@ -806,7 +904,11 @@ mod tests {
         .expect("configuration should be written");
         let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
@@ -821,7 +923,11 @@ mod tests {
         std::os::unix::fs::symlink(directory.path().join("src"), &link)
             .expect("symlink should be created");
 
-        let discovery = Discovery::run(&link, &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(&link)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovery.files(), vec![link.join("main.rs")]);
@@ -836,7 +942,11 @@ mod tests {
         ]);
         let config = config(directory.path(), &["examples/"]);
 
-        let discovery = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
@@ -855,7 +965,11 @@ mod tests {
         let config = config(directory.path(), &[]);
         let target = directory.path().join("proj");
 
-        let error = Discovery::run(&target, &config, WalkErrorPolicy::Fail)
+        let error = Discovery::run()
+            .path(&target)
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect_err("discovery should fail");
 
         let error = format!("{error:#}");
@@ -879,7 +993,11 @@ mod tests {
         .expect("gitignore should be written");
         let config = config(directory.path(), &[]);
 
-        let error = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let error = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect_err("discovery should fail");
 
         let error = format!("{error:#}");
@@ -907,12 +1025,12 @@ mod tests {
         .expect("gitignore should be written");
         let config = config(directory.path(), &[]);
 
-        let discovery = Discovery::run(
-            directory.path(),
-            &config,
-            WalkErrorPolicy::ReportAndContinue,
-        )
-        .expect("discovery should succeed");
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::ReportAndContinue)
+            .call()
+            .expect("discovery should succeed");
 
         assert_eq!(
             discovered(&discovery, directory.path()),
@@ -928,7 +1046,11 @@ mod tests {
             .expect("gitignore should be written");
         let config = config(directory.path(), &[]);
 
-        let error = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let error = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect_err("discovery should fail");
 
         assert!(
@@ -945,7 +1067,11 @@ mod tests {
         let locked = directory.path().join("locked");
         let _unreadable = make_unreadable(&locked);
 
-        let error = Discovery::run(directory.path(), &config, WalkErrorPolicy::Fail)
+        let error = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
             .expect_err("discovery should fail");
 
         let error = format!("{error:#}");
@@ -971,12 +1097,12 @@ mod tests {
         let locked = directory.path().join("locked");
         let _unreadable = make_unreadable(&locked);
 
-        let discovery = Discovery::run(
-            directory.path(),
-            &config,
-            WalkErrorPolicy::ReportAndContinue,
-        )
-        .expect("discovery should succeed");
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::ReportAndContinue)
+            .call()
+            .expect("discovery should succeed");
 
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
         assert_eq!(discovery.errors().len(), 1);

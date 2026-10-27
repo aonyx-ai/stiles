@@ -1,3 +1,5 @@
+use bon::Builder;
+
 use crate::config::{GitRev, GitUrl, LintPath};
 
 /// Where one configured set of custom lints comes from
@@ -43,29 +45,18 @@ impl std::fmt::Display for LintSource {
 /// # Examples
 ///
 /// ```ignore
-/// let source = GitLintSource::new(
-///     GitUrl::new("https://github.com/aonyx-ai/whisker-aonyx-rules")?,
-///     GitRev::new("0123456789abcdef0123456789abcdef01234567")?,
-/// );
+/// let source = GitLintSource::builder()
+///     .url(GitUrl::new("https://github.com/aonyx-ai/whisker-aonyx-rules")?)
+///     .rev(GitRev::new("0123456789abcdef0123456789abcdef01234567")?)
+///     .build();
 /// ```
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Builder)]
 pub struct GitLintSource {
     url: GitUrl,
     rev: GitRev,
 }
 
 impl GitLintSource {
-    /// Creates a git lint source from a remote and a pinned commit
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// let source = GitLintSource::new(url, rev);
-    /// ```
-    pub fn new(url: GitUrl, rev: GitRev) -> Self {
-        Self { url, rev }
-    }
-
     /// Returns the remote the lints are fetched from
     ///
     /// # Examples
@@ -102,10 +93,10 @@ mod tests {
     const REV: &str = "0123456789abcdef0123456789abcdef01234567";
 
     fn git_source() -> GitLintSource {
-        GitLintSource::new(
-            GitUrl::new("https://example.com/rules").expect("the remote should be accepted"),
-            GitRev::new(REV).expect("the revision should be accepted"),
-        )
+        GitLintSource::builder()
+            .url(GitUrl::new("https://example.com/rules").expect("the remote should be accepted"))
+            .rev(GitRev::new(REV).expect("the revision should be accepted"))
+            .build()
     }
 
     #[test]

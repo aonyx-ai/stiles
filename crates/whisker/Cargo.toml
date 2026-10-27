@@ -15,6 +15,7 @@ workspace = true
 
 [dependencies]
 anyhow = "1"
+bon.workspace = true
 clawless = "0.8.0"
 etcetera.workspace = true
 flate2.workspace = true

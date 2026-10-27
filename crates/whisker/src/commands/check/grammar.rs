@@ -57,7 +57,10 @@ impl Grammar {
             Self::TypeScript => whisker_typescript::language(),
             Self::Tsx => whisker_typescript::tsx_language(),
         };
-        Pipeline::new(self.language(), &grammar)
+        Pipeline::builder()
+            .language(self.language())
+            .grammar(&grammar)
+            .build()
     }
 }
 

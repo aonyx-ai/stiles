@@ -2,6 +2,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use anyhow::Context as _;
+use bon::bon;
 use clawless::prelude::*;
 use whisker_types::Language;
 
@@ -29,8 +30,10 @@ struct ListedRule {
     enabled: bool,
 }
 
+#[bon]
 impl ListedRule {
     /// Describes `declared` under the project's `config`
+    #[builder]
     fn new(declared: &DeclaredRule, config: &WhiskerConfig) -> Self {
         let DeclaredRule { rule, languages } = declared;
 
@@ -77,7 +80,12 @@ pub async fn rules(args: RulesArgs, context: Context) -> CommandResult {
     for declared in custom_lints.rules() {
         context
             .output()
-            .artifact(ListedRule::new(&declared, &config))
+            .artifact(
+                ListedRule::builder()
+                    .declared(&declared)
+                    .config(&config)
+                    .build(),
+            )
             .await
             .context("failed to report a rule")?;
     }

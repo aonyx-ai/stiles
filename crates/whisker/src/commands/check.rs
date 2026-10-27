@@ -147,8 +147,12 @@ pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode>
         false => WalkErrorPolicy::Fail,
     };
 
-    let discovery =
-        Discovery::run(&path, &config, on_error).context("failed to discover source files")?;
+    let discovery = Discovery::run()
+        .path(&path)
+        .config(&config)
+        .on_error(on_error)
+        .call()
+        .context("failed to discover source files")?;
 
     let mut outcome = CheckOutcome::Success;
 
@@ -167,7 +171,7 @@ pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode>
         path.display()
     );
 
-    let providers = Providers::load(&path, files)?;
+    let providers = Providers::load().path(&path).files(files).call()?;
     let mut pipelines: HashMap<Grammar, Pipeline> = HashMap::new();
 
     let mut all_diagnostics = Vec::new();
@@ -243,7 +247,10 @@ pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode>
         .collect();
 
     for diagnostic in &all_diagnostics {
-        let finding = Finding::new(diagnostic, &sources)?;
+        let finding = Finding::builder()
+            .diagnostic(diagnostic)
+            .sources(&sources)
+            .build()?;
         context
             .output()
             .artifact(finding)
@@ -251,7 +258,12 @@ pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode>
             .context("failed to report a diagnostic")?;
     }
 
-    let outcome = outcome.combine(CheckOutcome::from_diagnostics(&all_diagnostics, threshold));
+    let outcome = outcome.combine(
+        CheckOutcome::from_diagnostics()
+            .diagnostics(&all_diagnostics)
+            .threshold(threshold)
+            .call(),
+    );
 
     match outcome {
         CheckOutcome::Failure => Ok(ExitCode::FAILURE),
@@ -271,7 +283,10 @@ mod tests {
 
     #[test]
     fn record_with_no_gaps_collects_no_remedy() {
-        let uncovered = UncoveredFile::new(PathBuf::from("stray.rs"), Vec::new());
+        let uncovered = UncoveredFile::builder()
+            .file(PathBuf::from("stray.rs"))
+            .gaps(Vec::new())
+            .build();
         let mut remedies = CoverageRemedies::default();
 
         remedies.record(&uncovered);
@@ -282,11 +297,14 @@ mod tests {
     #[test]
     fn record_with_repeated_gap_keeps_one_remedy() {
         let gap = CoverageGap::Unreachable { root: root() };
-        let first = UncoveredFile::new(
-            PathBuf::from("one.rs"),
-            vec![(ProviderName("rust"), gap.clone())],
-        );
-        let second = UncoveredFile::new(PathBuf::from("two.rs"), vec![(ProviderName("rust"), gap)]);
+        let first = UncoveredFile::builder()
+            .file(PathBuf::from("one.rs"))
+            .gaps(vec![(ProviderName("rust"), gap.clone())])
+            .build();
+        let second = UncoveredFile::builder()
+            .file(PathBuf::from("two.rs"))
+            .gaps(vec![(ProviderName("rust"), gap)])
+            .build();
         let mut remedies = CoverageRemedies::default();
 
         remedies.record(&first);
@@ -301,16 +319,16 @@ mod tests {
 
     #[test]
     fn record_with_two_kinds_of_gap_keeps_both_remedies() {
-        let uncovered = UncoveredFile::new(
-            PathBuf::from("stray.rs"),
-            vec![
+        let uncovered = UncoveredFile::builder()
+            .file(PathBuf::from("stray.rs"))
+            .gaps(vec![
                 (
                     ProviderName("rust"),
                     CoverageGap::Unreachable { root: root() },
                 ),
                 (ProviderName("other"), CoverageGap::StaleSource),
-            ],
-        );
+            ])
+            .build();
         let mut remedies = CoverageRemedies::default();
 
         remedies.record(&uncovered);

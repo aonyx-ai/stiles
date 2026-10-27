@@ -1,5 +1,6 @@
 use std::hash::{Hash, Hasher};
 
+use bon::bon;
 use stabby::{string, vec};
 
 /// One option a project set for one rule
@@ -47,6 +48,7 @@ pub struct RuleOption {
     values: vec::Vec<string::String>,
 }
 
+#[bon]
 impl RuleOption {
     /// Creates the option `name` that `rule` reads, holding `values`
     ///
@@ -63,7 +65,12 @@ impl RuleOption {
     ///
     /// assert_eq!(option.values().collect::<Vec<_>>(), ["shard"]);
     /// ```
-    pub fn new(rule: String, name: String, values: Vec<String>) -> Self {
+    #[builder(start_fn = builder)]
+    pub fn new(
+        #[builder(into)] rule: String,
+        #[builder(into)] name: String,
+        values: Vec<String>,
+    ) -> Self {
         Self {
             rule: string::String::from(rule.as_str()),
             name: string::String::from(name.as_str()),

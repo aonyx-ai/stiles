@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::Context as _;
+use bon::bon;
 use whisker_types::{
     Coverage, DecoratedTree, DecorationProvider, Diagnostic, Language, UncoveredFile,
 };
@@ -17,6 +18,7 @@ pub struct Pipeline {
     parser: tree_sitter::Parser,
 }
 
+#[bon]
 impl Pipeline {
     /// Creates a pipeline that parses `language` with `grammar`
     ///
@@ -26,6 +28,7 @@ impl Pipeline {
     /// # Errors
     ///
     /// Returns an error if the tree-sitter language cannot be set.
+    #[builder]
     pub fn new(language: Language, grammar: &tree_sitter::Language) -> anyhow::Result<Self> {
         let mut parser = tree_sitter::Parser::new();
         parser
@@ -96,7 +99,11 @@ impl Pipeline {
         }
 
         if covered.is_empty() {
-            return Err(UncoveredFile::new(path.to_path_buf(), gaps).into());
+            return Err(UncoveredFile::builder()
+                .file(path.to_path_buf())
+                .gaps(gaps)
+                .build()
+                .into());
         }
 
         for decorations in covered {
@@ -137,10 +144,10 @@ mod tests {
 
     /// Pairs `pass` with the rules it may report
     fn lint(pass: impl LintPass + 'static, rules: &[&'static str]) -> Lint<'static> {
-        Lint::new(
-            Box::new(pass),
-            rules.iter().map(|rule| RuleId::new(rule)).collect(),
-        )
+        Lint::builder()
+            .pass(Box::new(pass))
+            .rules(rules.iter().map(|rule| RuleId::new(rule)).collect())
+            .build()
     }
 
     /// Claims every file and decorates nothing
@@ -272,7 +279,11 @@ mod tests {
     #[test]
     fn run_on_source_with_covering_and_declining_providers_returns_diagnostics() {
         let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-        let mut pipeline = Pipeline::new(Language::Rust, &ts_lang).unwrap();
+        let mut pipeline = Pipeline::builder()
+            .language(Language::Rust)
+            .grammar(&ts_lang)
+            .build()
+            .unwrap();
         let mut passes = vec![lint(ReportMarker, &["test.marker"])];
 
         let diagnostics = pipeline
@@ -294,7 +305,11 @@ mod tests {
     #[test]
     fn run_on_source_with_declining_provider_returns_uncovered_file() {
         let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-        let mut pipeline = Pipeline::new(Language::Rust, &ts_lang).unwrap();
+        let mut pipeline = Pipeline::builder()
+            .language(Language::Rust)
+            .grammar(&ts_lang)
+            .build()
+            .unwrap();
 
         let error = pipeline
             .run_on_source(
@@ -317,7 +332,11 @@ mod tests {
     #[test]
     fn run_on_source_with_empty_passes_produces_no_diagnostics() {
         let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-        let mut pipeline = Pipeline::new(Language::Rust, &ts_lang).unwrap();
+        let mut pipeline = Pipeline::builder()
+            .language(Language::Rust)
+            .grammar(&ts_lang)
+            .build()
+            .unwrap();
 
         let diagnostics = pipeline
             .run_on_source(
@@ -361,7 +380,11 @@ mod tests {
         }
 
         let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-        let mut pipeline = Pipeline::new(Language::Rust, &ts_lang).unwrap();
+        let mut pipeline = Pipeline::builder()
+            .language(Language::Rust)
+            .grammar(&ts_lang)
+            .build()
+            .unwrap();
         let mut passes = vec![lint(AlwaysWarn, &["test.always"])];
 
         let diagnostics = pipeline
@@ -380,7 +403,11 @@ mod tests {
     #[test]
     fn run_on_source_with_no_providers_returns_uncovered_file() {
         let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-        let mut pipeline = Pipeline::new(Language::Rust, &ts_lang).unwrap();
+        let mut pipeline = Pipeline::builder()
+            .language(Language::Rust)
+            .grammar(&ts_lang)
+            .build()
+            .unwrap();
 
         let error = pipeline
             .run_on_source("fn main() {}", Path::new("test.rs"), &[], &mut Vec::new())
@@ -431,7 +458,11 @@ mod tests {
         }
 
         let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-        let mut pipeline = Pipeline::new(Language::Rust, &ts_lang).unwrap();
+        let mut pipeline = Pipeline::builder()
+            .language(Language::Rust)
+            .grammar(&ts_lang)
+            .build()
+            .unwrap();
         let mut passes = vec![lint(Panicking, &[])];
 
         let error = pipeline
@@ -452,7 +483,11 @@ mod tests {
     #[test]
     fn run_on_source_with_two_decorating_providers_keeps_first_decoration() {
         let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-        let mut pipeline = Pipeline::new(Language::Rust, &ts_lang).unwrap();
+        let mut pipeline = Pipeline::builder()
+            .language(Language::Rust)
+            .grammar(&ts_lang)
+            .build()
+            .unwrap();
         let mut passes = vec![lint(ReportMarker, &["test.marker"])];
 
         let diagnostics = pipeline
@@ -496,7 +531,11 @@ mod tests {
         }
 
         let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-        let mut pipeline = Pipeline::new(Language::Rust, &ts_lang).unwrap();
+        let mut pipeline = Pipeline::builder()
+            .language(Language::Rust)
+            .grammar(&ts_lang)
+            .build()
+            .unwrap();
         let mut passes = vec![lint(Exploding, &[])];
 
         let error = pipeline
@@ -537,7 +576,11 @@ mod tests {
                 source in "(fn [a-z]+\\(\\) \\{\\}\n){0,5}",
             ) {
                 let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-                let mut pipeline = Pipeline::new(Language::Rust, &ts_lang).unwrap();
+                let mut pipeline = Pipeline::builder()
+                    .language(Language::Rust)
+                    .grammar(&ts_lang)
+                    .build()
+                    .unwrap();
 
                 let result = pipeline.run_on_source(
                     &source,
@@ -555,7 +598,11 @@ mod tests {
                 source in "\\PC{0,200}",
             ) {
                 let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-                let mut pipeline = Pipeline::new(Language::Rust, &ts_lang).unwrap();
+                let mut pipeline = Pipeline::builder()
+                    .language(Language::Rust)
+                    .grammar(&ts_lang)
+                    .build()
+                    .unwrap();
 
                 let result = pipeline.run_on_source(
                     &source,
@@ -572,7 +619,11 @@ mod tests {
                 source in "(fn [a-z]+\\(\\) \\{\\}\n){0,5}",
             ) {
                 let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-                let mut pipeline = Pipeline::new(Language::Rust, &ts_lang).unwrap();
+                let mut pipeline = Pipeline::builder()
+                    .language(Language::Rust)
+                    .grammar(&ts_lang)
+                    .build()
+                    .unwrap();
 
                 let result = pipeline.run_on_source(
                     &source,

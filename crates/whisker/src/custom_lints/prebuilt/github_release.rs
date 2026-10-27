@@ -385,19 +385,19 @@ mod tests {
     const REV: &str = "0123456789abcdef0123456789abcdef01234567";
 
     fn name() -> AssetName {
-        let tag = AbiTag::new(
-            &AbiIdentity {
+        let tag = AbiTag::builder()
+            .identity(&AbiIdentity {
                 abi_version: AbiVersion { major: 0, minor: 1 },
                 types_fingerprint: 0,
                 language_fingerprint: 0,
-            },
-            "aarch64-apple-darwin",
-        );
+            })
+            .target("aarch64-apple-darwin")
+            .build();
 
-        AssetName::new(
-            &GitRev::new(REV).expect("the revision should be accepted"),
-            &tag,
-        )
+        AssetName::builder()
+            .rev(&GitRev::new(REV).expect("the revision should be accepted"))
+            .tag(&tag)
+            .build()
     }
 
     /// Returns a client pointed at `base`, and reads no environment

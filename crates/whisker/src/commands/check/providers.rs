@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::Context as _;
+use bon::bon;
 use whisker_rust::RustDecorationProvider;
 use whisker_types::{
     Coverage, CoverageGap, DecoratedTree, DecorationProvider, Language, ProviderName,
@@ -33,6 +34,7 @@ pub(super) struct Providers {
     typescript: HashMap<PathBuf, TypeScriptDecorationProvider>,
 }
 
+#[bon]
 impl Providers {
     /// Loads the providers for every language among `files`, for a check
     /// of `path`
@@ -43,6 +45,7 @@ impl Providers {
     /// names the language, because a mixed repository may lack only one of
     /// the project files. A TypeScript file with no `tsconfig.json` is not
     /// an error here: [`Providers::for_file`] reports its gap.
+    #[builder]
     pub(super) fn load(path: &Path, files: &[PathBuf]) -> anyhow::Result<Self> {
         let mut has_rust = false;
         let mut typescript = HashMap::new();
@@ -163,7 +166,10 @@ mod tests {
         ]);
         let page = directory.path().join("site/page.ts");
         let index = directory.path().join("packages/a/index.ts");
-        let providers = Providers::load(directory.path(), &[page.clone(), index.clone()])
+        let providers = Providers::load()
+            .path(directory.path())
+            .files(&[page.clone(), index.clone()])
+            .call()
             .expect("both projects should load");
 
         let found = providers.for_file(&page, Language::TypeScript);
@@ -188,7 +194,10 @@ mod tests {
     fn for_file_without_a_tsconfig_reports_no_project() {
         let directory = tree(&[("main.ts", "export {};\n")]);
         let file = directory.path().join("main.ts");
-        let providers = Providers::load(directory.path(), std::slice::from_ref(&file))
+        let providers = Providers::load()
+            .path(directory.path())
+            .files(std::slice::from_ref(&file))
+            .call()
             .expect("a file without a project should not stop the load");
         let mut pipeline = Grammar::of(&file)
             .expect("a TypeScript grammar")
@@ -218,7 +227,11 @@ mod tests {
         ]);
         let files = [directory.path().join("a.ts"), directory.path().join("b.ts")];
 
-        let providers = Providers::load(directory.path(), &files).expect("the project should load");
+        let providers = Providers::load()
+            .path(directory.path())
+            .files(&files)
+            .call()
+            .expect("the project should load");
 
         assert_eq!(providers.typescript.len(), 1);
     }
@@ -228,7 +241,10 @@ mod tests {
         let directory = tree(&[("main.ts", "export {};\n")]);
         let file = directory.path().join("main.ts");
 
-        let providers = Providers::load(directory.path(), std::slice::from_ref(&file))
+        let providers = Providers::load()
+            .path(directory.path())
+            .files(std::slice::from_ref(&file))
+            .call()
             .expect("a file without a project should not stop the load");
 
         assert!(providers.typescript.is_empty());
@@ -238,7 +254,11 @@ mod tests {
     fn load_with_no_files_loads_nothing() {
         let directory = tree(&[]);
 
-        let providers = Providers::load(directory.path(), &[]).expect("nothing should load");
+        let providers = Providers::load()
+            .path(directory.path())
+            .files(&[])
+            .call()
+            .expect("nothing should load");
 
         assert!(providers.rust.is_none());
         assert!(providers.typescript.is_empty());
@@ -249,7 +269,10 @@ mod tests {
         let directory = tree(&[("tsconfig.json", "{}"), ("main.ts", "export {};\n")]);
         let file = directory.path().join("main.ts");
 
-        let providers = Providers::load(directory.path(), std::slice::from_ref(&file))
+        let providers = Providers::load()
+            .path(directory.path())
+            .files(std::slice::from_ref(&file))
+            .call()
             .expect("the TypeScript project should load");
 
         assert!(providers.rust.is_none());

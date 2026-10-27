@@ -1,3 +1,4 @@
+use bon::bon;
 use stabby::slice::Slice;
 
 use crate::Decoration;
@@ -23,6 +24,7 @@ pub struct DecorationLookup<'a> {
     entries: Slice<'a, Entry>,
 }
 
+#[bon]
 impl<'a> DecorationLookup<'a> {
     /// Returns the handle that reads `entries` through `order`
     ///
@@ -30,6 +32,7 @@ impl<'a> DecorationLookup<'a> {
     /// entry sits on. [`DecorationMap::lookup`] is the only caller.
     ///
     /// [`DecorationMap::lookup`]: crate::DecorationMap
+    #[builder]
     pub(crate) fn of(order: &'a [usize], entries: &'a [Entry]) -> Self {
         Self {
             order: Slice::from(order),

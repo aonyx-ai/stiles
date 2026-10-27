@@ -23,6 +23,7 @@ provider = [
 
 [dependencies]
 anyhow = { workspace = true, optional = true }
+bon.workspace = true
 ra_ap_hir = { workspace = true, optional = true }
 ra_ap_ide_db = { workspace = true, optional = true }
 ra_ap_load-cargo = { workspace = true, optional = true }

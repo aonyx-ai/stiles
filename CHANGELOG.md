@@ -12,6 +12,12 @@ and this project adheres to
 
 ### Added
 
+- `Diagnostic`, `Span`, `Location`, `Suggestion`, `RuleOption`,
+  `DecoratedTree`, `DecoratedNode`, and the `TypePath`, `PublicPath`, and
+  `FnSignature` of `whisker-rust` each have a builder, `builder()`, beside
+  their positional `new`. A builder names every field at the call site. The
+  positional constructors go away once the rules use the builders.
+
 - `--json` writes each diagnostic of `whisker check` as one JSON object per
   line, with the rule, severity, message, file, byte offsets, line, and
   column. `whisker abi --json` writes the tag as a JSON string. `--verbose`
@@ -77,6 +83,10 @@ and this project adheres to
   A directory may also hold a cargo workspace.
 
 ### Changed
+
+- The decorations of the TypeScript provider, `ResolvedType`, `Parameter`,
+  and `FnSignature`, are built through `builder()`. Their positional `new` is
+  gone.
 
 - A TypeScript file with no `tsconfig.json` at or above it no longer stops the
   whole check. It reports a coverage gap of its own, like any file whisker

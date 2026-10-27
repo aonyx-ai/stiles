@@ -106,7 +106,7 @@ impl CustomLints {
                 let configured: Result<(), Panic> =
                     pass.configure(&options.for_rules(&lint.rules)).into();
                 configured.context("a lint pass panicked while reading the project's options")?;
-                Ok(Lint::new(pass, lint.rules.clone()))
+                Ok(Lint::builder().pass(pass).rules(lint.rules.clone()).build())
             })
             .collect()
     }
@@ -619,7 +619,10 @@ mod tests {
     fn config_with(root: &Path, lints: Vec<LintPath>) -> WhiskerConfig {
         let lints = lints.into_iter().map(LintSource::Path).collect();
 
-        WhiskerConfig::new(ProjectRoot::new(root.to_path_buf()), Vec::new(), lints)
+        WhiskerConfig::builder()
+            .root(ProjectRoot::new(root.to_path_buf()))
+            .lints(lints)
+            .build()
     }
 
     fn directories(config: &WhiskerConfig) -> anyhow::Result<Vec<PathBuf>> {

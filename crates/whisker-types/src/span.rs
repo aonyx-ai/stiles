@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use bon::bon;
+
 use crate::FilePath;
 
 /// A byte range within a source file
@@ -21,12 +23,14 @@ pub struct Span {
     end: usize,
 }
 
+#[bon]
 impl Span {
     /// Creates a span covering `[start, end)` in the given file
     ///
     /// # Panics
     ///
     /// Panics if `start > end`.
+    #[builder(start_fn = builder)]
     pub fn new(file: impl Into<FilePath>, start: usize, end: usize) -> Self {
         let file = file.into();
         assert!(

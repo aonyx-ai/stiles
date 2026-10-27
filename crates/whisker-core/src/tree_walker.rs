@@ -104,10 +104,10 @@ mod tests {
 
     /// Pairs `pass` with the rules it may report
     fn lint(pass: impl LintPass + 'static, rules: &[&'static str]) -> Lint<'static> {
-        Lint::new(
-            Box::new(pass),
-            rules.iter().map(|rule| RuleId::new(rule)).collect(),
-        )
+        Lint::builder()
+            .pass(Box::new(pass))
+            .rules(rules.iter().map(|rule| RuleId::new(rule)).collect())
+            .build()
     }
 
     fn parse_rust(source: &str) -> DecoratedTree {

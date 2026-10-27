@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use bon::bon;
+
 use crate::{DecoratedNode, DecorationMap, FilePath, Language};
 
 /// A parsed syntax tree with an overlay of semantic decorations
@@ -18,11 +20,13 @@ pub struct DecoratedTree {
     decorations: DecorationMap,
 }
 
+#[bon]
 impl DecoratedTree {
     /// Creates a decorated tree from a tree-sitter tree parsed as `language`
     ///
     /// The language decides which lint passes see the tree, so it must be
     /// the language of the grammar that produced it.
+    #[builder(start_fn = builder)]
     pub fn new(
         tree: tree_sitter::Tree,
         language: Language,

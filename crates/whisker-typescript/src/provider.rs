@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context as _;
+use bon::bon;
 use whisker_tsrs::tsrs_compiler::{
     Program, ProgramOptions, new_cached_fs_compiler_host, new_program,
 };
@@ -333,8 +334,10 @@ struct Target {
     end: u32,
 }
 
+#[bon]
 impl Target {
     /// Returns the target for `node`, found in tsrs by the range of `found_by`
+    #[builder]
     fn new(node: &DecoratedNode<'_>, found_by: &DecoratedNode<'_>) -> Option<Self> {
         Some(Self {
             node_id: node.id(),
@@ -360,19 +363,19 @@ fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Targets) {
     let kind = node.kind();
 
     if TYPED_KINDS.contains(&kind)
-        && let Some(target) = Target::new(node, node)
+        && let Some(target) = Target::builder().node(node).found_by(node).build()
     {
         targets.values.push(target);
     }
     if FUNCTION_KINDS.contains(&kind)
         && let Some(name) = node.child_by_field_name("name")
-        && let Some(target) = Target::new(node, &name)
+        && let Some(target) = Target::builder().node(node).found_by(&name).build()
     {
         targets.functions.push(target);
     }
     if MODULE_REFERENCE_KINDS.contains(&kind)
         && let Some(source) = node.child_by_field_name("source")
-        && let Some(target) = Target::new(&source, &source)
+        && let Some(target) = Target::builder().node(&source).found_by(&source).build()
     {
         targets.modules.push(target);
     }

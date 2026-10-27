@@ -87,11 +87,15 @@ pub fn fetch(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<Option<Path
     let directory = cache::prebuilt_directory(source, tag)?;
     let host = github_release::configured_repository_host();
 
-    let Some(repository) = GitHubRepository::from_url(source.url(), host.as_deref()) else {
+    let Some(repository) = GitHubRepository::from_url()
+        .url(source.url())
+        .maybe_api_host(host.as_deref())
+        .call()
+    else {
         return Ok(None);
     };
 
-    let name = AssetName::new(source.rev(), tag);
+    let name = AssetName::builder().rev(source.rev()).tag(tag).build();
 
     match download(&repository, &name, &directory) {
         Ok(Installed::Yes) => Ok(Some(directory)),

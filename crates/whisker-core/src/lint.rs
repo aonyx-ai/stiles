@@ -1,3 +1,4 @@
+use bon::bon;
 use whisker_types::{DecoratedNode, Diagnostic, Language, LintPass, Panic, RuleId};
 
 use crate::{PassPanic, UndeclaredRule};
@@ -13,7 +14,10 @@ use crate::{PassPanic, UndeclaredRule};
 /// # Examples
 ///
 /// ```ignore
-/// let lint = Lint::new(pass, vec![RuleId::new("lint.todo-comment")]);
+/// let lint = Lint::builder()
+///     .pass(pass)
+///     .rules(vec![RuleId::new("lint.todo-comment")])
+///     .build();
 ///
 /// assert_eq!(lint.rules(), [RuleId::new("lint.todo-comment")]);
 /// ```
@@ -30,14 +34,19 @@ enum Declared {
     Unchecked,
 }
 
+#[bon]
 impl<'pass> Lint<'pass> {
     /// Pairs `pass` with the rules its plugin declared for it
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// let lint = Lint::new(pass, vec![RuleId::new("lint.todo-comment")]);
+    /// let lint = Lint::builder()
+    ///     .pass(pass)
+    ///     .rules(vec![RuleId::new("lint.todo-comment")])
+    ///     .build();
     /// ```
+    #[builder]
     pub fn new(pass: Box<dyn LintPass + 'pass>, rules: Vec<RuleId>) -> Self {
         Self {
             pass,
@@ -108,7 +117,13 @@ impl<'pass> Lint<'pass> {
     ) -> anyhow::Result<Vec<Diagnostic>> {
         let checked: Result<_, Panic> = self.pass.check_node(node).into();
         let found: Vec<Diagnostic> = checked
-            .map_err(|panic| PassPanic::new(node.kind(), node.span(), panic))?
+            .map_err(|panic| {
+                PassPanic::builder()
+                    .kind(node.kind())
+                    .span(node.span())
+                    .panic(panic)
+                    .build()
+            })?
             .into_iter()
             .collect();
 
@@ -119,7 +134,12 @@ impl<'pass> Lint<'pass> {
             .iter()
             .find(|diagnostic| !rules.contains(&diagnostic.rule_id()))
         {
-            return Err(UndeclaredRule::new(stray.rule_id(), rules.clone(), node.span()).into());
+            return Err(UndeclaredRule::builder()
+                .rule(stray.rule_id())
+                .declared(rules.clone())
+                .span(node.span())
+                .build()
+                .into());
         }
 
         Ok(found)

@@ -244,6 +244,11 @@ hold a `serde_json::Value`.
   Debug, Default
 - Third-party derives: alphabetical by crate, then by macro
 
+A constructor with two or more parameters gets a builder. Derive
+`bon::Builder` on the struct, or put `#[builder]` on a constructor that
+validates and returns a `Result`. Positional arguments are allowed only in
+trait impls and test code.
+
 ```rust
 // DO
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
