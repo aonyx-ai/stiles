@@ -8,6 +8,7 @@ Usage: whisker [OPTIONS] [COMMAND]
 Commands:
   abi    Print the tag that names the prebuilt lints this whisker can load
   check  Run whisker lints against a project
+  rules  List the rules the project's configured lints declare
   help   Print this message or the help of the given subcommand(s)
 
 Options:

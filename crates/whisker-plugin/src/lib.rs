@@ -19,12 +19,12 @@ mod declares_rules;
 mod export_lints;
 
 pub use declares_rules::DeclaresRules;
-pub use whisker_types::Panic;
 use whisker_types::plugin::stable_fingerprint;
 pub use whisker_types::plugin::{
-    ABI_VERSION, AbiVersion, Constructed, Factories, LintPassFactory, Loaded, Plugin,
+    ABI_VERSION, AbiVersion, Constructed, ExportedLint, LintPassFactory, Loaded, Plugin,
     PluginDeclaration, TYPES_FINGERPRINT, factory,
 };
+pub use whisker_types::{Language, Panic};
 
 #[doc(hidden)]
 pub mod __private {

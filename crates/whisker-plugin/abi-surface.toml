@@ -1,6 +1,6 @@
 # The plugin boundary as this commit builds it. A test in whisker-plugin
 # fails when these values differ from the code, and `just check-abi`
 # fails when a fingerprint moves and the version does not.
-version = "0.2"
-types-fingerprint = "c24935f2378f4aba"
+version = "0.3"
+types-fingerprint = "4c18519f481c9dba"
 language-fingerprint = "6ddbcd1ad0a3f382"

@@ -25,6 +25,16 @@ whisker check [OPTIONS] [PATH]
 | `--keep-going`    | Report each failure and continue. The run still exits non-zero |
 | `--deny-warnings` | Fail on warnings as well as errors                             |
 
+## rules
+
+To see which rules the configured lints declare, run this in the project. Each
+line names a rule, the languages it runs on, and `off` when the project's
+`[rules]` turn it off.
+
+```bash
+whisker rules [PATH]
+```
+
 ## abi
 
 To find the ABI version of a Whisker binary, you can run this command. It takes

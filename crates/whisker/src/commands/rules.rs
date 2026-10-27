@@ -1,0 +1,152 @@
+use std::fmt;
+use std::path::PathBuf;
+
+use anyhow::Context as _;
+use clawless::prelude::*;
+use whisker_types::Language;
+
+use crate::config::WhiskerConfig;
+use crate::custom_lints::{CustomLints, DeclaredRule};
+
+/// List the rules the project's configured lints declare
+#[derive(Debug, Args)]
+pub struct RulesArgs {
+    /// Path to the target project directory
+    #[arg(default_value = ".")]
+    path: PathBuf,
+}
+
+/// One rule as `whisker rules` lists it
+///
+/// A rule can run on several languages, each through its own lint, and the
+/// listing names them all. `enabled` says whether the project's `[rules]`
+/// let the rule's diagnostics through, so a reader sees the effect of the
+/// configuration and not just what the plugins offer.
+#[derive(Clone, Eq, PartialEq, Debug, Serialize)]
+struct ListedRule {
+    rule: &'static str,
+    languages: Vec<&'static str>,
+    enabled: bool,
+}
+
+impl ListedRule {
+    /// Describes `declared` under the project's `config`
+    fn new(declared: &DeclaredRule, config: &WhiskerConfig) -> Self {
+        let DeclaredRule { rule, languages } = declared;
+
+        Self {
+            rule: rule.as_str(),
+            languages: languages.iter().copied().map(language_name).collect(),
+            enabled: config.rules().admits(rule),
+        }
+    }
+}
+
+impl fmt::Display for ListedRule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.rule, self.languages.join(", "))?;
+
+        match self.enabled {
+            true => Ok(()),
+            false => f.write_str(", off"),
+        }
+    }
+}
+
+/// Returns the lowercase name a reader of the listing sees for `language`
+///
+/// The names match the groups of `export_lints!`, where a rule author
+/// writes them.
+fn language_name(language: Language) -> &'static str {
+    match language {
+        Language::Rust => "rust",
+        Language::TypeScript => "typescript",
+    }
+}
+
+#[command]
+pub async fn rules(args: RulesArgs, context: Context) -> CommandResult {
+    let RulesArgs { path } = args;
+
+    anyhow::ensure!(path.exists(), "{} does not exist", path.display());
+
+    let config = WhiskerConfig::load(&path).context("failed to load the whisker configuration")?;
+    let custom_lints =
+        CustomLints::load(&config).context("failed to load the project's custom lints")?;
+
+    for declared in custom_lints.rules() {
+        context
+            .output()
+            .artifact(ListedRule::new(&declared, &config))
+            .await
+            .context("failed to report a rule")?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn listed(enabled: bool) -> ListedRule {
+        ListedRule {
+            rule: "lint.todo-comment",
+            languages: vec!["rust", "typescript"],
+            enabled,
+        }
+    }
+
+    #[test]
+    fn display_names_the_rule_and_its_languages() {
+        let text = listed(true).to_string();
+
+        assert_eq!(text, "lint.todo-comment (rust, typescript)");
+    }
+
+    #[test]
+    fn display_with_a_rule_turned_off_says_so() {
+        let text = listed(false).to_string();
+
+        assert_eq!(text, "lint.todo-comment (rust, typescript), off");
+    }
+
+    #[test]
+    fn json_has_the_rule_its_languages_and_whether_it_runs() {
+        let json = serde_json::to_value(listed(true)).expect("should serialize");
+
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "rule": "lint.todo-comment",
+                "languages": ["rust", "typescript"],
+                "enabled": true,
+            })
+        );
+    }
+
+    #[test]
+    fn language_name_matches_the_export_lints_groups() {
+        let names = [Language::Rust, Language::TypeScript].map(language_name);
+
+        assert_eq!(names, ["rust", "typescript"]);
+    }
+
+    #[test]
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<ListedRule>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<ListedRule>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<ListedRule>();
+    }
+}

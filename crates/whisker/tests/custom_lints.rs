@@ -492,3 +492,27 @@ fn check_with_lint_that_exports_no_declaration_fails() {
         .stderr(predicate::str::contains("not a whisker lint plugin"))
         .stderr(predicate::str::contains("export_lints!"));
 }
+
+/// Pins that `whisker rules` lists what the configured lints declare
+///
+/// The disabled rule still appears, marked off, so the listing shows what
+/// the configuration does and not only what the plugins offer.
+#[test]
+fn rules_lists_every_declared_rule_and_marks_the_disabled_one() {
+    let target = package(TODO_SOURCE);
+    let lints = workspace_of_lints();
+    let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
+    write_config(
+        target.path(),
+        &format!("[rules]\ndisable = [\"workspace.first\"]\n\n[[lints]]\npath = {lint_path}\n"),
+    );
+
+    whisker()
+        .env("CARGO_TARGET_DIR", shared_build_directory())
+        .arg("rules")
+        .arg(target.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("workspace.first (rust), off\n"))
+        .stdout(predicate::str::contains("workspace.second (rust)\n"));
+}
