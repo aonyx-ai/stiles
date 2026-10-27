@@ -2,9 +2,9 @@
 ///
 /// TypeScript gives a type alias of a primitive no type of its own:
 /// `type Name = string` makes `Name` another spelling of `string`. Two
-/// values of two such aliases are interchangeable to the checker, so a
-/// rule that wants to know whether a caller can swap them compares the
-/// primitive, not the name.
+/// values of two such aliases are interchangeable to the checker. A rule
+/// that asks whether a caller can swap them compares the primitive, not the
+/// name.
 ///
 /// A literal type counts as its primitive, so `"red"` is a
 /// [`Primitive::String`]. A numeric enum is not a number here, because the
