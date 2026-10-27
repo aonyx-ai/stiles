@@ -94,12 +94,15 @@ jobs:
         command: ${{ fromJson(needs.commands.outputs.commands) }}
 
     steps:
+      # Only the check of the bundle reads tsrs. Every other job builds the
+      # generated crate, so it skips the download of the submodule.
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The setup cleans the tree itself.
           clean: false
           persist-credentials: false
+          submodules: ${{ matrix.command == 'check-bundle-tsrs' }}
 
       - name: Set up the tools
         uses: $/.github/actions/setup

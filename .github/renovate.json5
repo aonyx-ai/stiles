@@ -3,13 +3,16 @@
   extends: ["github>aonyx-ai/renovate-config"],
   packageRules: [
     {
-      // The tsrs crates come from one repository at one commit, and they
-      // build only together. Renovate otherwise opens one pull request per
-      // crate, and each one moves a single crate to a commit the others are
-      // not at, so none of them builds. A git dependency's package name is
-      // its repository URL, so the rule matches the crate names instead.
-      matchDepNames: ["/^tsrs_/"],
-      groupName: "tsrs",
+      // A bump of the tsrs submodule changes the checker, and it fails
+      // `check-bundle-tsrs` until `bundle-tsrs` runs on the branch. tsrs
+      // moves often, so the submodule moves once a week, and a person
+      // regenerates the bundle and merges the pull request.
+      matchManagers: ["git-submodules"],
+      schedule: ["on monday"],
+      automerge: false,
     },
   ],
+  "git-submodules": {
+    enabled: true,
+  },
 }

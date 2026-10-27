@@ -4,6 +4,7 @@ extends: default
 ignore: |
   docs/node_modules/*
   target/*
+  vendor/*
 
 rules:
   comments:

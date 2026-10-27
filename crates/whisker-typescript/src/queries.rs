@@ -6,11 +6,11 @@
 
 use std::path::Path;
 
-use tsrs_ast::{Kind, Node, SourceFile, SymbolFlags, get_type_annotation_node};
-use tsrs_checker::{Checker, LiteralValue, Type, TypeFlags};
-use tsrs_compiler::Program;
-use tsrs_core::P;
-use tsrs_core::tspath::is_external_module_name_relative;
+use whisker_tsrs::tsrs_ast::{Kind, Node, SourceFile, SymbolFlags, get_type_annotation_node};
+use whisker_tsrs::tsrs_checker::{Checker, LiteralValue, Type, TypeFlags};
+use whisker_tsrs::tsrs_compiler::Program;
+use whisker_tsrs::tsrs_core::P;
+use whisker_tsrs::tsrs_core::tspath::is_external_module_name_relative;
 
 use crate::decorations::{
     FnSignature, ImportSource, Parameter, Primitive, ResolvedType, StringUnion,

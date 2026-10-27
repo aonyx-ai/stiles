@@ -134,6 +134,14 @@ file, a dependency in `node_modules`, or a package of the workspace. A
 file the project leaves out gets the gap that names its remedy, as for
 Rust.
 
+tsrs publishes no crates, and crates.io refuses a crate that depends on a
+repository. `mise run rakko -- bundle-tsrs` therefore copies the tsrs crates
+the provider needs into `whisker-tsrs`, one module for each crate, and
+rewrites only the paths that name a crate. A bump moves the `vendor/tsrs`
+submodule and runs the tool again. `mise run rakko -- check-bundle-tsrs`
+fails when the committed crate differs from a fresh run, so no fix to tsrs
+lands in the copy by hand.
+
 A provider and the syntax tree keep separate parses of the same file, so
 byte offsets tie them together. Each provider compares the text it analyzed
 with the text the pipeline parsed, and declines the file when they differ.
@@ -421,6 +429,7 @@ workspace, and `rakko test-fixture-lint` runs the tests of the probes.
 | `whisker-codegen`    | Generates a lint pass trait from `node-types.json`                                       |
 | `whisker-rust`       | Rust support: the generated trait, the decorations, and the provider                     |
 | `whisker-typescript` | TypeScript support: the trait from both grammars, the decorations, and the tsrs provider |
+| `whisker-tsrs`       | The tsrs crates as modules of one crate, generated from the `vendor/tsrs` submodule      |
 | `whisker-plugin`     | What a plugin exports: `export_lints!`, `DeclaresRules`, and the language fingerprint    |
 | `whisker-macros`     | The derive macro for decoration types                                                    |
 | `whisker-reporting`  | Diagnostic rendering                                                                     |

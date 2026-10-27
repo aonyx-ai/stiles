@@ -7,6 +7,8 @@
 //! which no action of Rakko knows how to do. The actions of this crate cover
 //! both, and the harness mounts them next to the bundles.
 
+/// Types for the actions that generate the tsrs bundle and check it
+pub mod bundle_tsrs;
 /// Types for the action that compares the plugin boundary with the one on main
 pub mod check_abi;
 /// Types for the action that checks the language crates without their providers
@@ -22,6 +24,7 @@ mod step;
 /// Types for the action that loads a plugin built with another toolchain
 pub mod test_plugin_toolchain;
 
+pub use self::bundle_tsrs::{BundleTsrs, CheckBundleTsrs};
 pub use self::check_abi::CheckAbi;
 pub use self::check_features::CheckFeatures;
 pub use self::check_self::CheckSelf;

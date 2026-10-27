@@ -1,0 +1,19 @@
+# Generates `crates/whisker-tsrs` from the tsrs submodule. It has no version
+# of its own, so a release leaves it out, and nothing that whisker ships
+# depends on it.
+[package]
+name = "bundle-tsrs"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+# `span-locations` gives every token its byte range in the file, so the tool
+# rewrites paths in place and leaves the rest of each file as upstream wrote it.
+proc-macro2 = { workspace = true, features = ["span-locations"] }
+serde.workspace = true
+serde_json.workspace = true
