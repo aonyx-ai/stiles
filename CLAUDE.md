@@ -493,6 +493,10 @@ mod tests {
 - Third-person singular ("Returns the..." not "Return the...")
 - No trailing period on summary
 
+The summary is the first paragraph, as rustdoc shows it. When it wraps over
+several lines, its last line carries no trailing period. An ellipsis or a
+closing code span is not a trailing period.
+
 ```rust
 // DO
 /// Returns the length of the string

@@ -152,7 +152,7 @@ mod tests {
     }
 
     /// A dependency that builds a cdylib of its own resolves outside the
-    /// configured directory, so containment keeps it out of the result.
+    /// configured directory, so containment keeps it out of the result
     #[test]
     fn cdylib_artifacts_ignores_a_dependency_outside_the_directory() {
         let stdout = [
@@ -181,7 +181,7 @@ mod tests {
     }
 
     /// A directory sharing a name prefix with the configured one is not
-    /// inside it, and `starts_with` compares whole components.
+    /// inside it, and `starts_with` compares whole components
     #[test]
     fn cdylib_artifacts_ignores_a_sibling_with_a_shared_prefix() {
         let stdout = [
@@ -246,7 +246,7 @@ mod tests {
     }
 
     /// Cargo reports a package once per built target, and loading the same
-    /// library twice would double every diagnostic it produces.
+    /// library twice would double every diagnostic it produces
     #[test]
     fn cdylib_artifacts_reports_a_package_once() {
         let stdout = [

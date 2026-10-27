@@ -440,9 +440,10 @@ mod tests {
         );
     }
 
-    /// The sort makes diagnostics reproducible across machines. This test
-    /// uses enough files for the storage order to differ from the sorted
-    /// order, so it fails without the sort.
+    /// The sort makes diagnostics reproducible across machines
+    ///
+    /// This test uses enough files for the storage order to differ from the
+    /// sorted order, so it fails without the sort.
     #[test]
     fn run_returns_files_in_sorted_order() {
         let directory = tree(&[
@@ -674,7 +675,9 @@ mod tests {
     }
 
     /// The walker reads `.git/info/exclude` only after it recognizes the
-    /// directory as a repository. An empty `.git` directory is enough.
+    /// directory as a repository
+    ///
+    /// An empty `.git` directory is enough.
     #[test]
     fn run_with_git_exclude_file_excludes_it() {
         let directory = tree(&["src/main.rs", "generated/schema.rs"]);

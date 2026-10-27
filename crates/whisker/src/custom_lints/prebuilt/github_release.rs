@@ -443,7 +443,8 @@ mod tests {
         );
     }
 
-    /// The token has to reach the public API too, and it once did not.
+    /// The token has to reach the public API too, and it once did not
+    ///
     /// The host that scoped it was the one that serves repositories, and
     /// the public API names no such host. Every request to it therefore
     /// went out unauthenticated, and no private repository answered.
@@ -473,9 +474,10 @@ mod tests {
         );
     }
 
-    /// A download redirects to a storage host. That host signs the
-    /// request itself and refuses one that carries an `Authorization`
-    /// header, so the token must not follow it there.
+    /// A download redirects to a storage host
+    ///
+    /// That host signs the request itself and refuses one that carries an
+    /// `Authorization` header, so the token must not follow it there.
     #[test]
     fn serves_is_false_for_the_host_a_download_redirects_to() {
         let api = api_for(DEFAULT_BASE);
@@ -533,7 +535,7 @@ mod tests {
         assert_eq!(asset.sidecar.name, name.sidecar());
     }
 
-    /// Whisker unpacks no archive it cannot check.
+    /// Whisker unpacks no archive it cannot check
     #[test]
     fn select_asset_without_a_sidecar_is_none() {
         let name = name();
@@ -553,7 +555,7 @@ mod tests {
         assert_eq!(select_asset(&releases, &name), None);
     }
 
-    /// Nobody published a draft, and its assets can still change.
+    /// Nobody published a draft, and its assets can still change
     #[test]
     fn select_asset_skips_a_draft() {
         let name = name();
@@ -576,7 +578,9 @@ mod tests {
     }
 
     /// A listing carries far more than whisker reads, and GitHub adds
-    /// fields over time. Neither fact may fail a check.
+    /// fields over time
+    ///
+    /// Neither fact may fail a check.
     #[test]
     fn releases_ignore_fields_whisker_does_not_read() {
         let json = r#"[{"id":1,"tag_name":"v1","draft":false,"prerelease":true,
