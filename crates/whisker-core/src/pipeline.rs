@@ -519,7 +519,7 @@ mod tests {
 
             #[test]
             fn detect_language_unknown_extensions_always_fail(ext in "[a-z]{1,5}") {
-                prop_assume!(ext != "rs");
+                prop_assume!(!["rs", "ts", "mts", "cts", "tsx"].contains(&ext.as_str()));
                 let path = PathBuf::from(format!("file.{ext}"));
                 prop_assert!(detect_language(&path).is_err());
             }
