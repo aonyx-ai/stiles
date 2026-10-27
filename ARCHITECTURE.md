@@ -115,10 +115,13 @@ produces receives no decorations.
 
 For every file it covers, the provider resolves a fixed set of node kinds.
 Those are function items, match scrutinees, else branches, the operand of
-`?`, and use declarations. It records what it finds as decorations: function
-signatures, resolved types, ADT flags, and import sources. The set belongs
-to the provider, and a rule that needs a decoration on another node kind
-needs a change to whisker-rust.
+`?`, use declarations, and the paths each use declaration imports. It
+records what it finds as decorations: function signatures, resolved types,
+ADT flags, import sources, and re-exports. The re-exports of an imported
+path are the public paths to the same item through the other crates the
+current crate depends on, which rust-analyzer's import maps prove. The set
+belongs to the provider, and a rule that needs a decoration on another node
+kind needs a change to whisker-rust.
 
 TypeScript's provider uses [tsrs][tsrs], a Rust port of the TypeScript 7
 checker, as a library. A TypeScript file belongs to the project of the

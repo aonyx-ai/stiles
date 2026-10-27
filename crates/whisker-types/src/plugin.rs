@@ -75,9 +75,9 @@ pub use fingerprint::stable_fingerprint;
 /// ```
 /// use whisker_types::plugin::{ABI_VERSION, AbiVersion};
 ///
-/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 4 });
+/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 5 });
 /// ```
-pub const ABI_VERSION: AbiVersion = AbiVersion { major: 0, minor: 4 };
+pub const ABI_VERSION: AbiVersion = AbiVersion { major: 0, minor: 5 };
 
 /// A fingerprint of how this crate lays out the plugin boundary
 ///

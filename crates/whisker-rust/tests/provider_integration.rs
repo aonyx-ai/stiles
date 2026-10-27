@@ -6,7 +6,8 @@ use std::sync::OnceLock;
 
 use decoration_probes::{AnyhowBareTry, FunctionScopedImport, WildcardMatchArm};
 use whisker_rust::decorations::{
-    AdtFlags, FnSignature, ImportSource, ResolvedType, ReturnMode, TypePathRef,
+    AdtFlags, FnSignature, ImportSource, PublicPath, Reexports, ResolvedType, ReturnMode,
+    TypePathRef,
 };
 use whisker_rust::{RustDecorationProvider, RustLintPassAdapter};
 use whisker_types::{
@@ -108,7 +109,12 @@ fn parse_fixture_file(relative: &str) -> DecoratedTree {
 }
 
 fn parse_and_decorate_fixture(provider: &RustDecorationProvider) -> DecoratedTree {
-    let mut decorated = parse_fixture_file("src/lib.rs");
+    decorate_fixture_file(provider, "src/lib.rs")
+}
+
+/// Parses and decorates the fixture file at `relative`, which must be covered
+fn decorate_fixture_file(provider: &RustDecorationProvider, relative: &str) -> DecoratedTree {
+    let mut decorated = parse_fixture_file(relative);
 
     let coverage = provider
         .decorate(&decorated)
@@ -551,6 +557,177 @@ fn import_source_on_an_uppercase_module_is_module() {
         import_source_in(&tree, "import_from_uppercase_module"),
         ImportSource::Module
     );
+}
+
+/// Returns the [`Reexports`] on the imported path `leaf` in `src/reexports.rs`
+///
+/// The `use` lines of that file each name their items once, so the text of
+/// a path that a `use` imports picks out its node. Only a node whose parent
+/// is a `use`, a list, or a rename is an imported path: the `Shape` inside
+/// `facade_core::Shape::Circle` is a qualifier.
+fn decorated_reexports_of(tree: &DecoratedTree, leaf: &str) -> Reexports {
+    fn find<'a>(node: &DecoratedNode<'a>, leaf: &str) -> Option<DecoratedNode<'a>> {
+        let parent_kind = node.parent().map(|parent| parent.kind());
+        let imported = match parent_kind {
+            Some("use_declaration" | "use_list" | "use_as_clause") => true,
+            Some(_) | None => false,
+        };
+        if imported && node.text() == leaf {
+            return Some(*node);
+        }
+        node.named_children()
+            .iter()
+            .find_map(|child| find(child, leaf))
+    }
+
+    let node = find(&tree.root_node(), leaf)
+        .unwrap_or_else(|| panic!("src/reexports.rs should import {leaf}"));
+
+    node.decoration::<Reexports>()
+        .cloned()
+        .unwrap_or_else(|| panic!("{leaf} should carry Reexports"))
+}
+
+fn rendered(reexports: &Reexports) -> Vec<String> {
+    reexports.paths().iter().map(ToString::to_string).collect()
+}
+
+/// An item of `core` is exposed by `std`, which every crate depends on
+#[test]
+fn reexports_on_a_core_item_lists_its_std_path() {
+    let provider = load_provider();
+    let tree = decorate_fixture_file(provider, "src/reexports.rs");
+
+    let reexports = decorated_reexports_of(&tree, "core::fmt::Debug");
+
+    let std_path = reexports.through("std").expect("std exposes core's Debug");
+    assert_eq!(std_path.to_string(), "std::fmt::Debug");
+    assert!(reexports.through("core").is_none());
+}
+
+/// A crate that depends on another proves nothing about re-exports
+///
+/// `lookalike_json` depends on `lookalike` as `serde_json` depends on
+/// `serde`, and exposes none of it. `anyhow` stands in for an unrelated
+/// crate from the registry.
+#[test]
+fn reexports_on_a_crate_that_reexports_nothing_is_empty() {
+    let provider = load_provider();
+    let tree = decorate_fixture_file(provider, "src/reexports.rs");
+
+    for leaf in [
+        "lookalike::Serialize",
+        "lookalike_json::Value",
+        "anyhow::Context",
+    ] {
+        let reexports = decorated_reexports_of(&tree, leaf);
+
+        assert!(
+            reexports.paths().is_empty(),
+            "{leaf} should have no other path, got {:?}",
+            rendered(&reexports)
+        );
+    }
+}
+
+/// A re-export marked `#[doc(hidden)]` is not offered as a path
+#[test]
+fn reexports_on_a_doc_hidden_reexport_is_empty() {
+    let provider = load_provider();
+    let tree = decorate_fixture_file(provider, "src/reexports.rs");
+
+    let reexports = decorated_reexports_of(&tree, "facade_core::hidden::Hidden");
+
+    assert!(reexports.paths().is_empty());
+}
+
+/// Each name in a grouped import gets its own decoration
+///
+/// The names inside the braces resolve with the prefix in front of them,
+/// so `Shape` and `thing::make` name `facade_core`'s items.
+#[test]
+fn reexports_on_a_grouped_import_decorates_each_name() {
+    let provider = load_provider();
+    let tree = decorate_fixture_file(provider, "src/reexports.rs");
+
+    let shape = decorated_reexports_of(&tree, "Shape");
+    let make = decorated_reexports_of(&tree, "thing::make");
+
+    assert_eq!(rendered(&shape), vec!["facade::Shape"]);
+    assert_eq!(rendered(&make), vec!["facade::thing::make"]);
+}
+
+#[test]
+fn reexports_on_a_local_item_is_empty() {
+    let provider = load_provider();
+    let tree = decorate_fixture_file(provider, "src/reexports.rs");
+
+    let reexports = decorated_reexports_of(&tree, "crate::Palette");
+
+    assert!(reexports.paths().is_empty());
+}
+
+/// A path that already goes through the facade lists the facade itself
+///
+/// The defining crate is the one left out, not the crate the `use` names,
+/// so a rule sees that `facade::thing::Thing` already takes the facade.
+/// The decoration sits on the path of a rename, not on the rename.
+#[test]
+fn reexports_on_a_path_through_the_facade_lists_the_facade() {
+    let provider = load_provider();
+    let tree = decorate_fixture_file(provider, "src/reexports.rs");
+
+    let reexports = decorated_reexports_of(&tree, "facade::thing::Thing");
+
+    assert_eq!(rendered(&reexports), vec!["facade::thing::Thing"]);
+}
+
+/// The item `facade` re-exports through a module gets the facade's path
+///
+/// The facade re-exports the whole `thing` module, so the path runs
+/// through a module that `facade_core` defines.
+#[test]
+fn reexports_on_a_reexported_item_lists_the_facade_path() {
+    let provider = load_provider();
+    let tree = decorate_fixture_file(provider, "src/reexports.rs");
+
+    let reexports = decorated_reexports_of(&tree, "facade_core::thing::Thing");
+
+    assert_eq!(
+        reexports.paths(),
+        &[PublicPath::new("facade", ["thing", "Thing"])]
+    );
+}
+
+/// A variant takes the facade's path to its enum
+#[test]
+fn reexports_on_an_enum_variant_goes_through_its_enum() {
+    let provider = load_provider();
+    let tree = decorate_fixture_file(provider, "src/reexports.rs");
+
+    let reexports = decorated_reexports_of(&tree, "facade_core::Shape::Circle");
+
+    assert_eq!(rendered(&reexports), vec!["facade::Shape::Circle"]);
+}
+
+/// Items of `facade_core` that `facade` does not offer get no path
+///
+/// `facade` re-exports the module that holds `Internal`, but marks the
+/// re-export `#[doc(hidden)]`, so no path through it counts.
+#[test]
+fn reexports_on_an_item_the_facade_leaves_out_is_empty() {
+    let provider = load_provider();
+    let tree = decorate_fixture_file(provider, "src/reexports.rs");
+
+    for leaf in ["facade_core::unexported::Internal", "facade_core::Draw"] {
+        let reexports = decorated_reexports_of(&tree, leaf);
+
+        assert!(
+            reexports.paths().is_empty(),
+            "{leaf} should have no other path, got {:?}",
+            rendered(&reexports)
+        );
+    }
 }
 
 #[test]

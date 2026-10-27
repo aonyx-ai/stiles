@@ -1,11 +1,13 @@
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::ops::Range;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Context as _;
+use ra_ap_hir::import_map::ImportMap;
 use ra_ap_hir::{
-    Adt, Enum, Function, HasAttrs, HirDisplay, Module, ModuleDef, PathResolution, Semantics, Type,
-    attach_db,
+    Adt, AsAssocItem as _, Crate, CrateDependency, Enum, Function, HasAttrs, HirDisplay, ItemInNs,
+    Module, ModuleDef, PathResolution, ScopeDef, Semantics, Type, attach_db,
 };
 use ra_ap_ide_db::base_db::SourceDatabase as _;
 use ra_ap_ide_db::famous_defs::FamousDefs;
@@ -20,7 +22,8 @@ use whisker_types::{
 };
 
 use crate::decorations::{
-    AdtFlags, ErrorType, FnSignature, ImportSource, ResolvedType, ReturnMode, TypePath,
+    AdtFlags, ErrorType, FnSignature, ImportSource, PublicPath, Reexports, ResolvedType,
+    ReturnMode, TypePath,
 };
 
 /// Decoration provider for Rust using rust-analyzer
@@ -310,11 +313,13 @@ fn resolve_targets(
     let ctx = DecorateCtx {
         sema,
         syntax: &syntax,
+        module,
         edition: krate.edition(sema.db),
         core_result: famous.core_result_Result(),
         core_option: famous.core_option_Option(),
     };
 
+    let mut module_paths = ModulePaths::default();
     let mut decorations = DecorationMap::new();
     for target in targets {
         match target {
@@ -355,6 +360,11 @@ fn resolve_targets(
                     decorations.insert(*node_id, source);
                 }
             }
+            Target::ImportPath { node_id, range } => {
+                if let Some(reexports) = resolve_reexports(&ctx, &mut module_paths, *range) {
+                    decorations.insert(*node_id, reexports);
+                }
+            }
         }
     }
     decorations
@@ -389,6 +399,10 @@ enum Target {
         operand_node_id: usize,
     },
     Import {
+        node_id: usize,
+        range: TextRange,
+    },
+    ImportPath {
         node_id: usize,
         range: TextRange,
     },
@@ -463,6 +477,9 @@ fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
                     range,
                 });
             }
+            if let Some(argument) = node.child_by_field_name("argument") {
+                collect_import_paths(&argument, targets);
+            }
         }
         _ => {}
     }
@@ -472,13 +489,49 @@ fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
     }
 }
 
+/// Collects each path a use tree imports, one target per imported name
+///
+/// The walk descends through lists and renames to the paths that name an
+/// item. A wildcard names no single item. Neither does a bare `self`,
+/// `super`, or `crate` in a list, nor a macro metavariable, so none of
+/// them becomes a target.
+fn collect_import_paths(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
+    match node.kind() {
+        "identifier" | "scoped_identifier" => {
+            if let Some(range) = text_range_of(node) {
+                targets.push(Target::ImportPath {
+                    node_id: node.id(),
+                    range,
+                });
+            }
+        }
+        "use_as_clause" => {
+            if let Some(path) = node.child_by_field_name("path") {
+                collect_import_paths(&path, targets);
+            }
+        }
+        "scoped_use_list" => {
+            if let Some(list) = node.child_by_field_name("list") {
+                collect_import_paths(&list, targets);
+            }
+        }
+        "use_list" => {
+            for child in node.named_children() {
+                collect_import_paths(&child, targets);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Shared state for resolving one file's targets
 ///
-/// The edition and the `core` enums are per-crate, so `resolve_targets`
-/// fills them once for the whole file.
+/// The module, the edition, and the `core` enums are per-file or
+/// per-crate, so `resolve_targets` fills them once for the whole file.
 struct DecorateCtx<'a, 'db> {
     sema: &'a Semantics<'db, RootDatabase>,
     syntax: &'a SyntaxNode,
+    module: Module,
     edition: Edition,
     core_result: Option<Enum>,
     core_option: Option<Enum>,
@@ -763,6 +816,210 @@ fn import_source_of(resolution: PathResolution<'_>) -> ImportSource {
         | PathResolution::ToolModule(_)
         | PathResolution::DeriveHelper(_) => ImportSource::Other,
     }
+}
+
+/// The public module paths of each dependency one file has asked about
+///
+/// Every target of a file looks out of the same crate, and a module of
+/// another crate is visible from every module of this one alike. One walk
+/// of a dependency therefore serves every `use` path in the file.
+#[derive(Default)]
+struct ModulePaths {
+    by_crate: HashMap<Crate, HashMap<Module, Vec<String>>>,
+}
+
+impl ModulePaths {
+    /// Returns the public path to each module of `krate`, walking it once
+    fn of(&mut self, ctx: &DecorateCtx<'_, '_>, krate: Crate) -> &HashMap<Module, Vec<String>> {
+        self.by_crate
+            .entry(krate)
+            .or_insert_with(|| public_module_paths(ctx, krate))
+    }
+}
+
+/// Returns the shortest public path from the root of `krate` to each module
+///
+/// The walk goes breadth first through the modules that the file's module
+/// can see, so it enters only `pub` modules, and it reaches a module first
+/// along its shortest path. A module that `krate` re-exports from another
+/// crate is part of the walk, because a path through it is a public path
+/// of `krate`.
+///
+/// A module that `#[doc(hidden)]` marks is not part of the walk, because
+/// its authors do not offer it as a path. The mark can sit on the module
+/// or on the `pub use` that re-exports it, and only the import map of
+/// `krate` records the second, so the walk asks the map about each step.
+fn public_module_paths(ctx: &DecorateCtx<'_, '_>, krate: Crate) -> HashMap<Module, Vec<String>> {
+    let db = ctx.sema.db;
+    let import_map = ImportMap::of(db, krate.base());
+    let root = krate.root_module(db);
+    let mut paths = HashMap::from([(root, Vec::new())]);
+    let mut queue = VecDeque::from([root]);
+
+    while let Some(module) = queue.pop_front() {
+        let Some(prefix) = paths.get(&module).cloned() else {
+            continue;
+        };
+        for (name, def) in module.scope(db, Some(ctx.module)) {
+            let ScopeDef::ModuleDef(ModuleDef::Module(child)) = def else {
+                continue;
+            };
+            if paths.contains_key(&child) {
+                continue;
+            }
+            let Ok(key) = ItemInNs::from(ModuleDef::Module(child)).try_into() else {
+                continue;
+            };
+            let offered = import_map.import_info_for(key).is_some_and(|infos| {
+                infos.iter().any(|info| {
+                    Module::from(info.container) == module
+                        && info.name == name
+                        && !info.is_doc_hidden
+                })
+            });
+            if !offered {
+                continue;
+            }
+            let mut path = prefix.clone();
+            path.push(name.display(db, ctx.edition).to_string());
+            paths.insert(child, path);
+            queue.push_back(child);
+        }
+    }
+
+    paths
+}
+
+/// Returns the other crates' public paths to what a `use` path imports
+///
+/// The target range covers one imported path, and the covering node in
+/// rust-analyzer's tree sits in that [`ast::Path`]. A path inside a use
+/// tree list resolves with the prefix in front of it, so `b` in
+/// `use a::{b}` resolves as `a::b`.
+///
+/// A path that resolves to nothing, or to something other than an item,
+/// yields [`None`] and so gets no decoration. A path whose span differs
+/// from the target's also yields [`None`], because the two parsers then
+/// disagree about what the `use` names.
+fn resolve_reexports(
+    ctx: &DecorateCtx<'_, '_>,
+    module_paths: &mut ModulePaths,
+    range: TextRange,
+) -> Option<Reexports> {
+    let path = covering_node(ctx.syntax, range)?
+        .ancestors()
+        .find_map(ast::Path::cast)?;
+    if path.syntax().text_range() != range {
+        return None;
+    }
+    path.syntax().ancestors().find_map(ast::UseTree::cast)?;
+
+    let PathResolution::Def(def) = ctx.sema.resolve_path(&path)? else {
+        return None;
+    };
+
+    Some(Reexports::new(public_paths(ctx, module_paths, def)))
+}
+
+/// Returns the crate that defines `def`, or [`None`] for a builtin type
+fn defining_crate(ctx: &DecorateCtx<'_, '_>, def: ModuleDef) -> Option<Crate> {
+    let db = ctx.sema.db;
+
+    match def {
+        ModuleDef::Module(module) => Some(module.krate(db)),
+        ModuleDef::Function(_)
+        | ModuleDef::Adt(_)
+        | ModuleDef::EnumVariant(_)
+        | ModuleDef::Const(_)
+        | ModuleDef::Static(_)
+        | ModuleDef::Trait(_)
+        | ModuleDef::TypeAlias(_)
+        | ModuleDef::Macro(_)
+        | ModuleDef::BuiltinType(_) => def.module(db).map(|module| module.krate(db)),
+    }
+}
+
+/// Returns a public path to `def` through each other crate that exposes it
+///
+/// Only a direct dependency of the current crate qualifies, because a
+/// `use` can only start at one. The crate that defines `def` is left out:
+/// its own path is the one a rule compares the others with. A crate can
+/// only re-export what it depends on, so a dependency outside the reverse
+/// dependencies of the defining crate is skipped without a lookup.
+///
+/// rust-analyzer's import map of a dependency proves that the item is
+/// public there and names the module that exposes it. The map lists an
+/// enum variant under the module of its enum, without the enum, so a
+/// variant takes the path of its enum with its own name after it. An
+/// associated item has no path a `use` can name, so it gets none.
+fn public_paths(
+    ctx: &DecorateCtx<'_, '_>,
+    module_paths: &mut ModulePaths,
+    def: ModuleDef,
+) -> Vec<PublicPath> {
+    let db = ctx.sema.db;
+    if def.as_assoc_item(db).is_some() {
+        return Vec::new();
+    }
+
+    let (item, suffix) = match def {
+        ModuleDef::EnumVariant(variant) => (
+            ModuleDef::Adt(Adt::Enum(variant.parent_enum(db))),
+            Some(variant.name(db).display(db, ctx.edition).to_string()),
+        ),
+        ModuleDef::Module(_)
+        | ModuleDef::Function(_)
+        | ModuleDef::Adt(_)
+        | ModuleDef::Const(_)
+        | ModuleDef::Static(_)
+        | ModuleDef::Trait(_)
+        | ModuleDef::TypeAlias(_)
+        | ModuleDef::Macro(_)
+        | ModuleDef::BuiltinType(_) => (def, None),
+    };
+
+    let current = ctx.module.krate(db);
+    let Some(defining) = defining_crate(ctx, item) else {
+        return Vec::new();
+    };
+    if defining == current {
+        return Vec::new();
+    }
+    let Ok(key) = ItemInNs::from(item).try_into() else {
+        return Vec::new();
+    };
+    let exposing: HashSet<Crate> = defining.transitive_reverse_dependencies(db).collect();
+
+    let mut paths = Vec::new();
+    for CrateDependency { krate, name } in current.dependencies(db) {
+        if krate == defining || !exposing.contains(&krate) {
+            continue;
+        }
+        let Some(infos) = ImportMap::of(db, krate.base()).import_info_for(key) else {
+            continue;
+        };
+        let modules = module_paths.of(ctx, krate);
+        let shortest = infos
+            .iter()
+            .filter(|info| !info.is_doc_hidden)
+            .filter_map(|info| {
+                let mut segments = modules.get(&Module::from(info.container))?.clone();
+                segments.push(info.name.display(db, ctx.edition).to_string());
+                Some(segments)
+            })
+            .min_by(|lhs, rhs| lhs.len().cmp(&rhs.len()).then_with(|| lhs.cmp(rhs)));
+        let Some(segments) = shortest else {
+            continue;
+        };
+
+        let krate_name = name.display(db, ctx.edition).to_string();
+        paths.push(PublicPath::new(
+            &krate_name,
+            segments.iter().chain(suffix.iter()),
+        ));
+    }
+
+    paths
 }
 
 #[cfg(test)]
