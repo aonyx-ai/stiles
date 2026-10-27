@@ -50,7 +50,7 @@ pub fn execute(tree: &DecoratedTree, passes: &mut [Box<dyn LintPass>]) -> Vec<Di
     whisker_core::walk(tree, passes).unwrap_or_else(|error| panic!("{error:#}"))
 }
 
-/// Builder for asserting diagnostic properties
+/// Starts a chain of assertions on the properties of a diagnostic
 ///
 /// # Examples
 ///

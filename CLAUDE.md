@@ -509,7 +509,8 @@ mod tests {
 
 #### Summary line
 
-- Third-person singular ("Returns the..." not "Return the...")
+- Third-person singular ("Returns the..." not "Return the..."). The summary
+  opens with that verb, not with a noun phrase, a code span, or a link.
 - No trailing period on summary
 
 The summary is the first paragraph, as rustdoc shows it. When it wraps over
