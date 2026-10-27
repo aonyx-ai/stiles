@@ -586,6 +586,11 @@ Documentation should explain the "why", not just the "what":
 - Type docs: comprehensive, self-contained.
 - Some duplication between module and type docs is acceptable.
 
+Document a module that lives in its own file with a `//!` header in that
+file, never with `///` on its `mod foo;` declaration. Rustc attaches both to
+the same module, so rustdoc prints the summary twice. An inline
+`mod foo { ... }` keeps its `///`.
+
 #### Language
 
 Use American English spelling: "color" not "colour", "serialize" not
