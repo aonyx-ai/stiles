@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::check_outcome::CheckOutcome;
+use super::file_failure::FileFailure;
 
 /// Whether the walk continues after a file fails
 ///
@@ -21,8 +21,8 @@ pub(crate) enum Walk {
 /// pipeline rejects the source. Both paths route through this type, so one
 /// place decides how a per-file failure affects the run.
 ///
-/// Both modes report the failure and set the outcome to
-/// [`CheckOutcome::Failure`]. A file that fails produces no diagnostics, so
+/// Both modes record the failure, and the command reports every recorded
+/// failure and fails the run. A file that fails produces no diagnostics, so
 /// nothing else would keep the exit code non-zero. The modes differ only in
 /// whether the walk visits the remaining files.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
@@ -34,21 +34,24 @@ pub(crate) enum ErrorRecovery {
 }
 
 impl ErrorRecovery {
-    /// Reports a failure encountered while processing a single file
+    /// Records a failure encountered while processing a single file
     ///
-    /// The method writes the error to stderr and sets `outcome` to
-    /// [`CheckOutcome::Failure`], which the command turns into a non-zero
-    /// exit code after the walk.
+    /// The method adds the failure to `failures`. The command reports them
+    /// after the walk and turns any of them into a non-zero exit code.
     ///
     /// Returns whether the caller should keep walking.
     pub(crate) fn record(
         self,
-        outcome: &mut CheckOutcome,
+        failures: &mut Vec<FileFailure>,
         file: &Path,
         error: anyhow::Error,
     ) -> Walk {
-        eprintln!("error: {}: {error:#}", file.display());
-        *outcome = CheckOutcome::Failure;
+        failures.push(
+            FileFailure::builder()
+                .file(file.to_path_buf())
+                .error(error)
+                .build(),
+        );
 
         match self {
             Self::Abort => Walk::Stop,
@@ -66,48 +69,49 @@ mod tests {
     }
 
     #[test]
-    fn record_with_abort_fails_the_outcome() {
-        let mut outcome = CheckOutcome::Success;
+    fn record_with_abort_records_the_failure() {
+        let mut failures = Vec::new();
 
-        ErrorRecovery::Abort.record(&mut outcome, Path::new("bad.rs"), test_error());
+        ErrorRecovery::Abort.record(&mut failures, Path::new("bad.rs"), test_error());
 
-        assert_eq!(outcome, CheckOutcome::Failure);
+        assert_eq!(failures.len(), 1);
     }
 
     #[test]
     fn record_with_abort_stops_the_walk() {
-        let mut outcome = CheckOutcome::Success;
+        let mut failures = Vec::new();
 
-        let walk = ErrorRecovery::Abort.record(&mut outcome, Path::new("bad.rs"), test_error());
+        let walk = ErrorRecovery::Abort.record(&mut failures, Path::new("bad.rs"), test_error());
 
         assert_eq!(walk, Walk::Stop);
     }
 
     #[test]
-    fn record_with_continue_fails_the_outcome() {
-        let mut outcome = CheckOutcome::Success;
-
-        ErrorRecovery::Continue.record(&mut outcome, Path::new("bad.rs"), test_error());
-
-        assert_eq!(outcome, CheckOutcome::Failure);
-    }
-
-    #[test]
     fn record_with_continue_keeps_an_earlier_failure() {
-        let mut outcome = CheckOutcome::Failure;
+        let mut failures = Vec::new();
+        ErrorRecovery::Continue.record(&mut failures, Path::new("first.rs"), test_error());
 
-        ErrorRecovery::Continue.record(&mut outcome, Path::new("bad.rs"), test_error());
+        ErrorRecovery::Continue.record(&mut failures, Path::new("second.rs"), test_error());
 
-        assert_eq!(outcome, CheckOutcome::Failure);
+        assert_eq!(failures.len(), 2);
     }
 
     #[test]
     fn record_with_continue_keeps_walking() {
-        let mut outcome = CheckOutcome::Success;
+        let mut failures = Vec::new();
 
-        let walk = ErrorRecovery::Continue.record(&mut outcome, Path::new("bad.rs"), test_error());
+        let walk = ErrorRecovery::Continue.record(&mut failures, Path::new("bad.rs"), test_error());
 
         assert_eq!(walk, Walk::Continue);
+    }
+
+    #[test]
+    fn record_with_continue_records_the_failure() {
+        let mut failures = Vec::new();
+
+        ErrorRecovery::Continue.record(&mut failures, Path::new("bad.rs"), test_error());
+
+        assert_eq!(failures.len(), 1);
     }
 
     #[test]

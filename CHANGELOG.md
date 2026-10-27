@@ -84,6 +84,14 @@ and this project adheres to
 
 ### Changed
 
+- `whisker check` and `whisker rules` write their errors and notes to stderr
+  after the report, not while they run. A file whisker could not check, a
+  walk error, and a note or warning about prebuilt lints all come last, and
+  a run that stops on an error still writes the ones it collected first.
+
+- `whisker_codegen::build_language` takes the writer for the directives it
+  gives cargo. A build script passes its standard output.
+
 - The decorations of the TypeScript provider, `ResolvedType`, `Parameter`,
   and `FnSignature`, are built through `builder()`. Their positional `new` is
   gone.

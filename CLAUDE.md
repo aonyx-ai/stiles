@@ -374,6 +374,21 @@ reads the disk, the network, or a subprocess, or loads a library, takes a name
 such as `load`, `fetch`, `build`, or `run`. Reading an environment variable is
 an input, not I/O.
 
+#### Output
+
+Code that produces a result never writes it to the terminal and never ends
+the process. It returns the result, or it writes to a handle its caller passes
+in. Only `main.rs` prints, takes `std::io::stdout()` or `std::io::stderr()`,
+and calls `std::process::exit`. Build scripts and tests may print too.
+
+```rust
+// DO
+sink.report(CheckEvent::Skipped { file, gap });
+
+// DON'T
+eprintln!("error: {}: {error:#}", file.display());
+```
+
 #### Comments
 
 - No inline comments (doc comments only)

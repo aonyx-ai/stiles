@@ -40,6 +40,9 @@ mod archive;
 mod asset_name;
 mod github_release;
 mod github_repository;
+mod notice;
+
+pub use self::notice::PrebuiltNotice;
 
 /// What the downloaded archive is called while it is being checked
 const DOWNLOAD: &str = "archive.tar.gz";
@@ -74,16 +77,19 @@ pub fn cached(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<Option<Pat
 /// nothing, and the caller then compiles the source. That fallback is
 /// what whisker did before any of this existed, and it is never wrong.
 ///
-/// The cases differ in whether the reader hears about them. A failure is
-/// a warning, and a release that holds no archive for this whisker is a
-/// note, because a publisher can act on it. A repository whisker cannot
-/// see stays quiet: that is what a private one looks like without a
-/// token, and nobody reading it can do anything about it.
+/// The cases differ in whether the reader hears about them. A failure and
+/// a release that holds no archive for this whisker each add a
+/// [`PrebuiltNotice`] to `notices`, which the command shows. A repository
+/// whisker cannot see adds nothing.
 ///
 /// # Errors
 ///
 /// Returns an error if no cache location can be determined.
-pub fn fetch(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<Option<PathBuf>> {
+pub fn fetch(
+    source: &GitLintSource,
+    tag: &AbiTag,
+    notices: &mut Vec<PrebuiltNotice>,
+) -> anyhow::Result<Option<PathBuf>> {
     let directory = cache::prebuilt_directory(source, tag)?;
     let host = github_release::configured_repository_host();
 
@@ -100,12 +106,18 @@ pub fn fetch(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<Option<Path
     match download(&repository, &name, &directory) {
         Ok(Installed::Yes) => Ok(Some(directory)),
         Ok(Installed::Absent) => {
-            note_absent(source, &name);
+            notices.push(PrebuiltNotice::Unpublished {
+                lints: source.clone(),
+                name,
+            });
             Ok(None)
         }
         Ok(Installed::Unlisted) => Ok(None),
         Err(error) => {
-            warn(source, &error);
+            notices.push(PrebuiltNotice::Unusable {
+                lints: source.clone(),
+                error,
+            });
             Ok(None)
         }
     }
@@ -149,47 +161,6 @@ enum Installed {
 
     /// Whisker could not see the repository, so it asked nothing of it
     Unlisted,
-}
-
-/// Tells the reader that nobody published lints this whisker can load
-///
-/// Nothing is wrong when this appears, and the check reports exactly what
-/// it would have reported anyway. It costs a compile of every rule in the
-/// source, on every machine and every build agent, which is minutes that
-/// look like whisker being slow rather than like an archive being absent.
-/// Silence there reads the same as a warm cache, so the one case a
-/// publisher can act on says so.
-///
-/// The message names the archive rather than describing it. A publisher
-/// reading it knows the exact file to produce, and the name carries the
-/// commit and this whisker's ABI tag, which are the two things that
-/// decide whether an archive is found.
-///
-/// This is not the same as [`warn`]. That one reports a lookup that
-/// failed and might succeed next time. This one reports a lookup that
-/// worked and found nothing.
-fn note_absent(source: &GitLintSource, name: &AssetName) {
-    eprintln!(
-        "note: no prebuilt lints published for {source} as {}; whisker builds them from source \
-         instead",
-        name.as_str()
-    );
-}
-
-/// Tells the reader that whisker compiles what it hoped to download
-///
-/// Whisker says this at most once per source. Nothing is broken when it
-/// appears. The check goes on and reports the same diagnostics, more
-/// slowly.
-///
-/// This reports a lookup that failed and might succeed on the next run.
-/// [`note_absent`] reports the other outcome, where the lookup worked and
-/// the archive is simply not published.
-fn warn(source: &GitLintSource, error: &anyhow::Error) {
-    eprintln!(
-        "warning: whisker cannot use the prebuilt lints for {source}: {error:#}; it builds them \
-         from source instead"
-    );
 }
 
 /// Downloads, checks, and unpacks the archive a release publishes

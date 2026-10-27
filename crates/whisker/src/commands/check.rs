@@ -1,6 +1,7 @@
 mod check_outcome;
 mod error_recovery;
 mod failure_threshold;
+mod file_failure;
 mod finding;
 mod grammar;
 mod providers;
@@ -11,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context as _;
+use clawless::exit::Exit;
 use clawless::prelude::*;
 use whisker_core::{Lint, Pipeline};
 use whisker_types::{Diagnostic, RuleOptions, UncoveredFile};
@@ -18,9 +20,11 @@ use whisker_types::{Diagnostic, RuleOptions, UncoveredFile};
 use self::check_outcome::CheckOutcome;
 use self::error_recovery::{ErrorRecovery, Walk};
 use self::failure_threshold::FailureThreshold;
+use self::file_failure::FileFailure;
 use self::finding::Finding;
 use self::grammar::Grammar;
 use self::providers::Providers;
+use super::closing_text::ClosingText;
 use crate::config::WhiskerConfig;
 use crate::custom_lints::CustomLints;
 use crate::discovery::{Discovery, WalkErrorPolicy};
@@ -106,7 +110,31 @@ impl CoverageRemedies {
 }
 
 #[command]
-pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode> {
+pub async fn check(args: CheckArgs, context: Context) -> CommandResult<Exit> {
+    let mut closing = ClosingText::default();
+
+    match run(args, &context, &mut closing).await {
+        Ok(code) => Ok(closing.into_exit(code)),
+        Err(error) => Ok(closing.into_failure(&error)),
+    }
+}
+
+/// Runs the check, and leaves its errors and notices in `closing`
+///
+/// The diagnostics go to the presenter as the walk finds them. The errors
+/// of the files the walk could not check, and the notices of the lint
+/// loading, go into `closing`. The command returns them in its exit, so
+/// they reach the standard error after the report. An error that ends the
+/// run comes back to the command, which puts it after them.
+///
+/// # Errors
+///
+/// Returns an error if the run cannot start or cannot report a result.
+async fn run(
+    args: CheckArgs,
+    context: &Context,
+    closing: &mut ClosingText,
+) -> anyhow::Result<ExitCode> {
     let CheckArgs {
         path,
         keep_going,
@@ -127,8 +155,13 @@ pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode>
 
     let config = WhiskerConfig::load(&path).context("failed to load the whisker configuration")?;
 
-    let custom_lints =
-        CustomLints::load(&config).context("failed to load the project's custom lints")?;
+    let mut notices = Vec::new();
+    let custom_lints = CustomLints::load()
+        .config(&config)
+        .notices(&mut notices)
+        .call();
+    closing.extend(notices);
+    let custom_lints = custom_lints.context("failed to load the project's custom lints")?;
 
     let declared = custom_lints.declared();
 
@@ -157,7 +190,7 @@ pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode>
     let mut outcome = CheckOutcome::Success;
 
     for error in discovery.errors() {
-        eprintln!("error: {error:#}");
+        closing.push(format_args!("error: {error:#}"));
         outcome = CheckOutcome::Failure;
     }
 
@@ -177,6 +210,7 @@ pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode>
     let mut all_diagnostics = Vec::new();
     let mut sources: HashMap<Arc<Path>, String> = HashMap::new();
     let mut remedies = CoverageRemedies::default();
+    let mut failures: Vec<FileFailure> = Vec::new();
 
     for file in files {
         context
@@ -187,7 +221,7 @@ pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode>
 
         let source = match std::fs::read_to_string(file) {
             Ok(source) => source,
-            Err(e) => match recovery.record(&mut outcome, file, anyhow::Error::new(e)) {
+            Err(e) => match recovery.record(&mut failures, file, anyhow::Error::new(e)) {
                 Walk::Continue => continue,
                 Walk::Stop => break,
             },
@@ -198,7 +232,7 @@ pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode>
 
         let Some(grammar) = Grammar::of(file) else {
             let error = anyhow::anyhow!("whisker has no grammar for {}", file.display());
-            match recovery.record(&mut outcome, file, error) {
+            match recovery.record(&mut failures, file, error) {
                 Walk::Continue => continue,
                 Walk::Stop => break,
             }
@@ -231,7 +265,7 @@ pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode>
                     remedies.record(uncovered);
                 }
 
-                match recovery.record(&mut outcome, file, e) {
+                match recovery.record(&mut failures, file, e) {
                     Walk::Continue => {}
                     Walk::Stop => break,
                 }
@@ -239,7 +273,12 @@ pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode>
         }
     }
 
-    remedies.report(&context).await?;
+    for failure in failures {
+        closing.push(failure);
+        outcome = CheckOutcome::Failure;
+    }
+
+    remedies.report(context).await?;
 
     let all_diagnostics: Vec<Diagnostic> = all_diagnostics
         .into_iter()

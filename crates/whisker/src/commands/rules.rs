@@ -3,9 +3,11 @@ use std::path::PathBuf;
 
 use anyhow::Context as _;
 use bon::bon;
+use clawless::exit::Exit;
 use clawless::prelude::*;
 use whisker_types::Language;
 
+use super::closing_text::ClosingText;
 use crate::config::WhiskerConfig;
 use crate::custom_lints::{CustomLints, DeclaredRule};
 
@@ -68,14 +70,34 @@ fn language_name(language: Language) -> &'static str {
 }
 
 #[command]
-pub async fn rules(args: RulesArgs, context: Context) -> CommandResult {
+pub async fn rules(args: RulesArgs, context: Context) -> CommandResult<Exit> {
+    let mut closing = ClosingText::default();
+
+    match list(args, &context, &mut closing).await {
+        Ok(()) => Ok(closing.into_exit(ExitCode::SUCCESS)),
+        Err(error) => Ok(closing.into_failure(&error)),
+    }
+}
+
+/// Lists the rules, and leaves the notices of the lint loading in `closing`
+///
+/// # Errors
+///
+/// Returns an error if the configuration or the lints cannot be loaded, or
+/// if a rule cannot be reported.
+async fn list(args: RulesArgs, context: &Context, closing: &mut ClosingText) -> anyhow::Result<()> {
     let RulesArgs { path } = args;
 
     anyhow::ensure!(path.exists(), "{} does not exist", path.display());
 
     let config = WhiskerConfig::load(&path).context("failed to load the whisker configuration")?;
-    let custom_lints =
-        CustomLints::load(&config).context("failed to load the project's custom lints")?;
+    let mut notices = Vec::new();
+    let custom_lints = CustomLints::load()
+        .config(&config)
+        .notices(&mut notices)
+        .call();
+    closing.extend(notices);
+    let custom_lints = custom_lints.context("failed to load the project's custom lints")?;
 
     for declared in custom_lints.rules() {
         context
