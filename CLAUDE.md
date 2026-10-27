@@ -236,6 +236,23 @@ like `Other(String)`, `Custom(Box<dyn Any>)`, or
 payload-less `Other` is fine. A type that deserializes an external format may
 hold a `serde_json::Value`.
 
+#### Ports speak the domain's language
+
+A port is a `pub trait` that an adapter implements with a toolchain. Its
+methods name only types the domain owns: the standard library, this crate, and
+sibling crates of this workspace. Never put an external crate's type in a
+port's parameters, return type, or generic bounds. Every implementation and
+every caller would then depend on that crate. The adapter converts at the
+boundary instead.
+
+```rust
+// DO
+fn decorate(&self, tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError>;
+
+// DON'T
+fn decorate(&self, tree: &DecoratedTree) -> anyhow::Result<Coverage>;
+```
+
 #### Derive conventions
 
 - Builders with `bon`
