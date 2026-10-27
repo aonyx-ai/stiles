@@ -360,6 +360,15 @@ for entry in entries {
 }
 ```
 
+#### Pure functions
+
+Functions named `new`, `try_from`, or `from_str`, and functions named `parse`,
+`resolve`, or `plan` or starting with `parse_`, `resolve_`, or `plan_`, are
+pure: they build a value from their inputs and do no I/O. A function that
+reads the disk, the network, or a subprocess, or loads a library, takes a name
+such as `load`, `fetch`, `build`, or `run`. Reading an environment variable is
+an input, not I/O.
+
 #### Comments
 
 - No inline comments (doc comments only)
