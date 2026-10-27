@@ -157,14 +157,14 @@ impl Package {
         self.rust_version.as_deref()
     }
 
-    /// The directory that holds the manifest of the crate
+    /// Returns the directory that holds the manifest of the crate
     pub(crate) fn dir(&self) -> PathBuf {
         self.manifest_path
             .parent()
             .map_or_else(PathBuf::new, Path::to_path_buf)
     }
 
-    /// The directory that holds the sources of the library
+    /// Returns the directory that holds the sources of the library
     pub(crate) fn src_dir(&self) -> PathBuf {
         self.dir().join("src")
     }
@@ -190,7 +190,7 @@ impl Package {
         Ok(())
     }
 
-    /// The build script of the crate, if it has one
+    /// Returns the build script of the crate, if it has one
     pub(crate) fn build_script(&self) -> Option<&Path> {
         self.targets
             .iter()
@@ -198,7 +198,9 @@ impl Package {
             .map(|target| target.src_path.as_path())
     }
 
-    /// The dependencies that a build of the library needs, without the dev-dependencies
+    /// Returns the dependencies that a build of the library needs
+    ///
+    /// The dev-dependencies are left out.
     pub(crate) fn dependencies(&self) -> impl Iterator<Item = &Dependency> {
         self.dependencies
             .iter()
@@ -211,12 +213,14 @@ impl Dependency {
         &self.name
     }
 
-    /// The version requirement, as Cargo normalizes it, such as `^2`
+    /// Returns the version requirement, as Cargo normalizes it, such as `^2`
     pub(crate) fn req(&self) -> &str {
         &self.req
     }
 
-    /// The kind of the dependency: `None` for a normal one, or `build` or `dev`
+    /// Returns the kind of the dependency, or `None` for a normal one
+    ///
+    /// The kind of any other dependency is `build` or `dev`.
     pub(crate) fn kind(&self) -> Option<&str> {
         self.kind.as_deref()
     }
@@ -233,12 +237,14 @@ impl Dependency {
         &self.features
     }
 
-    /// The platform the dependency applies to, such as `cfg(unix)`
+    /// Returns the platform the dependency applies to, such as `cfg(unix)`
     pub(crate) fn target(&self) -> Option<&str> {
         self.target.as_deref()
     }
 
-    /// The name the crate uses for the dependency, when it differs from its package name
+    /// Returns the name the crate uses for the dependency
+    ///
+    /// It is `None` when the crate uses the package name.
     pub(crate) fn rename(&self) -> Option<&str> {
         self.rename.as_deref()
     }
