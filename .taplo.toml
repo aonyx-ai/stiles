@@ -1,6 +1,8 @@
 exclude = [
   ".claude/worktrees/**",
+  "crates/whisker-tsrs/**",
   "docs/node_modules/**",
+  "vendor/**",
   # Cargo writes its build output to the target directory of each workspace.
   # Taplo does not read .gitignore and anchors each pattern at this directory,
   # so the pattern names the target directory at every depth.

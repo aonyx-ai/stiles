@@ -1,15 +1,18 @@
 [workspace]
-members = ["crates/*"]
+members = ["crates/*", "tools/bundle-tsrs"]
 # A lint plugin is never a member, because whisker builds and loads it the way
 # it loads a plugin from outside this repository. The two plugins in `examples`
 # declare a workspace of their own, so they need no entry here. The lint
 # plugin of the tests cannot, because whisker-rust depends on it by path. The
 # sample projects are the code that the tests check, not code of this
-# repository.
+# repository. `tools/rakko` is a workspace of its own, so the members name the
+# generator of the tsrs bundle and not the whole directory. `vendor` holds the
+# tsrs submodule, which `tools/bundle-tsrs` reads and nothing builds.
 exclude = [
   "crates/whisker-rust/tests/fixtures/lints/decoration_probes",
   "crates/whisker-rust/tests/fixtures/sample_project",
   "examples/sample_project",
+  "vendor",
 ]
 
 # Opt-in to the new feature resolver introduced in Rust 1.85 and Edition 2024.
@@ -124,18 +127,6 @@ tree-sitter-rust = "0.24"
 # TypeScript grammar and `.tsx` files with the TSX grammar, whose JSX
 # syntax conflicts with TypeScript's angle-bracket type assertions.
 tree-sitter-typescript = "0.23"
-# The TypeScript provider type-checks with tsrs, a Rust port of the
-# TypeScript 7 checker, so analysis runs in whisker's process with no
-# Node.js or Go toolchain. tsrs publishes no crates, so the crates are
-# pinned to one commit; a bump is a deliberate change to the checker.
-tsrs_ast = { git = "https://github.com/oxc-project/tsrs", rev = "4a61321929d0d62b86c5fb35f15bfa1607e03b50" }
-tsrs_astnav = { git = "https://github.com/oxc-project/tsrs", rev = "4a61321929d0d62b86c5fb35f15bfa1607e03b50" }
-tsrs_checker = { git = "https://github.com/oxc-project/tsrs", rev = "4a61321929d0d62b86c5fb35f15bfa1607e03b50" }
-tsrs_compiler = { git = "https://github.com/oxc-project/tsrs", rev = "4a61321929d0d62b86c5fb35f15bfa1607e03b50" }
-tsrs_core = { git = "https://github.com/oxc-project/tsrs", rev = "4a61321929d0d62b86c5fb35f15bfa1607e03b50" }
-tsrs_module = { git = "https://github.com/oxc-project/tsrs", rev = "4a61321929d0d62b86c5fb35f15bfa1607e03b50" }
-tsrs_tsoptions = { git = "https://github.com/oxc-project/tsrs", rev = "4a61321929d0d62b86c5fb35f15bfa1607e03b50" }
-tsrs_vfs = { git = "https://github.com/oxc-project/tsrs", rev = "4a61321929d0d62b86c5fb35f15bfa1607e03b50" }
 whisker-core = { path = "crates/whisker-core", version = "=0.1.0" }
 whisker-macros = { path = "crates/whisker-macros", version = "=0.1.0" }
 whisker-codegen = { path = "crates/whisker-codegen", version = "=0.1.0" }
@@ -143,3 +134,10 @@ whisker-reporting = { path = "crates/whisker-reporting", version = "=0.1.0" }
 whisker-rust = { path = "crates/whisker-rust", version = "=0.1.0" }
 whisker-types = { path = "crates/whisker-types", version = "=0.1.0" }
 whisker-testing = { path = "crates/whisker-testing", version = "=0.1.0" }
+# The TypeScript provider type-checks with tsrs, a Rust port of the
+# TypeScript 7 checker, so analysis runs in whisker's process with no
+# Node.js or Go toolchain. tsrs publishes no crates, and crates.io refuses a
+# dependency on a repository, so `mise run rakko -- bundle-tsrs` repackages the tsrs crates
+# that whisker uses as one crate. The `vendor/tsrs` submodule pins the commit;
+# a bump is a deliberate change to the checker.
+whisker-tsrs = { path = "crates/whisker-tsrs", version = "=0.1.0" }

@@ -18,7 +18,10 @@
 //! Run it with `mise run rakko`, or with `rakko` where the environment
 //! supplies the shortcut.
 
-use harness::{CheckAbi, CheckFeatures, CheckSelf, InDirectory, TestPluginToolchain};
+use harness::{
+    BundleTsrs, CheckAbi, CheckBundleTsrs, CheckFeatures, CheckSelf, InDirectory,
+    TestPluginToolchain,
+};
 use rakko_action::{ErasedAction, action_name};
 use rakko_cli::ErasedCommand;
 use rakko_format_json::FormatJson;
@@ -63,7 +66,9 @@ fn main() {
 /// Returns the actions that only this repository mounts
 fn whisker() -> Vec<Box<dyn ErasedAction>> {
     vec![
+        Box::new(BundleTsrs),
         Box::new(CheckAbi),
+        Box::new(CheckBundleTsrs),
         Box::new(CheckFeatures),
         Box::new(CheckSelf),
         format_fixture_lint(),

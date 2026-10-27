@@ -5,3 +5,6 @@ docs/node_modules/
 # with the grammar crate whisker links, and formatting would break that.
 crates/whisker-typescript/src/tsx-node-types.json
 crates/whisker-typescript/src/typescript-node-types.json
+# Generated from the tsrs submodule, and checked against a fresh run.
+crates/whisker-tsrs/
+vendor/

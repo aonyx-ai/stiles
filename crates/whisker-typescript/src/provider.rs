@@ -2,11 +2,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context as _;
-use tsrs_compiler::{Program, ProgramOptions, new_cached_fs_compiler_host, new_program};
-use tsrs_core::P;
-use tsrs_core::context::Context;
-use tsrs_tsoptions::{ParseConfigHost, ParsedCommandLine};
-use tsrs_vfs::{FS, bundled, osvfs};
+use whisker_tsrs::tsrs_compiler::{
+    Program, ProgramOptions, new_cached_fs_compiler_host, new_program,
+};
+use whisker_tsrs::tsrs_core::P;
+use whisker_tsrs::tsrs_core::context::Context;
+use whisker_tsrs::tsrs_tsoptions::{ParseConfigHost, ParsedCommandLine};
+use whisker_tsrs::tsrs_vfs::{FS, bundled, osvfs};
+use whisker_tsrs::{tsrs_ast, tsrs_astnav, tsrs_tsoptions};
 use whisker_types::{
     Coverage, CoverageGap, DecoratedNode, DecoratedTree, DecorationMap, DecorationProvider,
     ProviderName,

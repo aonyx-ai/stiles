@@ -3,12 +3,16 @@
 # `/examples/` and the fixtures hold code that breaks whisker's own lints on
 # purpose. `/docs/` is the documentation site: its TypeScript configuration
 # extends a package that exists only after `npm install`, and the site's own
-# build checks that code. `/tools/` holds the harness of the maintenance
-# commands, a workspace of its own that follows the conventions of Rakko.
+# build checks that code. `/tools/rakko/` holds the harness of the
+# maintenance commands, a workspace of its own that follows the conventions of
+# Rakko. `/crates/whisker-tsrs/` and `/vendor/` hold tsrs, which follows its
+# own rules.
 ignore = [
+  "/crates/whisker-tsrs/",
   "/docs/",
   "/examples/",
-  "/tools/",
+  "/tools/rakko/",
+  "/vendor/",
   "crates/whisker-rust/tests/fixtures/",
 ]
 

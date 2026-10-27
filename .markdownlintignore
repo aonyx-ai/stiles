@@ -3,3 +3,5 @@ target
 docs/.docusaurus
 docs/build
 docs/node_modules
+crates/whisker-tsrs
+vendor
