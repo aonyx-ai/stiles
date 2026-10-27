@@ -1,8 +1,15 @@
 [workspace]
 members = ["crates/*"]
+# A lint plugin is never a member, because whisker builds and loads it the way
+# it loads a plugin from outside this repository. The two plugins in `examples`
+# declare a workspace of their own, so they need no entry here. The lint
+# plugin of the tests cannot, because whisker-rust depends on it by path. The
+# sample projects are the code that the tests check, not code of this
+# repository.
 exclude = [
   "crates/whisker-rust/tests/fixtures/lints/decoration_probes",
-  "examples",
+  "crates/whisker-rust/tests/fixtures/sample_project",
+  "examples/sample_project",
 ]
 
 # Opt-in to the new feature resolver introduced in Rust 1.85 and Edition 2024.

@@ -61,7 +61,7 @@ mod tests {
     fn abi_surface() -> String {
         format!(
             "# The plugin boundary as this commit builds it. A test in whisker-plugin\n\
-             # fails when these values differ from the code, and `just check-abi`\n\
+             # fails when these values differ from the code, and `rakko check-abi`\n\
              # fails when a fingerprint moves and the version does not.\n\
              version = \"{ABI_VERSION}\"\n\
              types-fingerprint = \"{TYPES_FINGERPRINT:016x}\"\n\

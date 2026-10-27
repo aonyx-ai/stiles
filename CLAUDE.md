@@ -91,30 +91,46 @@ than large rewrites.
 
 ### Development environment
 
-The development environment is managed using [Flox][flox]. The justfile uses
-`flox activate` as its shell, so all `just` recipes automatically run within
-the Flox environment.
+[Mise] provisions every external tool at the version that `mise.toml` pins.
+Run `mise install` once, and activate mise in your shell so that the tools and
+the stubs in `bin` reach your `PATH`.
 
-For ad-hoc commands outside of just:
+[Rakko] provides the maintenance tasks. `tools/rakko` is the harness of this
+repository: a package outside the workspace that mounts the bundles of actions
+this repository runs, and that turns each action into a command. Run
+`mise run rakko` to list the commands, or `rakko` where mise supplies its
+environment.
 
-```shell
-flox activate -- <command>
-```
+- Add an action by mounting it in `tools/rakko/src/main.rs`, and pin the tool
+  it needs in `mise.toml`. Rakko installs nothing, and an action whose tool
+  mise does not report stops instead of passing quietly.
+- The checks that only Whisker needs, such as `check-self` and
+  `test-plugin-toolchain`, live in the library of `tools/rakko`.
+- CI enumerates the commands from the help of the harness and runs each one
+  whose name starts with `build-`, `check-`, `format-`, `lint-`, or `test-`,
+  so a mounted action with one of these prefixes becomes a required check.
+- `mise run rakko -- pre-commit` runs the actions that guard a commit, and
+  `--fix` lets the formatters repair what they find. The Git hook runs it.
+- The release workflow builds and packages the binaries, and no action does,
+  because the harness only reads and repairs the tree of this repository.
+- The documentation site has no action. Run `npm ci` and then
+  `npm run start` in `docs` to serve it locally.
 
 ## Quick reference
 
 ```bash
 # Run all pre-commit checks (formatting, linting, tests)
-just pre-commit
+mise run rakko -- pre-commit
 
 # Format code (REQUIRED before committing)
-just format-rust true
+mise run rakko -- format-rust --fix
 
-# Run tests (uses nextest)
-just test-rust
+# Run tests (uses nextest), and the examples in the documentation
+mise run rakko -- test-rust
+mise run rakko -- test-rust-docs
 
 # Lint
-just lint-rust
+mise run rakko -- lint-rust
 
 # Build
 cargo build --all-targets --all-features
@@ -143,8 +159,10 @@ git show <commit> --stat
 ### Edition and formatting
 
 - Use Rust 2024 edition.
-- Format with `just format-rust true` (uses unstable formatting options).
-- Formatting is enforced in CI—always run `just format-rust` before committing.
+- Format with `mise run rakko -- format-rust --fix` (uses unstable formatting
+  options).
+- Formatting is enforced in CI—always run `mise run rakko -- format-rust`
+  before committing.
 
 ### Module organization
 
@@ -401,7 +419,7 @@ fn helper() {}
 
 Testing tools:
 
-- **nextest**: Test runner (used by `just test-rust`).
+- **nextest**: Test runner (used by `mise run rakko -- test-rust`).
 
 #### Test structure
 
@@ -627,6 +645,7 @@ This `CLAUDE.md` file was adopted from
 [nextest's AGENTS.md][nextest-agents], which is published under the
 Apache-2.0 or MIT license.
 
-[flox]: https://flox.dev
+[mise]: https://mise.jdx.dev
+[rakko]: https://github.com/aonyx-ai/rakko
 [nextest-agents]: https://github.com/nextest-rs/nextest/blob/main/AGENTS.md
 [tbaggery]: https://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html

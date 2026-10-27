@@ -38,14 +38,12 @@ Git repository:
 cargo install --git https://github.com/aonyx-ai/whisker --locked whisker
 ```
 
-Alternatively, you can clone the repository and install it from there. Note that
-our workspace includes a nightly toolchain for some checks, but you can use
-Cargo's `+stable` option to bypass installing it.
+Alternatively, you can clone the repository and install it from there:
 
 ```bash
 git clone https://github.com/aonyx-ai/whisker
 cd whisker
-cargo +stable install --locked --path crates/whisker
+cargo install --locked --path crates/whisker
 ```
 
 [install-sh]: https://github.com/aonyx-ai/whisker/blob/main/docs/static/install.sh

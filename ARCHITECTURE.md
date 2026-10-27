@@ -371,7 +371,7 @@ the promise, and a plugin built for any minor of it keeps loading.
 `crates/whisker-plugin/abi-surface.toml` records the version and both
 fingerprints, and a test in whisker-plugin fails when the record and the
 code differ. A change to the boundary therefore changes the record, and
-`just check-abi` compares the record with the one on `main`. A moved
+`rakko check-abi` compares the record with the one on `main`. A moved
 fingerprint with the same version fails the check. From 1.0, a moved
 fingerprint with the same major fails it too, because a fingerprinted type
 that changed refuses every older plugin.
@@ -411,8 +411,8 @@ plugin packages stay here for the tests that need one.
 decorations, so the provider's output stays under test. Both sit outside
 the workspace and keep their own lockfiles, the way a plugin written
 elsewhere does. The workspace test run builds and loads them through the
-CLI, and `just test-examples` and `just test-fixture-lint` run their
-own tests.
+CLI. `rakko test-rust` runs the tests of the two examples beside those of the
+workspace, and `rakko test-fixture-lint` runs the tests of the probes.
 
 | Crate                | Role                                                                                     |
 | -------------------- | ---------------------------------------------------------------------------------------- |

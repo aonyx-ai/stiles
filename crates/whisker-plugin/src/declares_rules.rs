@@ -12,7 +12,7 @@ use whisker_types::RuleId;
 /// plugin built against a newer protocol than an older one without
 /// refusing either.
 ///
-/// [`export_lints!`]: crate::export_lints
+/// [`export_lints!`]: macro@crate::export_lints
 ///
 /// # Examples
 ///

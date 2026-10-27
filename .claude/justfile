@@ -89,4 +89,4 @@ launch *args: require-https
     export GH_CONFIG_DIR="{{ justfile_directory() }}/.gh"
     mkdir -p "$GH_CONFIG_DIR"
 
-    flox activate -- claude "$@"
+    mise exec -- claude "$@"
