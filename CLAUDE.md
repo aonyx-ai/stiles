@@ -270,7 +270,8 @@ pub struct CommandId(i64);
 
 - let-else for early returns
 - Minimize if-let (only for short actions without else)
-- Full match expressions (no matches! macro)
+- Full match expressions (no matches! macro). In a condition, let the `match`
+  carry the branch bodies; do not bind its result to a `bool` and test that.
 - Explicit variant matching (no wildcards except for #[non_exhaustive])
 
 ```rust

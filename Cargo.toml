@@ -28,6 +28,10 @@ repository = "https://github.com/aonyx-ai/whisker.git"
 undocumented_unsafe_blocks = "warn"
 missing_errors_doc = "warn"
 missing_panics_doc = "warn"
+# The lint conflicts with lint.matches-macro of the rules. Clippy asks for
+# `matches!` in place of a `match` that yields `bool` literals and ends in a
+# wildcard, and the rule asks for that `match` in place of `matches!`.
+match_like_matches_macro = "allow"
 
 # The tests run rust-analyzer far more than they compile it.
 [profile.dev.package."*"]
