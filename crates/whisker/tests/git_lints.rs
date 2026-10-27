@@ -105,15 +105,25 @@ fn repository_with_one_lint(rule: &str) -> FixtureRepository {
     })
 }
 
-/// Pins that the fixture helper ignores the git environment around the tests
+/// The files of a repository around a fixture, read before and after the
+/// fixture was built inside that repository's git environment
+struct AmbientRun {
+    index_before: Vec<u8>,
+    index_after: Vec<u8>,
+    config_before: Vec<u8>,
+    config_after: Vec<u8>,
+    rules: FixtureRepository,
+}
+
+/// Builds a fixture while `GIT_DIR` and `GIT_INDEX_FILE` name another
+/// repository, and reads that repository's index and config around it
 ///
 /// The suite runs from a pre-commit hook, and git exports `GIT_DIR` and
 /// `GIT_INDEX_FILE` to a hook in a linked worktree. A fixture that inherited
 /// them once ran `git init` and `git add --all` against the checkout being
-/// committed. The test sets the process environment, which nextest confines
-/// to this test's own process.
-#[test]
-fn fixture_repository_ignores_an_ambient_git_environment() {
+/// committed. This sets the process environment, which nextest confines to
+/// the test's own process.
+fn fixture_in_an_ambient_git_environment() -> AmbientRun {
     let victim = tempfile::tempdir().expect("temporary directory should be created");
     std::fs::write(victim.path().join("file.txt"), "hello\n").expect("the file should be written");
     git(victim.path(), &["init", "--quiet", "-b", "main"]);
@@ -139,18 +149,47 @@ fn fixture_repository_ignores_an_ambient_git_environment() {
     let index_after = std::fs::read(git_dir.join("index")).expect("the index should be readable");
     let config_after =
         std::fs::read(git_dir.join("config")).expect("the config should be readable");
+
+    AmbientRun {
+        index_before,
+        index_after,
+        config_before,
+        config_after,
+        rules,
+    }
+}
+
+/// Pins that the fixture helper commits in a repository of its own
+#[test]
+fn fixture_repository_in_an_ambient_git_environment_holds_its_own_commit() {
+    let run = fixture_in_an_ambient_git_environment();
+
     assert_eq!(
-        index_after, index_before,
-        "the fixture wrote the victim's index"
-    );
-    assert_eq!(
-        config_after, config_before,
-        "the fixture wrote the victim's config"
-    );
-    assert_eq!(
-        rules.rev().len(),
+        run.rules.rev().len(),
         40,
         "the fixture should hold a commit of its own"
+    );
+}
+
+/// Pins that the fixture helper leaves the config of the ambient repository
+#[test]
+fn fixture_repository_ignores_an_ambient_git_config() {
+    let run = fixture_in_an_ambient_git_environment();
+
+    assert_eq!(
+        run.config_after, run.config_before,
+        "the fixture wrote the victim's config"
+    );
+}
+
+/// Pins that the fixture helper leaves the index of the ambient repository
+#[test]
+fn fixture_repository_ignores_an_ambient_git_environment() {
+    let run = fixture_in_an_ambient_git_environment();
+
+    assert_eq!(
+        run.index_after, run.index_before,
+        "the fixture wrote the victim's index"
     );
 }
 

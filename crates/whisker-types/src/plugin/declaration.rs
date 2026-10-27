@@ -86,9 +86,14 @@ mod tests {
     fn load_sits_after_every_other_field() {
         let load = offset_of!(PluginDeclaration, load);
 
-        assert!(offset_of!(PluginDeclaration, abi_version) < load);
-        assert!(offset_of!(PluginDeclaration, types_fingerprint) < load);
-        assert!(offset_of!(PluginDeclaration, language_fingerprint) < load);
+        let before = [
+            offset_of!(PluginDeclaration, abi_version),
+            offset_of!(PluginDeclaration, types_fingerprint),
+            offset_of!(PluginDeclaration, language_fingerprint),
+        ]
+        .map(|offset| offset < load);
+
+        assert_eq!(before, [true; 3]);
     }
 
     #[test]

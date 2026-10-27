@@ -245,23 +245,38 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
+    fn trait_send_fn_signature() {
         fn assert_send<T: Send>() {}
         assert_send::<FnSignature>();
+    }
+
+    #[test]
+    fn trait_send_parameter() {
+        fn assert_send<T: Send>() {}
         assert_send::<Parameter>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_sync_fn_signature() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<FnSignature>();
+    }
+
+    #[test]
+    fn trait_sync_parameter() {
+        fn assert_sync<T: Sync>() {}
         assert_sync::<Parameter>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_unpin_fn_signature() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<FnSignature>();
+    }
+
+    #[test]
+    fn trait_unpin_parameter() {
+        fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Parameter>();
     }
 }

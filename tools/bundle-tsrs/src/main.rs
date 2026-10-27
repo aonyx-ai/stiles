@@ -349,9 +349,14 @@ mod tests {
     }
 
     #[test]
-    fn trait_auto() {
+    fn trait_auto_arguments() {
         fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<Arguments>();
+    }
+
+    #[test]
+    fn trait_auto_revision() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<Revision>();
     }
 }

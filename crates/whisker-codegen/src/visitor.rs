@@ -233,12 +233,22 @@ mod tests {
     ]"#;
 
     #[test]
+    fn generate_visitor_with_minimal_json_produces_a_method_per_named_node() {
+        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+
+        let missing: Vec<&str> = ["fn check_source_file(", "fn check_function_item("]
+            .into_iter()
+            .filter(|method| !code.contains(method))
+            .collect();
+
+        assert_eq!(missing, Vec::<&str>::new());
+    }
+
+    #[test]
     fn generate_visitor_with_minimal_json_produces_trait() {
         let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
 
         assert!(code.contains("pub trait RustLintPass: Send + Sync {"));
-        assert!(code.contains("fn check_source_file("));
-        assert!(code.contains("fn check_function_item("));
     }
 
     #[test]
@@ -246,15 +256,36 @@ mod tests {
         let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
 
         assert!(code.contains("fn configure(&mut self, _options: &RuleOptions) {}"));
+    }
+
+    #[test]
+    fn generate_visitor_imports_the_rule_options() {
+        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+
         assert!(code.contains("use whisker_types::{DecoratedNode, Diagnostic, RuleOptions};"));
     }
 
     #[test]
-    fn generate_visitor_excludes_unnamed_nodes() {
+    fn generate_visitor_excludes_unnamed_nodes_from_the_dispatch() {
+        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+
+        assert!(!code.contains("\";\""));
+    }
+
+    #[test]
+    fn generate_visitor_excludes_unnamed_nodes_from_the_methods() {
         let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
 
         assert!(!code.contains("check_semicolon"));
-        assert!(!code.contains("\";\""));
+    }
+
+    #[test]
+    fn generate_visitor_dispatches_each_kind_to_its_method() {
+        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+
+        assert!(
+            code.contains("\"source_file\" => diagnostics.extend(pass.check_source_file(node))")
+        );
     }
 
     #[test]
@@ -262,9 +293,6 @@ mod tests {
         let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
 
         assert!(code.contains("pub fn dispatch("));
-        assert!(
-            code.contains("\"source_file\" => diagnostics.extend(pass.check_source_file(node))")
-        );
     }
 
     #[test]
@@ -278,19 +306,42 @@ mod tests {
     fn generate_visitor_with_supertype_dispatches_subtypes() {
         let code = generate_visitor(SUPERTYPE_JSON, "Rust").expect("should parse");
 
-        assert!(code.contains("\"function_item\""));
-        assert!(code.contains("\"const_item\""));
+        let missing: Vec<&str> = ["\"function_item\"", "\"const_item\""]
+            .into_iter()
+            .filter(|kind| !code.contains(kind))
+            .collect();
+
+        assert_eq!(missing, Vec::<&str>::new());
+    }
+
+    #[test]
+    fn generate_visitor_with_supertype_dispatches_subtypes_to_the_supertype_method() {
+        let code = generate_visitor(SUPERTYPE_JSON, "Rust").expect("should parse");
+
         assert!(code.contains("check_declaration_statement(node)"));
+    }
+
+    #[test]
+    fn generate_visitor_with_nested_supertypes_produces_the_outer_method() {
+        let code = generate_visitor(NESTED_SUPERTYPE_JSON, "Rust").expect("should parse");
+
+        assert!(code.contains("check_expression("));
     }
 
     #[test]
     fn generate_visitor_with_nested_supertypes_resolves_leaves() {
         let code = generate_visitor(NESTED_SUPERTYPE_JSON, "Rust").expect("should parse");
 
-        assert!(code.contains("check_expression("));
-        assert!(code.contains("\"integer_literal\""));
-        assert!(code.contains("\"string_literal\""));
-        assert!(code.contains("\"array_expression\""));
+        let missing: Vec<&str> = [
+            "\"integer_literal\"",
+            "\"string_literal\"",
+            "\"array_expression\"",
+        ]
+        .into_iter()
+        .filter(|kind| !code.contains(kind))
+        .collect();
+
+        assert_eq!(missing, Vec::<&str>::new());
     }
 
     const DIAMOND_SUPERTYPE_JSON: &str = r#"[
@@ -346,6 +397,12 @@ mod tests {
         let code = generate_visitor(MINIMAL_JSON, "Python").expect("should parse");
 
         assert!(code.contains("pub trait PythonLintPass: Send + Sync {"));
+    }
+
+    #[test]
+    fn generate_visitor_with_different_language_drops_the_rust_name() {
+        let code = generate_visitor(MINIMAL_JSON, "Python").expect("should parse");
+
         assert!(!code.contains("RustLintPass"));
     }
 
@@ -368,9 +425,13 @@ mod tests {
     }
 
     #[test]
+    fn method_name_prefixes_check() {
+        assert_eq!(method_name("function_item"), "check_function_item");
+    }
+
+    #[test]
     fn method_name_strips_underscore_prefix() {
         assert_eq!(method_name("_expression"), "check_expression");
-        assert_eq!(method_name("function_item"), "check_function_item");
     }
 
     mod prop {

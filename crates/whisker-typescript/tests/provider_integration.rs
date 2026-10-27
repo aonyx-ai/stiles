@@ -256,11 +256,8 @@ fn decorate_feeds_a_rule_that_flags_swappable_parameters() {
 
     let diagnostics = whisker_core::walk(&tree, &mut passes).expect("the walk should succeed");
 
-    assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
-    assert_eq!(
-        diagnostics[0].message(),
-        "`greeting` and `name` can be swapped"
-    );
+    let messages: Vec<&str> = diagnostics.iter().map(|found| found.message()).collect();
+    assert_eq!(messages, ["`greeting` and `name` can be swapped"]);
 }
 
 #[test]
@@ -285,24 +282,45 @@ fn decorate_lists_the_members_of_a_string_union() {
     assert_eq!(members, ["green", "red"]);
 }
 
-#[test]
-fn decorate_resolves_a_primitive_alias_on_a_parameter() {
+/// Returns the type of the `greeting` parameter, declared with the alias
+/// `Greeting` of `string`
+fn greeting_type() -> ResolvedType {
     let source = format!("{ALIASES}export function greet(greeting: Greeting): void {{}}\n");
     let project = Project::new(STRICT, &[("src/main.ts", &source)]);
 
     let tree = decorate(&project, "src/main.ts").expect("the file should be covered");
 
     let greeting = find(&tree, "identifier", "greeting");
-    let ty = greeting
+    greeting
         .decoration::<ResolvedType>()
-        .expect("the parameter should be resolved");
-    assert_eq!(ty.alias(), Some("Greeting"));
-    assert_eq!(ty.primitive(), Primitive::String);
-    assert_eq!(ty.display(), "string");
+        .expect("the parameter should be resolved")
+        .clone()
 }
 
 #[test]
-fn decorate_signs_a_function_declaration() {
+fn decorate_resolves_a_primitive_alias_on_a_parameter() {
+    let ty = greeting_type();
+
+    assert_eq!(ty.alias(), Some("Greeting"));
+}
+
+#[test]
+fn decorate_resolves_the_primitive_behind_an_alias() {
+    let ty = greeting_type();
+
+    assert_eq!(ty.primitive(), Primitive::String);
+}
+
+#[test]
+fn decorate_resolves_the_text_behind_an_alias() {
+    let ty = greeting_type();
+
+    assert_eq!(ty.display(), "string");
+}
+
+/// Returns the signature of a function that takes an aliased and a plain
+/// parameter and returns an alias
+fn sign_signature() -> FnSignature {
     let source = format!(
         "{ALIASES}export function sign(greeting: Greeting, count: number): Name {{ return greeting; }}\n"
     );
@@ -311,9 +329,16 @@ fn decorate_signs_a_function_declaration() {
     let tree = decorate(&project, "src/main.ts").expect("the file should be covered");
 
     let function = first_function(&tree);
-    let signature = function
+    function
         .decoration::<FnSignature>()
-        .expect("the function should carry its signature");
+        .expect("the function should carry its signature")
+        .clone()
+}
+
+#[test]
+fn decorate_signs_a_function_declaration() {
+    let signature = sign_signature();
+
     let parameters: Vec<(&str, Option<&str>, Primitive)> = signature
         .parameters()
         .iter()
@@ -325,6 +350,7 @@ fn decorate_signs_a_function_declaration() {
             )
         })
         .collect();
+
     assert_eq!(
         parameters,
         [
@@ -332,6 +358,12 @@ fn decorate_signs_a_function_declaration() {
             ("count", None, Primitive::Number),
         ]
     );
+}
+
+#[test]
+fn decorate_signs_the_return_type_of_a_function_declaration() {
+    let signature = sign_signature();
+
     assert_eq!(signature.return_type().alias(), Some("Name"));
 }
 
@@ -420,12 +452,15 @@ fn decorate_types_the_identifiers_of_a_file_in_the_program() {
 
     let tree = decorate(&project, "src/main.ts").expect("should cover the file");
 
-    assert_eq!(types_of(&tree, "total"), vec![Some("number".to_owned())]);
+    let types = ["total", "add"].map(|name| types_of(&tree, name));
     assert_eq!(
-        types_of(&tree, "add"),
-        vec![
-            Some("(a: number, b: number) => number".to_owned()),
-            Some("(a: number, b: number) => number".to_owned())
+        types,
+        [
+            vec![Some("number".to_owned())],
+            vec![
+                Some("(a: number, b: number) => number".to_owned()),
+                Some("(a: number, b: number) => number".to_owned())
+            ],
         ]
     );
 }
@@ -496,8 +531,13 @@ fn project_root_finds_the_nearest_configuration() {
     let outer = TypeScriptDecorationProvider::project_root(&project.path("src/main.ts"));
     let inner = TypeScriptDecorationProvider::project_root(&project.path("packages/b/index.ts"));
 
-    assert_eq!(outer, Some(project.directory.path().to_path_buf()));
-    assert_eq!(inner, Some(project.path("packages/b")));
+    assert_eq!(
+        (outer, inner),
+        (
+            Some(project.directory.path().to_path_buf()),
+            Some(project.path("packages/b"))
+        )
+    );
 }
 
 #[test]

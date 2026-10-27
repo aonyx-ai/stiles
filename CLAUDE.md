@@ -523,6 +523,12 @@ fn parse_with_valid_input_returns_value() {
 }
 ```
 
+Each test makes exactly one assertion. A test that asserts on a `Result` and
+then on its contents checks two facts, and its failure does not say which one
+broke. Take the value with `.expect()` in the Act phase, and give each
+remaining fact its own test. A helper whose name starts with `assert_`, such
+as `assert_send`, counts as an assertion, so each trait test checks one type.
+
 #### Error assertions
 
 For error cases, use `expect_err` in the Act phase:
@@ -540,7 +546,8 @@ fn parse_with_invalid_input_returns_error() {
 
 #### Required tests
 
-- Trait tests (Send, Sync, Unpin) for every custom type
+- Trait tests (Send, Sync, Unpin) for every custom type. When a module tests
+  several types, each test names its type, as in `trait_send_my_type`.
 
 ```rust
 #[cfg(test)]

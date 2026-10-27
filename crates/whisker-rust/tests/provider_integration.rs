@@ -187,6 +187,55 @@ fn find_first_try_operand<'a>(node: &DecoratedNode<'a>) -> Option<DecoratedNode<
     find_first_node_of_kind(node, "try_expression")?.named_child(0)
 }
 
+/// Returns the [`FnSignature`] on the named function of the fixture
+fn signature_of(function: &str) -> FnSignature {
+    let provider = load_provider();
+    let tree = parse_and_decorate_fixture(provider);
+    let root = tree.root_node();
+    let func =
+        find_function_by_name(&root, function).unwrap_or_else(|| panic!("should find {function}"));
+
+    func.decoration::<FnSignature>()
+        .expect("should have FnSignature decoration")
+        .clone()
+}
+
+/// Returns the text and the [`ResolvedType`] of the first `match`
+/// scrutinee inside the named function of the fixture
+fn scrutinee_of(function: &str) -> (String, ResolvedType) {
+    let provider = load_provider();
+    let tree = parse_and_decorate_fixture(provider);
+    let root = tree.root_node();
+    let func =
+        find_function_by_name(&root, function).unwrap_or_else(|| panic!("should find {function}"));
+    let match_expr =
+        find_first_node_of_kind(&func, "match_expression").expect("should find match_expression");
+    let scrutinee = match_expr
+        .child_by_field_name("value")
+        .expect("match should have value field");
+
+    let ty = scrutinee
+        .decoration::<ResolvedType>()
+        .expect("scrutinee should have ResolvedType");
+    (scrutinee.text().to_owned(), ty.clone())
+}
+
+/// Returns the text and the [`ResolvedType`] of the first `?` operand
+/// inside the named function of the fixture
+fn try_operand_of(function: &str) -> (String, ResolvedType) {
+    let provider = load_provider();
+    let tree = parse_and_decorate_fixture(provider);
+    let root = tree.root_node();
+    let func =
+        find_function_by_name(&root, function).unwrap_or_else(|| panic!("should find {function}"));
+    let operand = find_first_try_operand(&func).expect("should find a `?` operand");
+
+    let ty = operand
+        .decoration::<ResolvedType>()
+        .expect("`?` operand should have ResolvedType");
+    (operand.text().to_owned(), ty.clone())
+}
+
 /// Returns the source text covered by each diagnostic raised inside `func`
 ///
 /// A diagnostic belongs to `func` when `func` contains the whole diagnostic
@@ -295,14 +344,12 @@ fn decorate_with_imports_rustc_rejects_reports_other_and_unresolved() {
         Coverage::Covered(decorations) => tree.merge_decorations(decorations),
         Coverage::NotCovered(gap) => panic!("the crate root should be covered, got: {gap}"),
     }
-    assert_eq!(
-        import_source_in(&tree, "import_an_associated_function"),
-        ImportSource::Other
-    );
-    assert_eq!(
-        import_source_in(&tree, "import_from_an_unknown_crate"),
-        ImportSource::Unresolved
-    );
+    let sources = [
+        "import_an_associated_function",
+        "import_from_an_unknown_crate",
+    ]
+    .map(|function| import_source_in(&tree, function));
+    assert_eq!(sources, [ImportSource::Other, ImportSource::Unresolved]);
 }
 
 #[test]
@@ -413,31 +460,36 @@ fn fn_signature_on_anyhow_result_function() {
 /// An `async fn`'s signature must describe the awaited type
 ///
 /// `Function::ret_type` reads the opaque future from the signature, and a
-/// regression to it fails both the mode and the error-type assertions.
+/// regression to it fails the three tests of this async function.
 #[test]
 fn fn_signature_on_async_function_reports_the_awaited_type() {
-    let provider = load_provider();
-    let tree = parse_and_decorate_fixture(provider);
-    let root = tree.root_node();
-
-    let func = find_function_by_name(&root, "returns_anyhow_result_async")
-        .expect("should find returns_anyhow_result_async");
-
-    let sig = func
-        .decoration::<FnSignature>()
-        .expect("should have FnSignature decoration");
+    let sig = signature_of("returns_anyhow_result_async");
 
     assert_eq!(sig.return_mode(), ReturnMode::Awaited);
+}
+
+#[test]
+fn fn_signature_on_async_function_reports_the_awaited_error() {
+    let sig = signature_of("returns_anyhow_result_async");
+
+    let error = sig.error_type().expect("should have an error type");
+
+    assert!(
+        error.is(TypePathRef::new("anyhow", &[], "Error")),
+        "the awaited error should be anyhow's, got: {error:?}"
+    );
+}
+
+#[test]
+fn fn_signature_on_async_function_reports_the_awaited_result() {
+    let sig = signature_of("returns_anyhow_result_async");
+
     let ret = sig.return_type().expect("should have return type");
+
     assert!(
         ret.is_result(),
         "the awaited type should be Result, got display: {}",
         ret.display()
-    );
-    let error = sig.error_type().expect("should have an error type");
-    assert!(
-        error.is(TypePathRef::new("anyhow", &[], "Error")),
-        "the awaited error should be anyhow's, got: {error:?}"
     );
 }
 
@@ -446,24 +498,10 @@ fn fn_signature_on_async_function_reports_the_awaited_type() {
 /// `std::io::Error` is a re-export, so the definition path names `core`.
 #[test]
 fn fn_signature_on_io_result_function() {
-    let provider = load_provider();
-    let tree = parse_and_decorate_fixture(provider);
-    let root = tree.root_node();
+    let sig = signature_of("returns_io_result");
 
-    let func =
-        find_function_by_name(&root, "returns_io_result").expect("should find returns_io_result");
-
-    let sig = func
-        .decoration::<FnSignature>()
-        .expect("should have FnSignature decoration");
-
-    let ret = sig.return_type().expect("should have return type");
-    assert!(
-        ret.is_result(),
-        "return type should be Result, got display: {}",
-        ret.display()
-    );
     let error = sig.error_type().expect("should have an error type");
+
     assert!(
         error.is(TypePathRef::new("core", &["io", "error"], "Error")),
         "the error should be io's, got: {error:?}"
@@ -471,19 +509,31 @@ fn fn_signature_on_io_result_function() {
 }
 
 #[test]
-fn fn_signature_on_non_result_function() {
-    let provider = load_provider();
-    let tree = parse_and_decorate_fixture(provider);
-    let root = tree.root_node();
-
-    let func = find_function_by_name(&root, "bool_param").expect("should find bool_param");
-
-    let sig = func
-        .decoration::<FnSignature>()
-        .expect("should have FnSignature decoration");
+fn fn_signature_on_io_result_function_returns_a_result() {
+    let sig = signature_of("returns_io_result");
 
     let ret = sig.return_type().expect("should have return type");
+
+    assert!(
+        ret.is_result(),
+        "return type should be Result, got display: {}",
+        ret.display()
+    );
+}
+
+#[test]
+fn fn_signature_on_non_result_function() {
+    let sig = signature_of("bool_param");
+
+    let ret = sig.return_type().expect("should have return type");
+
     assert!(!ret.is_result(), "return type should not be Result");
+}
+
+#[test]
+fn fn_signature_on_non_result_function_has_no_error_type() {
+    let sig = signature_of("bool_param");
+
     assert!(sig.error_type().is_none());
 }
 
@@ -533,25 +583,23 @@ fn fn_signature_on_trait_method_without_body() {
 }
 
 #[test]
+fn fn_signature_on_user_defined_result_has_no_error_type() {
+    let sig = signature_of("user_defined_result");
+
+    assert!(sig.error_type().is_none());
+}
+
+#[test]
 fn fn_signature_on_user_defined_result_is_not_a_result() {
-    let provider = load_provider();
-    let tree = parse_and_decorate_fixture(provider);
-    let root = tree.root_node();
-
-    let func = find_function_by_name(&root, "user_defined_result")
-        .expect("should find user_defined_result");
-
-    let sig = func
-        .decoration::<FnSignature>()
-        .expect("should have FnSignature decoration");
+    let sig = signature_of("user_defined_result");
 
     let ret = sig.return_type().expect("should have return type");
+
     assert!(
         !ret.is_result(),
         "a user-defined Result is not core's, got display: {}",
         ret.display()
     );
-    assert!(sig.error_type().is_none());
 }
 
 /// A list import and a glob import out of an enum both report the enum
@@ -563,14 +611,10 @@ fn import_source_on_an_enum_qualifier_is_enum() {
     let provider = load_provider();
     let tree = parse_and_decorate_fixture(provider);
 
-    assert_eq!(
-        import_source_in(&tree, "import_enum_variants"),
-        ImportSource::Enum
-    );
-    assert_eq!(
-        import_source_in(&tree, "import_enum_variants_by_glob"),
-        ImportSource::Enum
-    );
+    let sources = ["import_enum_variants", "import_enum_variants_by_glob"]
+        .map(|function| import_source_in(&tree, function));
+
+    assert_eq!(sources, [ImportSource::Enum, ImportSource::Enum]);
 }
 
 #[test]
@@ -641,6 +685,15 @@ fn reexports_on_a_core_item_lists_its_std_path() {
 
     let std_path = reexports.through("std").expect("std exposes core's Debug");
     assert_eq!(std_path.to_string(), "std::fmt::Debug");
+}
+
+#[test]
+fn reexports_on_a_core_item_lists_no_core_path() {
+    let provider = load_provider();
+    let tree = decorate_fixture_file(provider, "src/reexports.rs");
+
+    let reexports = decorated_reexports_of(&tree, "core::fmt::Debug");
+
     assert!(reexports.through("core").is_none());
 }
 
@@ -689,11 +742,9 @@ fn reexports_on_a_grouped_import_decorates_each_name() {
     let provider = load_provider();
     let tree = decorate_fixture_file(provider, "src/reexports.rs");
 
-    let shape = decorated_reexports_of(&tree, "Shape");
-    let make = decorated_reexports_of(&tree, "thing::make");
+    let paths = ["Shape", "thing::make"].map(|leaf| rendered(&decorated_reexports_of(&tree, leaf)));
 
-    assert_eq!(rendered(&shape), vec!["facade::Shape"]);
-    assert_eq!(rendered(&make), vec!["facade::thing::make"]);
+    assert_eq!(paths, [vec!["facade::Shape"], vec!["facade::thing::make"]]);
 }
 
 #[test]
@@ -820,30 +871,20 @@ fn match_scrutinee_on_integer_has_is_enum_false() {
 /// `palette` and reports the struct, not the enum.
 #[test]
 fn match_scrutinee_on_field_expression_has_is_enum_true() {
-    let provider = load_provider();
-    let tree = parse_and_decorate_fixture(provider);
-    let root = tree.root_node();
+    let (_, ty) = scrutinee_of("match_on_field_expression");
 
-    let func = find_function_by_name(&root, "match_on_field_expression")
-        .expect("should find match_on_field_expression");
-
-    let match_expr =
-        find_first_node_of_kind(&func, "match_expression").expect("should find match_expression");
-
-    let scrutinee = match_expr
-        .child_by_field_name("value")
-        .expect("match should have value field");
-
-    let ty = scrutinee
-        .decoration::<ResolvedType>()
-        .expect("scrutinee should have ResolvedType");
-
-    assert_eq!(scrutinee.text(), "palette.primary");
     assert!(
         ty.is_enum(),
         "the field's Color type should be an enum, got: {}",
         ty.display()
     );
+}
+
+#[test]
+fn match_scrutinee_on_field_expression_is_the_field_expression() {
+    let (text, _) = scrutinee_of("match_on_field_expression");
+
+    assert_eq!(text, "palette.primary");
 }
 
 /// A scrutinee returned by a call must be typed as the call's result
@@ -852,30 +893,20 @@ fn match_scrutinee_on_field_expression_has_is_enum_true() {
 /// whose type is the function itself, not the `Color` it returns.
 #[test]
 fn match_scrutinee_on_call_expression_has_is_enum_true() {
-    let provider = load_provider();
-    let tree = parse_and_decorate_fixture(provider);
-    let root = tree.root_node();
+    let (_, ty) = scrutinee_of("match_on_call_expression");
 
-    let func = find_function_by_name(&root, "match_on_call_expression")
-        .expect("should find match_on_call_expression");
-
-    let match_expr =
-        find_first_node_of_kind(&func, "match_expression").expect("should find match_expression");
-
-    let scrutinee = match_expr
-        .child_by_field_name("value")
-        .expect("match should have value field");
-
-    let ty = scrutinee
-        .decoration::<ResolvedType>()
-        .expect("scrutinee should have ResolvedType");
-
-    assert_eq!(scrutinee.text(), "pick_color()");
     assert!(
         ty.is_enum(),
         "the returned Color type should be an enum, got: {}",
         ty.display()
     );
+}
+
+#[test]
+fn match_scrutinee_on_call_expression_is_the_call_expression() {
+    let (text, _) = scrutinee_of("match_on_call_expression");
+
+    assert_eq!(text, "pick_color()");
 }
 
 #[test]
@@ -962,28 +993,20 @@ fn if_let_with_non_diverging_else_is_not_never() {
 /// operand then never fire.
 #[test]
 fn try_operand_on_call_expression_is_typed_as_the_call_result() {
-    let provider = load_provider();
-    let tree = parse_and_decorate_fixture(provider);
-    let root = tree.root_node();
+    let (_, ty) = try_operand_of("returns_anyhow_result");
 
-    let func = find_function_by_name(&root, "returns_anyhow_result")
-        .expect("should find returns_anyhow_result");
-
-    let operand = find_first_try_operand(&func).expect("should find a `?` operand");
-
-    let ty = operand
-        .decoration::<ResolvedType>()
-        .expect("`?` operand should have ResolvedType");
-
-    assert_eq!(
-        operand.text(),
-        "std::fs::read_to_string(\"anyhow_bare.txt\")"
-    );
     assert!(
         ty.is_result(),
         "read_to_string returns a Result, got: {}",
         ty.display()
     );
+}
+
+#[test]
+fn try_operand_on_call_expression_is_the_whole_call() {
+    let (text, _) = try_operand_of("returns_anyhow_result");
+
+    assert_eq!(text, "std::fs::read_to_string(\"anyhow_bare.txt\")");
 }
 
 /// The operand of `?` must be typed as the method call, not as the receiver
@@ -993,25 +1016,20 @@ fn try_operand_on_call_expression_is_typed_as_the_call_result() {
 /// method-call shape of the same fault.
 #[test]
 fn try_operand_on_method_call_is_typed_as_the_call_result() {
-    let provider = load_provider();
-    let tree = parse_and_decorate_fixture(provider);
-    let root = tree.root_node();
+    let (_, ty) = try_operand_of("try_on_method_call");
 
-    let func =
-        find_function_by_name(&root, "try_on_method_call").expect("should find try_on_method_call");
-
-    let operand = find_first_try_operand(&func).expect("should find a `?` operand");
-
-    let ty = operand
-        .decoration::<ResolvedType>()
-        .expect("`?` operand should have ResolvedType");
-
-    assert_eq!(operand.text(), "loader.load()");
     assert!(
         ty.is_result(),
         "Loader::load returns a Result, got: {}",
         ty.display()
     );
+}
+
+#[test]
+fn try_operand_on_method_call_is_the_whole_method_call() {
+    let (text, _) = try_operand_of("try_on_method_call");
+
+    assert_eq!(text, "loader.load()");
 }
 
 /// A diagnostic that starts inside `func` but ends past it does not count
@@ -1133,21 +1151,26 @@ fn anyhow_bare_try_flags_only_the_anyhow_function_among_lookalike_errors() {
 
     let diagnostics = whisker_core::walk(&tree, &mut passes).expect("the walk should not panic");
 
-    let anyhow_fn = find_function_by_name(&root, "returns_anyhow_result")
-        .expect("should find returns_anyhow_result");
-    let syn_fn =
-        find_function_by_name(&root, "returns_syn_result").expect("should find returns_syn_result");
-    let fmt_fn = find_function_by_name(&root, "fmt").expect("should find Display::fmt");
-    let io_fn =
-        find_function_by_name(&root, "returns_io_result").expect("should find returns_io_result");
-
+    let flagged = [
+        "returns_anyhow_result",
+        "returns_syn_result",
+        "fmt",
+        "returns_io_result",
+    ]
+    .map(|name| {
+        let func =
+            find_function_by_name(&root, name).unwrap_or_else(|| panic!("should find {name}"));
+        flagged_within(&tree, &diagnostics, &func)
+    });
     assert_eq!(
-        flagged_within(&tree, &diagnostics, &anyhow_fn),
-        vec!["std::fs::read_to_string(\"anyhow_bare.txt\")?"]
+        flagged,
+        [
+            vec!["std::fs::read_to_string(\"anyhow_bare.txt\")?"],
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        ]
     );
-    assert!(flagged_within(&tree, &diagnostics, &syn_fn).is_empty());
-    assert!(flagged_within(&tree, &diagnostics, &fmt_fn).is_empty());
-    assert!(flagged_within(&tree, &diagnostics, &io_fn).is_empty());
 }
 
 /// An `async fn` that returns `std::io::Result` is not an anyhow function
@@ -1374,19 +1397,31 @@ fn count_fn_signatures(node: &DecoratedNode<'_>, functions: &mut usize, signatur
     }
 }
 
-#[test]
-fn every_function_item_has_fn_signature() {
+/// Returns how many `function_item` nodes the fixture holds, and how many
+/// of them carry a signature
+fn fixture_signature_counts() -> (usize, usize) {
     let provider = load_provider();
     let tree = parse_and_decorate_fixture(provider);
-    let root = tree.root_node();
 
     let mut fn_count = 0;
     let mut sig_count = 0;
-    count_fn_signatures(&root, &mut fn_count, &mut sig_count);
+    count_fn_signatures(&tree.root_node(), &mut fn_count, &mut sig_count);
+    (fn_count, sig_count)
+}
 
-    assert!(fn_count > 0, "fixture should have functions");
+#[test]
+fn every_function_item_has_fn_signature() {
+    let (fn_count, sig_count) = fixture_signature_counts();
+
     assert_eq!(
         fn_count, sig_count,
         "every function should have a FnSignature decoration"
     );
+}
+
+#[test]
+fn fixture_has_function_items() {
+    let (fn_count, _) = fixture_signature_counts();
+
+    assert!(fn_count > 0, "fixture should have functions");
 }

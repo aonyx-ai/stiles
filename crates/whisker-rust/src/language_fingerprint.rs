@@ -57,6 +57,12 @@ mod tests {
         let combined = LANGUAGE_FINGERPRINT;
 
         assert_ne!(combined, visitor_alone);
+    }
+
+    #[test]
+    fn language_fingerprint_is_not_zero() {
+        let combined = LANGUAGE_FINGERPRINT;
+
         assert_ne!(combined, 0);
     }
 

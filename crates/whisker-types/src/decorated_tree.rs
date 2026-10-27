@@ -157,8 +157,9 @@ mod tests {
         assert_eq!(decorated.root_node().decoration::<Tag>(), Some(&Tag(7)));
     }
 
-    #[test]
-    fn merge_decorations_twice_keeps_first_of_a_type() {
+    /// Returns a tree whose root got `Tag(1)` from one merge and `Tag(2)`
+    /// from a second merge
+    fn merged_twice() -> DecoratedTree {
         let source = "fn main() {}";
         let tree = parse_tree(source);
         let mut decorated = DecoratedTree::new(
@@ -176,11 +177,25 @@ mod tests {
         decorated.merge_decorations(first);
         decorated.merge_decorations(second);
 
-        assert_eq!(decorated.root_node().decoration::<Tag>(), Some(&Tag(1)));
-        assert_eq!(
-            decorated.root_node().decorations_of_type::<Tag>(),
-            vec![&Tag(1), &Tag(2)]
-        );
+        decorated
+    }
+
+    #[test]
+    fn merge_decorations_twice_keeps_every_instance_in_order() {
+        let decorated = merged_twice();
+
+        let tags = decorated.root_node().decorations_of_type::<Tag>();
+
+        assert_eq!(tags, vec![&Tag(1), &Tag(2)]);
+    }
+
+    #[test]
+    fn merge_decorations_twice_keeps_first_of_a_type() {
+        let decorated = merged_twice();
+
+        let tag = decorated.root_node().decoration::<Tag>();
+
+        assert_eq!(tag, Some(&Tag(1)));
     }
 
     #[test]

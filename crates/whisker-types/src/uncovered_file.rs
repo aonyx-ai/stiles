@@ -134,17 +134,12 @@ mod tests {
 
         let message = error.to_string();
 
-        let lines: Vec<&str> = message.lines().collect();
-        assert_eq!(lines.len(), 3, "unexpected message: {message}");
         assert_eq!(
-            lines[1],
-            "  rust: the text whisker parsed differs from the text the toolchain analyzed"
+            message,
+            "no decoration provider covers this file, so semantic rules cannot run\n  \
+             rust: the text whisker parsed differs from the text the toolchain analyzed\n  \
+             other: the file is outside /ws, the root the provider loaded"
         );
-        assert_eq!(
-            lines[2],
-            "  other: the file is outside /ws, the root the provider loaded"
-        );
-        assert!(!message.ends_with('\n'), "message has a trailing newline");
     }
 
     #[test]
@@ -174,11 +169,16 @@ mod tests {
 
         let gaps = error.gaps();
 
-        assert_eq!(gaps.len(), 2);
-        assert_eq!(gaps[0].0, ProviderName("rust"));
-        assert_eq!(gaps[0].1, CoverageGap::StaleSource);
-        assert_eq!(gaps[1].0, ProviderName("other"));
-        assert_eq!(gaps[1].1, CoverageGap::OutsideRoot { root: root() });
+        assert_eq!(
+            gaps,
+            [
+                (ProviderName("rust"), CoverageGap::StaleSource),
+                (
+                    ProviderName("other"),
+                    CoverageGap::OutsideRoot { root: root() },
+                ),
+            ]
+        );
     }
 
     #[test]

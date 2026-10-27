@@ -36,11 +36,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn adt_flags_accessors() {
+    fn non_exhaustive_external_when_set_returns_true() {
         let flags = AdtFlags::new(true);
-        assert!(flags.non_exhaustive_external());
 
+        assert!(flags.non_exhaustive_external());
+    }
+
+    #[test]
+    fn non_exhaustive_external_when_unset_returns_false() {
         let flags = AdtFlags::new(false);
+
         assert!(!flags.non_exhaustive_external());
     }
 

@@ -282,9 +282,9 @@ mod tests {
         assert_eq!(names, vec!["kept".to_owned()]);
     }
 
-    /// An archive must not be able to plant a link pointing anywhere
-    #[test]
-    fn extract_ignores_a_symbolic_link() {
+    /// Extracts an archive that holds a symbolic link named `link` and a
+    /// regular file named `kept`, and returns where it went
+    fn extracted_beside_a_link() -> (tempfile::TempDir, std::path::PathBuf) {
         let directory = tempfile::tempdir().expect("temporary directory should be created");
         let archive = archive_of_entries(
             directory.path(),
@@ -298,7 +298,21 @@ mod tests {
 
         extract(&archive, &into).expect("the archive should unpack");
 
+        (directory, into)
+    }
+
+    /// An archive must not be able to plant a link pointing anywhere
+    #[test]
+    fn extract_ignores_a_symbolic_link() {
+        let (_directory, into) = extracted_beside_a_link();
+
         assert!(!into.join("link").exists());
+    }
+
+    #[test]
+    fn extract_keeps_the_regular_file_beside_a_symbolic_link() {
+        let (_directory, into) = extracted_beside_a_link();
+
         assert!(into.join("kept").is_file());
     }
 

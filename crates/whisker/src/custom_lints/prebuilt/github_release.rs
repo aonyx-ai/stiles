@@ -529,13 +529,22 @@ mod tests {
     }
 
     #[test]
-    fn select_asset_finds_the_archive_and_its_sidecar() {
+    fn select_asset_finds_the_archive() {
         let name = name();
         let releases = releases(&listing(false, &[name.as_str(), &name.sidecar()]));
 
         let asset = select_asset(&releases, &name).expect("the pair should be found");
 
         assert_eq!(asset.archive.name, name.as_str());
+    }
+
+    #[test]
+    fn select_asset_finds_the_sidecar_of_the_archive() {
+        let name = name();
+        let releases = releases(&listing(false, &[name.as_str(), &name.sidecar()]));
+
+        let asset = select_asset(&releases, &name).expect("the pair should be found");
+
         assert_eq!(asset.sidecar.name, name.sidecar());
     }
 
@@ -603,23 +612,38 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
+    fn trait_send_github_api() {
         fn assert_send<T: Send>() {}
         assert_send::<GitHubApi>();
+    }
+
+    #[test]
+    fn trait_send_prebuilt_asset() {
+        fn assert_send<T: Send>() {}
         assert_send::<PrebuiltAsset>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_sync_github_api() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<GitHubApi>();
+    }
+
+    #[test]
+    fn trait_sync_prebuilt_asset() {
+        fn assert_sync<T: Sync>() {}
         assert_sync::<PrebuiltAsset>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_unpin_github_api() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<GitHubApi>();
+    }
+
+    #[test]
+    fn trait_unpin_prebuilt_asset() {
+        fn assert_unpin<T: Unpin>() {}
         assert_unpin::<PrebuiltAsset>();
     }
 }

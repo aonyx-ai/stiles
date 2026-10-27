@@ -126,12 +126,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn accessors_return_each_part() {
+    fn krate_returns_the_crate() {
         let path = PublicPath::new("facade", ["thing", "Thing"]);
 
-        let (krate, segments) = (path.krate(), path.segments().collect::<Vec<_>>());
+        assert_eq!(path.krate(), "facade");
+    }
 
-        assert_eq!(krate, "facade");
+    #[test]
+    fn segments_returns_each_segment_in_order() {
+        let path = PublicPath::new("facade", ["thing", "Thing"]);
+
+        let segments: Vec<&str> = path.segments().collect();
+
         assert_eq!(segments, vec!["thing", "Thing"]);
     }
 
@@ -162,7 +168,16 @@ mod tests {
         let found = paths.contains(&PublicPath::new("facade", ["thing", "Thing"]));
 
         assert!(found);
-        assert!(!paths.contains(&PublicPath::new("facade", ["Thing"])));
+    }
+
+    #[test]
+    fn hash_with_other_segments_misses() {
+        let mut paths = HashSet::new();
+        paths.insert(PublicPath::new("facade", ["thing", "Thing"]));
+
+        let found = paths.contains(&PublicPath::new("facade", ["Thing"]));
+
+        assert!(!found);
     }
 
     #[test]

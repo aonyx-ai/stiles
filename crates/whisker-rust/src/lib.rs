@@ -108,30 +108,26 @@ mod tests {
         );
     }
 
-    #[test]
-    fn dispatch_calls_both_concrete_and_supertype() {
-        struct DualCounter {
-            concrete: usize,
-            supertype: usize,
-        }
-        impl RustLintPass for DualCounter {
-            fn check_integer_literal(&mut self, _node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-                self.concrete += 1;
-                Vec::new()
-            }
-            fn check_literal(&mut self, _node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-                self.supertype += 1;
-                Vec::new()
-            }
-        }
+    /// Counts the calls of a concrete method and of its supertype's method
+    struct DualCounter {
+        concrete: usize,
+        supertype: usize,
+    }
 
-        let tree = parse_rust("fn main() { let _ = 42; }");
-        let root = tree.root_node();
-        let mut pass = DualCounter {
-            concrete: 0,
-            supertype: 0,
-        };
+    impl RustLintPass for DualCounter {
+        fn check_integer_literal(&mut self, _node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
+            self.concrete += 1;
+            Vec::new()
+        }
+        fn check_literal(&mut self, _node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
+            self.supertype += 1;
+            Vec::new()
+        }
+    }
 
+    /// Dispatches every named node of an integer literal's source to a
+    /// fresh [`DualCounter`] and returns it
+    fn dispatched_to_dual_counter() -> DualCounter {
         fn walk_and_dispatch(node: &DecoratedNode<'_>, pass: &mut impl RustLintPass) {
             dispatch(pass, node);
             for child in node.named_children() {
@@ -139,12 +135,29 @@ mod tests {
             }
         }
 
-        walk_and_dispatch(&root, &mut pass);
+        let tree = parse_rust("fn main() { let _ = 42; }");
+        let mut pass = DualCounter {
+            concrete: 0,
+            supertype: 0,
+        };
+        walk_and_dispatch(&tree.root_node(), &mut pass);
+        pass
+    }
+
+    #[test]
+    fn dispatch_calls_the_concrete_method_of_a_subtype() {
+        let pass = dispatched_to_dual_counter();
 
         assert!(
             pass.concrete > 0,
             "integer_literal should have been dispatched"
         );
+    }
+
+    #[test]
+    fn dispatch_calls_the_supertype_beside_the_concrete_method() {
+        let pass = dispatched_to_dual_counter();
+
         assert!(
             pass.supertype > 0,
             "literal supertype should have been dispatched"
@@ -172,8 +185,8 @@ mod tests {
 
         let diagnostics = dispatch(&mut pass, &fn_item);
 
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].rule_id(), RuleId::new("test.warn"));
+        let rules: Vec<RuleId> = diagnostics.iter().map(Diagnostic::rule_id).collect();
+        assert_eq!(rules, [RuleId::new("test.warn")]);
     }
 
     #[test]

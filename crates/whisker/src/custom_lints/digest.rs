@@ -46,16 +46,22 @@ mod tests {
     }
 
     #[test]
-    fn digest_is_sixteen_hexadecimal_digits() {
+    fn digest_is_lowercase_hexadecimal() {
         let digest = digest("whatever");
 
-        assert_eq!(digest.len(), 16, "{digest}");
         assert!(
             digest
                 .chars()
                 .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()),
             "{digest}"
         );
+    }
+
+    #[test]
+    fn digest_is_sixteen_hexadecimal_digits() {
+        let digest = digest("whatever");
+
+        assert_eq!(digest.len(), 16, "{digest}");
     }
 
     #[test]

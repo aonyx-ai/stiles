@@ -83,18 +83,15 @@ mod tests {
 
     #[test]
     fn combine_with_any_failure_returns_failure() {
-        assert_eq!(
-            CheckOutcome::Success.combine(CheckOutcome::Failure),
-            CheckOutcome::Failure
-        );
-        assert_eq!(
-            CheckOutcome::Failure.combine(CheckOutcome::Success),
-            CheckOutcome::Failure
-        );
-        assert_eq!(
-            CheckOutcome::Failure.combine(CheckOutcome::Failure),
-            CheckOutcome::Failure
-        );
+        let pairs = [
+            (CheckOutcome::Success, CheckOutcome::Failure),
+            (CheckOutcome::Failure, CheckOutcome::Success),
+            (CheckOutcome::Failure, CheckOutcome::Failure),
+        ];
+
+        let combined = pairs.map(|(first, second)| first.combine(second));
+
+        assert_eq!(combined, [CheckOutcome::Failure; 3]);
     }
 
     #[test]
@@ -135,17 +132,14 @@ mod tests {
             test_diagnostic(Severity::Info),
         ];
 
-        let lenient = CheckOutcome::from_diagnostics()
-            .diagnostics(&diagnostics)
-            .threshold(FailureThreshold::Errors)
-            .call();
-        let strict = CheckOutcome::from_diagnostics()
-            .diagnostics(&diagnostics)
-            .threshold(FailureThreshold::Warnings)
-            .call();
+        let outcomes = [FailureThreshold::Errors, FailureThreshold::Warnings].map(|threshold| {
+            CheckOutcome::from_diagnostics()
+                .diagnostics(&diagnostics)
+                .threshold(threshold)
+                .call()
+        });
 
-        assert_eq!(lenient, CheckOutcome::Success);
-        assert_eq!(strict, CheckOutcome::Success);
+        assert_eq!(outcomes, [CheckOutcome::Success; 2]);
     }
 
     #[test]
@@ -166,17 +160,14 @@ mod tests {
 
     #[test]
     fn from_diagnostics_with_no_diagnostics_returns_success() {
-        let lenient = CheckOutcome::from_diagnostics()
-            .diagnostics(&[])
-            .threshold(FailureThreshold::Errors)
-            .call();
-        let strict = CheckOutcome::from_diagnostics()
-            .diagnostics(&[])
-            .threshold(FailureThreshold::Warnings)
-            .call();
+        let outcomes = [FailureThreshold::Errors, FailureThreshold::Warnings].map(|threshold| {
+            CheckOutcome::from_diagnostics()
+                .diagnostics(&[])
+                .threshold(threshold)
+                .call()
+        });
 
-        assert_eq!(lenient, CheckOutcome::Success);
-        assert_eq!(strict, CheckOutcome::Success);
+        assert_eq!(outcomes, [CheckOutcome::Success; 2]);
     }
 
     #[test]

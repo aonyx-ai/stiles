@@ -157,10 +157,17 @@ mod tests {
 
         let code = expand(&input).expect("should expand").to_string();
 
-        assert!(code.contains("const KEY : :: whisker_types :: DecorationKey"));
-        assert!(code.contains(":: core :: module_path ! ()"));
-        assert!(code.contains(":: core :: stringify ! (Flag)"));
-        assert!(code.contains(&format!("{:?}", definition_hash(&input))));
+        let definition = format!("{:?}", definition_hash(&input));
+        let missing: Vec<&str> = [
+            "const KEY : :: whisker_types :: DecorationKey",
+            ":: core :: module_path ! ()",
+            ":: core :: stringify ! (Flag)",
+            definition.as_str(),
+        ]
+        .into_iter()
+        .filter(|part| !code.contains(part))
+        .collect();
+        assert_eq!(missing, Vec::<&str>::new());
     }
 
     #[test]
@@ -213,13 +220,30 @@ mod tests {
     }
 
     #[test]
+    fn expand_with_many_cardinality_looks_up_every_instance() {
+        let input = parse(r#"#[decoration(cardinality = "many")] struct Flag;"#);
+
+        let code = expand(&input).expect("should expand").to_string();
+
+        assert!(code.contains("decorations_of_type :: < Self > ()"));
+    }
+
+    #[test]
     fn expand_with_many_cardinality_returns_a_vec() {
         let input = parse(r#"#[decoration(cardinality = "many")] struct Flag;"#);
 
         let code = expand(&input).expect("should expand").to_string();
 
         assert!(code.contains(":: std :: vec :: Vec < & 'decoration Self >"));
-        assert!(code.contains("decorations_of_type :: < Self > ()"));
+    }
+
+    #[test]
+    fn expand_with_one_cardinality_looks_up_one_instance() {
+        let input = parse(r#"#[decoration(cardinality = "one")] struct Flag;"#);
+
+        let code = expand(&input).expect("should expand").to_string();
+
+        assert!(code.contains("decoration :: < Self > ()"));
     }
 
     #[test]
@@ -229,7 +253,6 @@ mod tests {
         let code = expand(&input).expect("should expand").to_string();
 
         assert!(code.contains(":: core :: option :: Option < & 'decoration Self >"));
-        assert!(code.contains("decoration :: < Self > ()"));
     }
 
     #[test]

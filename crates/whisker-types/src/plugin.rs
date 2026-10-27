@@ -203,6 +203,12 @@ mod tests {
         let all = TYPES_FINGERPRINT;
 
         assert_ne!(all, one);
+    }
+
+    #[test]
+    fn types_fingerprint_is_not_zero() {
+        let all = TYPES_FINGERPRINT;
+
         assert_ne!(all, 0);
     }
 }

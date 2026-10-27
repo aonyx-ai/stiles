@@ -150,13 +150,21 @@ mod tests {
     }
 
     #[test]
-    fn clone_shares_the_bytes() {
+    fn clone_equals_the_original() {
         let file = FilePath::from("src/lib.rs");
 
         let copy = file.clone();
 
-        assert_eq!(ArcSlice::strong_count(&file.0), 2);
         assert_eq!(copy, file);
+    }
+
+    #[test]
+    fn clone_shares_the_bytes() {
+        let file = FilePath::from("src/lib.rs");
+
+        let _copy = file.clone();
+
+        assert_eq!(ArcSlice::strong_count(&file.0), 2);
     }
 
     #[test]
@@ -178,13 +186,19 @@ mod tests {
     }
 
     #[test]
-    fn eq_compares_by_content() {
+    fn eq_with_another_path_is_false() {
         let literal = FilePath::from("a.rs");
-        let owned = FilePath::from(PathBuf::from("a.rs"));
         let other = FilePath::from("b.rs");
 
-        assert_eq!(literal, owned);
         assert_ne!(literal, other);
+    }
+
+    #[test]
+    fn eq_with_the_same_path_from_another_source_is_true() {
+        let literal = FilePath::from("a.rs");
+        let owned = FilePath::from(PathBuf::from("a.rs"));
+
+        assert_eq!(literal, owned);
     }
 
     #[test]

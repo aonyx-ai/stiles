@@ -90,14 +90,18 @@ mod tests {
 
     #[test]
     fn from_extension_with_unknown_returns_none() {
-        assert_eq!(Language::from_extension("py"), None);
-        assert_eq!(Language::from_extension("js"), None);
-        assert_eq!(Language::from_extension(""), None);
+        let languages = ["py", "js", ""].map(Language::from_extension);
+
+        assert_eq!(languages, [None, None, None]);
     }
 
     #[test]
-    fn display_shows_language_name() {
+    fn display_with_rust_shows_rust() {
         assert_eq!(Language::Rust.to_string(), "Rust");
+    }
+
+    #[test]
+    fn display_with_typescript_shows_typescript() {
         assert_eq!(Language::TypeScript.to_string(), "TypeScript");
     }
 

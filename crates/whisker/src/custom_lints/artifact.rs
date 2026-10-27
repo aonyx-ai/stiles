@@ -146,9 +146,11 @@ mod tests {
         .join("\n");
 
         let artifacts = cdylib_artifacts(&stdout, Path::new(DIRECTORY)).expect("should find");
+        let [artifact] = artifacts.as_slice() else {
+            panic!("expected one artifact, got {artifacts:?}");
+        };
 
-        assert_eq!(artifacts.len(), 1);
-        assert!(artifacts[0].to_string_lossy().contains("libplugin"));
+        assert!(artifact.to_string_lossy().contains("libplugin"));
     }
 
     /// A dependency that builds a cdylib of its own resolves outside the
@@ -162,9 +164,11 @@ mod tests {
         .join("\n");
 
         let artifacts = cdylib_artifacts(&stdout, Path::new(DIRECTORY)).expect("should find");
+        let [artifact] = artifacts.as_slice() else {
+            panic!("expected one artifact, got {artifacts:?}");
+        };
 
-        assert_eq!(artifacts.len(), 1);
-        assert!(artifacts[0].to_string_lossy().contains("libplugin"));
+        assert!(artifact.to_string_lossy().contains("libplugin"));
     }
 
     #[test]
@@ -195,9 +199,11 @@ mod tests {
         .join("\n");
 
         let artifacts = cdylib_artifacts(&stdout, Path::new(DIRECTORY)).expect("should find");
+        let [artifact] = artifacts.as_slice() else {
+            panic!("expected one artifact, got {artifacts:?}");
+        };
 
-        assert_eq!(artifacts.len(), 1);
-        assert!(artifacts[0].to_string_lossy().contains("libplugin"));
+        assert!(artifact.to_string_lossy().contains("libplugin"));
     }
 
     #[test]

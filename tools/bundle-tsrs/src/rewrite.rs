@@ -517,12 +517,27 @@ mod tests {
     }
 
     #[test]
-    fn trait_auto() {
+    fn trait_auto_crate_name() {
         fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<CrateName>();
-        assert_auto::<Rewritten>();
-        assert_auto::<Rewriter>();
+    }
+
+    #[test]
+    fn trait_auto_edit() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<Edit>();
+    }
+
+    #[test]
+    fn trait_auto_rewriter() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
+        assert_auto::<Rewriter>();
+    }
+
+    #[test]
+    fn trait_auto_rewritten() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
+        assert_auto::<Rewritten>();
     }
 
     #[test]

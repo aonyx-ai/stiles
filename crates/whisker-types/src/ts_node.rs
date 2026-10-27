@@ -43,9 +43,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn layout_matches_the_tree_sitter_node() {
-        assert_eq!(size_of::<TsNode>(), size_of::<tree_sitter::Node<'_>>());
+    fn alignment_matches_the_tree_sitter_node() {
         assert_eq!(align_of::<TsNode>(), align_of::<tree_sitter::Node<'_>>());
+    }
+
+    #[test]
+    fn size_matches_the_tree_sitter_node() {
+        assert_eq!(size_of::<TsNode>(), size_of::<tree_sitter::Node<'_>>());
     }
 
     #[test]

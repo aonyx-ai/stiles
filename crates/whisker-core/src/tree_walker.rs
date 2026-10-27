@@ -316,78 +316,81 @@ mod tests {
     }
 
     #[test]
-    fn walk_multiple_passes_each_see_same_nodes() {
-        static PASS_A: AtomicUsize = AtomicUsize::new(0);
-        static PASS_B: AtomicUsize = AtomicUsize::new(0);
-
-        struct CounterA;
-        impl LintPass for CounterA {
-            extern "C" fn language(&self) -> Language {
-                Language::Rust
-            }
-
-            extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
-                Configured::Ok(())
-            }
-
-            extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-                PASS_A.fetch_add(1, Ordering::Relaxed);
-                Checked::Ok(vec::Vec::new())
-            }
-        }
-
-        struct CounterB;
-        impl LintPass for CounterB {
-            extern "C" fn language(&self) -> Language {
-                Language::Rust
-            }
-
-            extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
-                Configured::Ok(())
-            }
-
-            extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-                PASS_B.fetch_add(1, Ordering::Relaxed);
-                Checked::Ok(vec::Vec::new())
-            }
-        }
-
-        PASS_A.store(0, Ordering::Relaxed);
-        PASS_B.store(0, Ordering::Relaxed);
-
+    fn walk_multiple_passes_call_the_first_pass() {
+        let (first, first_visited) = NodeCounter::boxed(Language::Rust);
+        let (second, _second_visited) = NodeCounter::boxed(Language::Rust);
         let tree = parse_rust("fn a() {} fn b() {}");
-        let mut passes = vec![lint(CounterA, &[]), lint(CounterB, &[])];
+        let mut passes = vec![first, second];
+
         walk_lints(&tree, &mut passes).expect("should walk");
 
-        let a = PASS_A.load(Ordering::Relaxed);
-        let b = PASS_B.load(Ordering::Relaxed);
-        assert!(a > 0, "pass A should have been called");
-        assert_eq!(a, b, "both passes should see the same number of nodes");
+        assert!(
+            first_visited.load(Ordering::Relaxed) > 0,
+            "the first pass should have been called"
+        );
+    }
+
+    #[test]
+    fn walk_multiple_passes_each_see_same_nodes() {
+        let (first, first_visited) = NodeCounter::boxed(Language::Rust);
+        let (second, second_visited) = NodeCounter::boxed(Language::Rust);
+        let tree = parse_rust("fn a() {} fn b() {}");
+        let mut passes = vec![first, second];
+
+        walk_lints(&tree, &mut passes).expect("should walk");
+
+        assert_eq!(
+            first_visited.load(Ordering::Relaxed),
+            second_visited.load(Ordering::Relaxed),
+            "both passes should see the same number of nodes"
+        );
     }
 
     #[test]
     fn walk_on_a_rust_tree_skips_the_typescript_passes() {
-        let (rust, rust_visited) = NodeCounter::boxed(Language::Rust);
+        let (rust, _rust_visited) = NodeCounter::boxed(Language::Rust);
         let (typescript, typescript_visited) = NodeCounter::boxed(Language::TypeScript);
         let tree = parse_rust("fn a() {}");
         let mut passes = vec![rust, typescript];
 
         walk_lints(&tree, &mut passes).expect("should walk");
 
-        assert!(rust_visited.load(Ordering::Relaxed) > 0);
         assert_eq!(typescript_visited.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn walk_on_a_rust_tree_visits_the_rust_passes() {
+        let (rust, rust_visited) = NodeCounter::boxed(Language::Rust);
+        let (typescript, _typescript_visited) = NodeCounter::boxed(Language::TypeScript);
+        let tree = parse_rust("fn a() {}");
+        let mut passes = vec![rust, typescript];
+
+        walk_lints(&tree, &mut passes).expect("should walk");
+
+        assert!(rust_visited.load(Ordering::Relaxed) > 0);
     }
 
     #[test]
     fn walk_on_a_typescript_tree_skips_the_rust_passes() {
         let (rust, rust_visited) = NodeCounter::boxed(Language::Rust);
-        let (typescript, typescript_visited) = NodeCounter::boxed(Language::TypeScript);
+        let (typescript, _typescript_visited) = NodeCounter::boxed(Language::TypeScript);
         let tree = parse_typescript("function a(): void {}");
         let mut passes = vec![rust, typescript];
 
         walk_lints(&tree, &mut passes).expect("should walk");
 
         assert_eq!(rust_visited.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn walk_on_a_typescript_tree_visits_the_typescript_passes() {
+        let (rust, _rust_visited) = NodeCounter::boxed(Language::Rust);
+        let (typescript, typescript_visited) = NodeCounter::boxed(Language::TypeScript);
+        let tree = parse_typescript("function a(): void {}");
+        let mut passes = vec![rust, typescript];
+
+        walk_lints(&tree, &mut passes).expect("should walk");
+
         assert!(typescript_visited.load(Ordering::Relaxed) > 0);
     }
 
@@ -426,39 +429,50 @@ mod tests {
         ];
         let diagnostics = walk_lints(&tree, &mut passes).expect("should walk");
 
-        assert_eq!(diagnostics.len(), 2);
-        assert_eq!(diagnostics[0].rule_id(), RuleId::new("pass.a"));
-        assert_eq!(diagnostics[1].rule_id(), RuleId::new("pass.b"));
+        let rules: Vec<RuleId> = diagnostics.iter().map(Diagnostic::rule_id).collect();
+        assert_eq!(rules, [RuleId::new("pass.a"), RuleId::new("pass.b")]);
+    }
+
+    /// Reports an informational diagnostic on every node it checks
+    struct SpanChecker;
+
+    impl LintPass for SpanChecker {
+        extern "C" fn language(&self) -> Language {
+            Language::Rust
+        }
+
+        extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+            Configured::Ok(())
+        }
+
+        extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+            Checked::Ok(
+                [Diagnostic::new(
+                    RuleId::new("test"),
+                    whisker_types::Severity::Info,
+                    "span check".into(),
+                    node.span(),
+                )]
+                .into_iter()
+                .collect(),
+            )
+        }
     }
 
     #[test]
-    fn walk_diagnostic_spans_are_valid() {
-        use whisker_types::{RuleId, Severity};
+    fn walk_diagnostic_spans_end_within_the_source() {
+        let source = "fn main() { let x = 42; }";
+        let tree = parse_rust(source);
+        let mut passes = vec![lint(SpanChecker, &["test"])];
+        let diagnostics = walk_lints(&tree, &mut passes).expect("should walk");
 
-        struct SpanChecker;
-        impl LintPass for SpanChecker {
-            extern "C" fn language(&self) -> Language {
-                Language::Rust
-            }
-
-            extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
-                Configured::Ok(())
-            }
-
-            extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-                Checked::Ok(
-                    [Diagnostic::new(
-                        RuleId::new("test"),
-                        Severity::Info,
-                        "span check".into(),
-                        node.span(),
-                    )]
-                    .into_iter()
-                    .collect(),
-                )
-            }
+        for diag in &diagnostics {
+            assert!(diag.span().end() <= source.len());
         }
+    }
 
+    #[test]
+    fn walk_diagnostic_spans_start_before_they_end() {
         let source = "fn main() { let x = 42; }";
         let tree = parse_rust(source);
         let mut passes = vec![lint(SpanChecker, &["test"])];
@@ -466,70 +480,62 @@ mod tests {
 
         for diag in &diagnostics {
             assert!(diag.span().start() <= diag.span().end());
-            assert!(diag.span().end() <= source.len());
+        }
+    }
+
+    /// Panics when it checks a function
+    struct PanicOnFn;
+
+    impl LintPass for PanicOnFn {
+        extern "C" fn language(&self) -> Language {
+            Language::Rust
+        }
+
+        extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+            Configured::Ok(())
+        }
+
+        extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+            let kind = node.kind();
+            Panic::catch(move || -> Vec<Diagnostic> {
+                match kind == "function_item" {
+                    true => panic!("no functions"),
+                    false => Vec::new(),
+                }
+            })
+            .map(|found| found.into_iter().collect())
+            .into()
         }
     }
 
     /// A panic stops the walk where it happened and says where that was
-    ///
-    /// Nodes after the panic go unchecked on purpose: the pass is in a
-    /// state its author never meant.
     #[test]
-    fn walk_with_a_panicking_pass_stops_and_names_the_node() {
-        static AFTER_PANIC: AtomicUsize = AtomicUsize::new(0);
-
-        struct PanicOnFn;
-        impl LintPass for PanicOnFn {
-            extern "C" fn language(&self) -> Language {
-                Language::Rust
-            }
-
-            extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
-                Configured::Ok(())
-            }
-
-            extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-                let kind = node.kind();
-                Panic::catch(move || -> Vec<Diagnostic> {
-                    match kind == "function_item" {
-                        true => panic!("no functions"),
-                        false => Vec::new(),
-                    }
-                })
-                .map(|found| found.into_iter().collect())
-                .into()
-            }
-        }
-
-        struct CountAfter;
-        impl LintPass for CountAfter {
-            extern "C" fn language(&self) -> Language {
-                Language::Rust
-            }
-
-            extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
-                Configured::Ok(())
-            }
-
-            extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-                AFTER_PANIC.fetch_add(1, Ordering::Relaxed);
-                Checked::Ok(vec::Vec::new())
-            }
-        }
-
-        AFTER_PANIC.store(0, Ordering::Relaxed);
+    fn walk_with_a_panicking_pass_names_the_node() {
         let tree = parse_rust("fn main() { let x = 1; }");
-        let mut passes = vec![lint(PanicOnFn, &[]), lint(CountAfter, &[])];
+        let mut passes = vec![lint(PanicOnFn, &[])];
 
         let error = walk_lints(&tree, &mut passes).expect_err("the panic should end the walk");
 
         let WalkLintsError::Panicked { source: error } = error else {
             panic!("should be a PassPanic, got {error:?}");
         };
-        assert_eq!(error.kind(), "function_item");
-        assert_eq!(error.span().start(), 0);
-        assert_eq!(error.panic().message(), "no functions");
-        assert_eq!(AFTER_PANIC.load(Ordering::Relaxed), 1);
+        assert_eq!(
+            error.to_string(),
+            "a lint pass panicked while checking a function_item at byte 0 of test.rs: no functions"
+        );
+    }
+
+    /// Nodes after a panic go unchecked on purpose: the pass is in a state
+    /// its author never meant
+    #[test]
+    fn walk_with_a_panicking_pass_stops_at_the_node() {
+        let (after, visited) = NodeCounter::boxed(Language::Rust);
+        let tree = parse_rust("fn main() { let x = 1; }");
+        let mut passes = vec![lint(PanicOnFn, &[]), after];
+
+        walk_lints(&tree, &mut passes).expect_err("the panic should end the walk");
+
+        assert_eq!(visited.load(Ordering::Relaxed), 1);
     }
 
     /// A rule outside the pass's declaration stops the walk and names itself
@@ -572,8 +578,11 @@ mod tests {
         let WalkLintsError::Undeclared { source: error } = error else {
             panic!("should be an UndeclaredRule, got {error:?}");
         };
-        assert_eq!(error.rule(), RuleId::new("pass.copied"));
-        assert_eq!(error.span().start(), 0);
+        assert_eq!(
+            error.to_string(),
+            "a lint pass reported `pass.copied` at byte 0 of test.rs, but its plugin declares only \
+             `pass.declared` for it"
+        );
     }
 
     mod prop {

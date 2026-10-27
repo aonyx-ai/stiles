@@ -169,13 +169,12 @@ mod tests {
         let index = directory.path().join("packages/a/index.ts");
         let providers = Providers::load()
             .path(directory.path())
-            .files(&[page.clone(), index.clone()])
+            .files(&[page.clone(), index])
             .call()
             .expect("both projects should load");
 
         let found = providers.for_file(&page, Language::TypeScript);
 
-        assert_eq!(providers.typescript.len(), 2);
         assert_eq!(found.len(), 1);
     }
 
@@ -252,7 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn load_with_no_files_loads_nothing() {
+    fn load_with_no_files_loads_no_rust_project() {
         let directory = tree(&[]);
 
         let providers = Providers::load()
@@ -262,7 +261,33 @@ mod tests {
             .expect("nothing should load");
 
         assert!(providers.rust.is_none());
+    }
+
+    #[test]
+    fn load_with_no_files_loads_no_typescript_project() {
+        let directory = tree(&[]);
+
+        let providers = Providers::load()
+            .path(directory.path())
+            .files(&[])
+            .call()
+            .expect("nothing should load");
+
         assert!(providers.typescript.is_empty());
+    }
+
+    #[test]
+    fn load_with_only_typescript_files_covers_them() {
+        let directory = tree(&[("tsconfig.json", "{}"), ("main.ts", "export {};\n")]);
+        let file = directory.path().join("main.ts");
+
+        let providers = Providers::load()
+            .path(directory.path())
+            .files(std::slice::from_ref(&file))
+            .call()
+            .expect("the TypeScript project should load");
+
+        assert_eq!(providers.for_file(&file, Language::TypeScript).len(), 1);
     }
 
     #[test]
@@ -277,27 +302,61 @@ mod tests {
             .expect("the TypeScript project should load");
 
         assert!(providers.rust.is_none());
-        assert_eq!(providers.for_file(&file, Language::TypeScript).len(), 1);
     }
 
     #[test]
-    fn trait_send() {
+    fn load_with_two_typescript_projects_loads_both() {
+        let directory = tree(&[
+            ("site/tsconfig.json", "{}"),
+            ("site/page.ts", "export {};\n"),
+            ("packages/a/tsconfig.json", "{}"),
+            ("packages/a/index.ts", "export {};\n"),
+        ]);
+        let page = directory.path().join("site/page.ts");
+        let index = directory.path().join("packages/a/index.ts");
+
+        let providers = Providers::load()
+            .path(directory.path())
+            .files(&[page, index])
+            .call()
+            .expect("both projects should load");
+
+        assert_eq!(providers.typescript.len(), 2);
+    }
+
+    #[test]
+    fn trait_send_no_typescript_project() {
         fn assert_send<T: Send>() {}
         assert_send::<NoTypeScriptProject>();
+    }
+
+    #[test]
+    fn trait_send_providers() {
+        fn assert_send<T: Send>() {}
         assert_send::<Providers>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_sync_no_typescript_project() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<NoTypeScriptProject>();
+    }
+
+    #[test]
+    fn trait_sync_providers() {
+        fn assert_sync<T: Sync>() {}
         assert_sync::<Providers>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_unpin_no_typescript_project() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<NoTypeScriptProject>();
+    }
+
+    #[test]
+    fn trait_unpin_providers() {
+        fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Providers>();
     }
 }

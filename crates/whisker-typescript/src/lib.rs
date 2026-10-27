@@ -126,8 +126,13 @@ mod tests {
 
         walk_and_dispatch(&tree.root_node(), &mut pass);
 
-        assert_eq!(pass.jsx_elements, 1);
-        assert_eq!(pass.type_assertions, 0);
+        let KindCounter {
+            jsx_elements,
+            type_assertions,
+            ..
+        } = pass;
+        let calls = (jsx_elements, type_assertions);
+        assert_eq!(calls, (1, 0));
     }
 
     #[test]
@@ -137,8 +142,13 @@ mod tests {
 
         walk_and_dispatch(&tree.root_node(), &mut pass);
 
-        assert_eq!(pass.type_assertions, 1);
-        assert_eq!(pass.jsx_elements, 0);
+        let KindCounter {
+            jsx_elements,
+            type_assertions,
+            ..
+        } = pass;
+        let calls = (type_assertions, jsx_elements);
+        assert_eq!(calls, (1, 0));
     }
 
     #[test]
@@ -168,6 +178,14 @@ mod tests {
         let root = tree.root_node();
 
         assert_eq!(root.kind(), "program");
+    }
+
+    #[test]
+    fn language_parses_typescript_source_without_error() {
+        let tree = parse_with(&language(), "function main(): void {}");
+
+        let root = tree.root_node();
+
         assert!(!root.raw().has_error());
     }
 
@@ -181,12 +199,17 @@ mod tests {
     }
 
     #[test]
-    fn vendored_node_types_match_the_linked_grammars() {
-        let typescript = include_str!("typescript-node-types.json");
+    fn vendored_node_types_match_the_linked_tsx_grammar() {
         let tsx = include_str!("tsx-node-types.json");
 
-        assert_eq!(typescript, tree_sitter_typescript::TYPESCRIPT_NODE_TYPES);
         assert_eq!(tsx, tree_sitter_typescript::TSX_NODE_TYPES);
+    }
+
+    #[test]
+    fn vendored_node_types_match_the_linked_typescript_grammar() {
+        let typescript = include_str!("typescript-node-types.json");
+
+        assert_eq!(typescript, tree_sitter_typescript::TYPESCRIPT_NODE_TYPES);
     }
 
     mod prop {

@@ -141,10 +141,9 @@ mod tests {
         tree.decorations_mut().insert(id, Repeated(2));
 
         let found = tree.root_node().get::<Repeated>();
+        let values: Vec<u32> = found.iter().map(|repeated| repeated.0).collect();
 
-        assert_eq!(found.len(), 2);
-        assert_eq!(found[0].0, 1);
-        assert_eq!(found[1].0, 2);
+        assert_eq!(values, [1, 2]);
     }
 
     #[test]

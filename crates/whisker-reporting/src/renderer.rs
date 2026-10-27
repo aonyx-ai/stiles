@@ -279,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn render_to_string_includes_suggestion_note() {
+    fn render_to_string_includes_suggestion_message() {
         let diag = test_diagnostic().with_suggestion(Suggestion::new(
             Span::new(PathBuf::from("test.rs"), 0, 2),
             "pub fn".into(),
@@ -290,6 +290,16 @@ mod tests {
             output.contains("make it public"),
             "output should contain suggestion message: {output}"
         );
+    }
+
+    #[test]
+    fn render_to_string_includes_suggestion_replacement() {
+        let diag = test_diagnostic().with_suggestion(Suggestion::new(
+            Span::new(PathBuf::from("test.rs"), 0, 2),
+            "pub fn".into(),
+            "make it public".into(),
+        ));
+        let output = render_to_string(&[diag], &test_source()).unwrap();
         assert!(
             output.contains("pub fn"),
             "output should contain replacement: {output}"
@@ -311,14 +321,11 @@ mod tests {
             Span::new(PathBuf::from("test.rs"), 3, 7),
         );
         let output = render_to_string(&[d1, d2], &test_source()).unwrap();
-        assert!(
-            output.contains("first"),
-            "should contain first diag: {output}"
-        );
-        assert!(
-            output.contains("second"),
-            "should contain second diag: {output}"
-        );
+        let missing: Vec<&str> = ["first", "second"]
+            .into_iter()
+            .filter(|message| !output.contains(message))
+            .collect();
+        assert_eq!(missing, Vec::<&str>::new(), "output: {output}");
     }
 
     #[test]

@@ -53,6 +53,14 @@ mod tests {
 
     use super::*;
 
+    /// Every severity, from the mildest to the most severe
+    const SEVERITIES: [Severity; 4] = [
+        Severity::Help,
+        Severity::Info,
+        Severity::Warn,
+        Severity::Error,
+    ];
+
     fn test_diagnostic(severity: Severity) -> Diagnostic {
         Diagnostic::new(
             RuleId::new("lint.test"),
@@ -84,20 +92,18 @@ mod tests {
     fn is_met_by_with_errors_accepts_only_error() {
         let threshold = FailureThreshold::Errors;
 
-        assert!(!threshold.is_met_by(Severity::Help));
-        assert!(!threshold.is_met_by(Severity::Info));
-        assert!(!threshold.is_met_by(Severity::Warn));
-        assert!(threshold.is_met_by(Severity::Error));
+        let met = SEVERITIES.map(|severity| threshold.is_met_by(severity));
+
+        assert_eq!(met, [false, false, false, true]);
     }
 
     #[test]
     fn is_met_by_with_warnings_accepts_warn_and_error() {
         let threshold = FailureThreshold::Warnings;
 
-        assert!(!threshold.is_met_by(Severity::Help));
-        assert!(!threshold.is_met_by(Severity::Info));
-        assert!(threshold.is_met_by(Severity::Warn));
-        assert!(threshold.is_met_by(Severity::Error));
+        let met = SEVERITIES.map(|severity| threshold.is_met_by(severity));
+
+        assert_eq!(met, [false, false, true, true]);
     }
 
     #[test]
@@ -137,39 +143,88 @@ mod tests {
 
     #[test]
     fn promote_with_warnings_leaves_help_and_info_untouched() {
-        let help = FailureThreshold::Warnings.promote(test_diagnostic(Severity::Help));
-        let info = FailureThreshold::Warnings.promote(test_diagnostic(Severity::Info));
+        let severities = [Severity::Help, Severity::Info].map(|severity| {
+            FailureThreshold::Warnings
+                .promote(test_diagnostic(severity))
+                .severity()
+        });
 
-        assert_eq!(help.severity(), Severity::Help);
-        assert_eq!(info.severity(), Severity::Info);
+        assert_eq!(severities, [Severity::Help, Severity::Info]);
+    }
+
+    fn origin() -> Location {
+        Location::new(
+            Span::new(PathBuf::from("other.rs"), 1, 2),
+            "defined here".into(),
+        )
+    }
+
+    fn related() -> Location {
+        Location::new(
+            Span::new(PathBuf::from("other.rs"), 3, 4),
+            "also here".into(),
+        )
+    }
+
+    fn suggestion() -> Suggestion {
+        Suggestion::new(
+            Span::new(PathBuf::from("test.rs"), 0, 1),
+            "replacement".into(),
+            "try this".into(),
+        )
+    }
+
+    /// Returns a warning with an origin, a related location, and a
+    /// suggestion, promoted under [`FailureThreshold::Warnings`]
+    fn promoted_detailed_warning() -> Diagnostic {
+        let diagnostic = test_diagnostic(Severity::Warn)
+            .with_origin(origin())
+            .with_related(related())
+            .with_suggestion(suggestion());
+
+        FailureThreshold::Warnings.promote(diagnostic)
     }
 
     #[test]
-    fn promote_with_warnings_preserves_diagnostic_details() {
-        let diagnostic = test_diagnostic(Severity::Warn)
-            .with_origin(Location::new(
-                Span::new(PathBuf::from("other.rs"), 1, 2),
-                "defined here".into(),
-            ))
-            .with_related(Location::new(
-                Span::new(PathBuf::from("other.rs"), 3, 4),
-                "also here".into(),
-            ))
-            .with_suggestion(Suggestion::new(
-                Span::new(PathBuf::from("test.rs"), 0, 1),
-                "replacement".into(),
-                "try this".into(),
-            ));
+    fn promote_with_warnings_preserves_the_message() {
+        let promoted = promoted_detailed_warning();
 
-        let promoted = FailureThreshold::Warnings.promote(diagnostic);
+        assert_eq!(promoted.message(), "test message");
+    }
+
+    #[test]
+    fn promote_with_warnings_preserves_the_origins() {
+        let promoted = promoted_detailed_warning();
+
+        assert_eq!(promoted.origins(), [origin()]);
+    }
+
+    #[test]
+    fn promote_with_warnings_preserves_the_related_locations() {
+        let promoted = promoted_detailed_warning();
+
+        assert_eq!(promoted.related(), [related()]);
+    }
+
+    #[test]
+    fn promote_with_warnings_preserves_the_rule_id() {
+        let promoted = promoted_detailed_warning();
 
         assert_eq!(promoted.rule_id(), RuleId::new("lint.test"));
-        assert_eq!(promoted.message(), "test message");
-        assert_eq!(promoted.span().start(), 0);
-        assert_eq!(promoted.span().end(), 10);
-        assert_eq!(promoted.origins().len(), 1);
-        assert_eq!(promoted.related().len(), 1);
-        assert_eq!(promoted.suggestions().len(), 1);
+    }
+
+    #[test]
+    fn promote_with_warnings_preserves_the_span() {
+        let promoted = promoted_detailed_warning();
+
+        assert_eq!(promoted.span(), &Span::new(PathBuf::from("test.rs"), 0, 10));
+    }
+
+    #[test]
+    fn promote_with_warnings_preserves_the_suggestions() {
+        let promoted = promoted_detailed_warning();
+
+        assert_eq!(promoted.suggestions(), [suggestion()]);
     }
 
     #[test]

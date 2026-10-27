@@ -308,9 +308,11 @@ mod tests {
         let tree = parse("fn main() {}", Language::Rust);
         let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(FnFinder)];
         let diagnostics = execute(&tree, &mut passes);
+        let [diagnostic] = diagnostics.as_slice() else {
+            panic!("expected one diagnostic, got {diagnostics:?}");
+        };
 
-        assert_eq!(diagnostics.len(), 1);
-        assert_diagnostic(&diagnostics[0])
+        assert_diagnostic(diagnostic)
             .has_rule_id("test.fn")
             .has_severity(Severity::Warn)
             .message_contains("found fn");

@@ -278,12 +278,32 @@ mod tests {
     }
 
     #[test]
-    fn trait_auto() {
+    fn trait_auto_build_script() {
         fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<BuildScript>();
+    }
+
+    #[test]
+    fn trait_auto_bundle() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<Bundle<'_>>();
-        assert_auto::<Section>();
+    }
+
+    #[test]
+    fn trait_auto_kind() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<Kind>();
+    }
+
+    #[test]
+    fn trait_auto_merged() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<Merged>();
+    }
+
+    #[test]
+    fn trait_auto_section() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
+        assert_auto::<Section>();
     }
 }

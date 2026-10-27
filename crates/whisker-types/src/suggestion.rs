@@ -77,13 +77,27 @@ mod tests {
     }
 
     #[test]
-    fn accessors_return_correct_values() {
+    fn message_returns_the_message() {
+        let span = Span::new(PathBuf::from("test.rs"), 0, 5);
+        let suggestion = Suggestion::new(span, "new_text".into(), "try this".into());
+
+        assert_eq!(suggestion.message(), "try this");
+    }
+
+    #[test]
+    fn replacement_returns_the_replacement() {
+        let span = Span::new(PathBuf::from("test.rs"), 0, 5);
+        let suggestion = Suggestion::new(span, "new_text".into(), "try this".into());
+
+        assert_eq!(suggestion.replacement(), "new_text");
+    }
+
+    #[test]
+    fn span_returns_the_span() {
         let span = Span::new(PathBuf::from("test.rs"), 0, 5);
         let suggestion = Suggestion::new(span.clone(), "new_text".into(), "try this".into());
 
         assert_eq!(suggestion.span(), &span);
-        assert_eq!(suggestion.replacement(), "new_text");
-        assert_eq!(suggestion.message(), "try this");
     }
 
     mod prop {

@@ -145,7 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn a_boxed_pass_forwards_through_its_vtable() {
+    fn a_boxed_pass_forwards_configure_to_the_pass() {
         static CONFIGURED: AtomicU32 = AtomicU32::new(0);
         struct Counting;
 
@@ -166,30 +166,53 @@ mod tests {
 
         let mut pass: Box<dyn LintPass> = Box::new(boxed_lint_pass(Counting));
 
-        let configured: Result<(), Panic> = pass.configure(&RuleOptions::default()).into();
+        let _configured = pass.configure(&RuleOptions::default());
 
-        assert!(configured.is_ok());
         assert_eq!(CONFIGURED.load(Ordering::SeqCst), 1);
     }
 
     #[test]
-    fn trait_send() {
+    fn a_boxed_pass_forwards_the_result_of_configure() {
+        let mut pass: Box<dyn LintPass> = Box::new(boxed_lint_pass(Dummy));
+
+        let configured: Result<(), Panic> = pass.configure(&RuleOptions::default()).into();
+
+        assert!(configured.is_ok());
+    }
+
+    #[test]
+    fn trait_send_boxed_lint_pass() {
         fn assert_send<T: Send>() {}
-        assert_send::<Dummy>();
         assert_send::<BoxedLintPass>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_send_dummy() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Dummy>();
+    }
+
+    #[test]
+    fn trait_sync_boxed_lint_pass() {
         fn assert_sync<T: Sync>() {}
-        assert_sync::<Dummy>();
         assert_sync::<BoxedLintPass>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_sync_dummy() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Dummy>();
+    }
+
+    #[test]
+    fn trait_unpin_boxed_lint_pass() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<BoxedLintPass>();
+    }
+
+    #[test]
+    fn trait_unpin_dummy() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Dummy>();
-        assert_unpin::<BoxedLintPass>();
     }
 }

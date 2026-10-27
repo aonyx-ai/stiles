@@ -260,12 +260,9 @@ mod tests {
         let options = options();
 
         let empty = options.names(RuleId::new("lint.bool-param"), "boundary-attributes");
+        let absent = options.names(RuleId::new("lint.bool-param"), "absent");
 
-        assert_eq!(empty, Some(Vec::new()));
-        assert_eq!(
-            options.names(RuleId::new("lint.bool-param"), "absent"),
-            None
-        );
+        assert_eq!([empty, absent], [Some(Vec::new()), None]);
     }
 
     #[test]
@@ -327,13 +324,16 @@ mod tests {
             .validate(&declared(&["lint.derive-order"]))
             .expect_err("an unknown rule should be refused");
 
-        let message = format!("{error:#}");
-        assert!(message.contains("lint.bool-param"), "{message}");
-        assert!(
-            message.contains("lint.repeated-primitive-params"),
-            "{message}"
+        assert_eq!(
+            error,
+            ValidateRuleOptionsError::UnknownRules {
+                unknown: vec![
+                    "lint.bool-param".to_owned(),
+                    "lint.repeated-primitive-params".to_owned(),
+                ],
+                declared: vec!["lint.derive-order".to_owned()],
+            }
         );
-        assert!(message.contains("lint.derive-order"), "{message}");
     }
 
     #[test]

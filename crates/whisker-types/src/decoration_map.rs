@@ -194,9 +194,8 @@ mod tests {
         map.insert(1, TypeInfo("u64".into()));
 
         let results = map.get_all::<TypeInfo>(1);
-        assert_eq!(results.len(), 2);
-        assert_eq!(results[0].0, "i32");
-        assert_eq!(results[1].0, "u64");
+
+        assert_eq!(results, [&TypeInfo("i32".into()), &TypeInfo("u64".into())]);
     }
 
     #[test]
@@ -206,8 +205,9 @@ mod tests {
         assert!(results.is_empty());
     }
 
-    #[test]
-    fn merge_with_conflicting_type_keeps_first() {
+    /// Returns a map that holds `first` on node 1, merged with one that
+    /// holds `second` on the same node
+    fn merged_conflict() -> DecorationMap {
         let mut map = DecorationMap::new();
         map.insert(1, TypeInfo("first".into()));
         let mut other = DecorationMap::new();
@@ -215,15 +215,29 @@ mod tests {
 
         map.merge(other);
 
-        assert_eq!(map.get::<TypeInfo>(1).expect("should find").0, "first");
-        let all = map.get_all::<TypeInfo>(1);
-        assert_eq!(all.len(), 2);
-        assert_eq!(all[0].0, "first");
-        assert_eq!(all[1].0, "second");
+        map
     }
 
     #[test]
-    fn merge_with_disjoint_nodes_keeps_both() {
+    fn merge_with_conflicting_type_keeps_both_in_order() {
+        let map = merged_conflict();
+
+        let all = map.get_all::<TypeInfo>(1);
+
+        assert_eq!(all, [&TypeInfo("first".into()), &TypeInfo("second".into())]);
+    }
+
+    #[test]
+    fn merge_with_conflicting_type_keeps_first() {
+        let map = merged_conflict();
+
+        let first = map.get::<TypeInfo>(1);
+
+        assert_eq!(first, Some(&TypeInfo("first".into())));
+    }
+
+    #[test]
+    fn merge_with_disjoint_nodes_keeps_other_node() {
         let mut map = DecorationMap::new();
         map.insert(1, TypeInfo("i32".into()));
         let mut other = DecorationMap::new();
@@ -231,8 +245,19 @@ mod tests {
 
         map.merge(other);
 
-        assert_eq!(map.get::<TypeInfo>(1).expect("should find").0, "i32");
-        assert_eq!(map.get::<TypeInfo>(2).expect("should find").0, "u64");
+        assert_eq!(map.get::<TypeInfo>(2), Some(&TypeInfo("u64".into())));
+    }
+
+    #[test]
+    fn merge_with_disjoint_nodes_keeps_own_node() {
+        let mut map = DecorationMap::new();
+        map.insert(1, TypeInfo("i32".into()));
+        let mut other = DecorationMap::new();
+        other.insert(2, TypeInfo("u64".into()));
+
+        map.merge(other);
+
+        assert_eq!(map.get::<TypeInfo>(1), Some(&TypeInfo("i32".into())));
     }
 
     #[test]
@@ -242,12 +267,11 @@ mod tests {
 
         map.merge(DecorationMap::new());
 
-        assert_eq!(map.get::<TypeInfo>(1).expect("should find").0, "i32");
-        assert_eq!(map.get_all::<TypeInfo>(1).len(), 1);
+        assert_eq!(map.get_all::<TypeInfo>(1), [&TypeInfo("i32".into())]);
     }
 
     #[test]
-    fn merge_with_same_node_different_types_keeps_both() {
+    fn merge_with_same_node_different_types_keeps_other_type() {
         let mut map = DecorationMap::new();
         map.insert(1, TypeInfo("i32".into()));
         let mut other = DecorationMap::new();
@@ -255,19 +279,39 @@ mod tests {
 
         map.merge(other);
 
-        assert_eq!(map.get::<TypeInfo>(1).expect("should find").0, "i32");
-        assert_eq!(map.get::<Scope>(1).expect("should find").0, 3);
+        assert_eq!(map.get::<Scope>(1), Some(&Scope(3)));
     }
 
     #[test]
-    fn multiple_types_on_same_node() {
+    fn merge_with_same_node_different_types_keeps_own_type() {
         let mut map = DecorationMap::new();
+        map.insert(1, TypeInfo("i32".into()));
+        let mut other = DecorationMap::new();
+        other.insert(1, Scope(3));
+
+        map.merge(other);
+
+        assert_eq!(map.get::<TypeInfo>(1), Some(&TypeInfo("i32".into())));
+    }
+
+    #[test]
+    fn multiple_types_on_same_node_keep_the_first_type() {
+        let mut map = DecorationMap::new();
+
         map.insert(1, TypeInfo("i32".into()));
         map.insert(1, Scope(3));
 
-        assert!(map.get::<TypeInfo>(1).is_some());
-        assert!(map.get::<Scope>(1).is_some());
-        assert_eq!(map.get::<Scope>(1).unwrap().0, 3);
+        assert_eq!(map.get::<TypeInfo>(1), Some(&TypeInfo("i32".into())));
+    }
+
+    #[test]
+    fn multiple_types_on_same_node_keep_the_second_type() {
+        let mut map = DecorationMap::new();
+
+        map.insert(1, TypeInfo("i32".into()));
+        map.insert(1, Scope(3));
+
+        assert_eq!(map.get::<Scope>(1), Some(&Scope(3)));
     }
 
     mod prop {

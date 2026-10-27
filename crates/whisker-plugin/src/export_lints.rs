@@ -199,14 +199,24 @@ mod tests {
     }
 
     #[test]
-    fn declaration_carries_the_handshake_constants() {
-        assert_eq!(whisker_plugin_declaration.abi_version, ABI_VERSION);
+    fn declaration_carries_the_abi_version() {
+        let version = whisker_plugin_declaration.abi_version;
 
-        let types = whisker_plugin_declaration.types_fingerprint;
-        assert_eq!(types, TYPES_FINGERPRINT);
+        assert_eq!(version, ABI_VERSION);
+    }
 
+    #[test]
+    fn declaration_carries_the_language_fingerprint() {
         let language = whisker_plugin_declaration.language_fingerprint;
+
         assert_eq!(language, LANGUAGE_FINGERPRINT);
+    }
+
+    #[test]
+    fn declaration_carries_the_types_fingerprint() {
+        let types = whisker_plugin_declaration.types_fingerprint;
+
+        assert_eq!(types, TYPES_FINGERPRINT);
     }
 
     #[test]
@@ -228,11 +238,8 @@ mod tests {
         let checked: Result<_, Panic> = LintPass::check_node(&mut pass, &function).into();
 
         let diagnostics = checked.expect("the pass should not panic");
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(
-            diagnostics[0].rule_id(),
-            RuleId::new("test.flag-every-function")
-        );
+        let rules: Vec<RuleId> = diagnostics.iter().map(|found| found.rule_id()).collect();
+        assert_eq!(rules, [RuleId::new("test.flag-every-function")]);
     }
 
     #[test]
@@ -251,11 +258,8 @@ mod tests {
         let checked: Result<_, Panic> = LintPass::check_node(&mut pass, &comment).into();
 
         let diagnostics = checked.expect("the pass should not panic");
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(
-            diagnostics[0].rule_id(),
-            RuleId::new("test.flag-every-comment")
-        );
+        let rules: Vec<RuleId> = diagnostics.iter().map(|found| found.rule_id()).collect();
+        assert_eq!(rules, [RuleId::new("test.flag-every-comment")]);
     }
 
     #[test]

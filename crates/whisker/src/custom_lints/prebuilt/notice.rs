@@ -87,8 +87,9 @@ mod tests {
             .build()
     }
 
-    #[test]
-    fn display_of_unpublished_names_the_archive() {
+    /// Returns the notice that no archive is published for [`lints`], and
+    /// the name of the archive it looked for
+    fn unpublished() -> (PrebuiltNotice, AssetName) {
         let lints = lints();
         let name = AssetName::builder()
             .rev(lints.rev())
@@ -98,6 +99,21 @@ mod tests {
             lints,
             name: name.clone(),
         };
+        (notice, name)
+    }
+
+    #[test]
+    fn display_of_unpublished_names_the_archive() {
+        let (notice, name) = unpublished();
+
+        let text = notice.to_string();
+
+        assert!(text.contains(name.as_str()), "{text}");
+    }
+
+    #[test]
+    fn display_of_unpublished_starts_with_a_note() {
+        let (notice, _) = unpublished();
 
         let text = notice.to_string();
 
@@ -105,7 +121,6 @@ mod tests {
             text.starts_with("note: no prebuilt lints published for "),
             "{text}"
         );
-        assert!(text.contains(name.as_str()), "{text}");
     }
 
     #[test]
@@ -117,11 +132,22 @@ mod tests {
 
         let text = notice.to_string();
 
+        assert!(text.contains("the digest does not match"), "{text}");
+    }
+
+    #[test]
+    fn display_of_unusable_starts_with_a_warning() {
+        let notice = PrebuiltNotice::Unusable {
+            lints: lints(),
+            error: anyhow::anyhow!("the digest does not match"),
+        };
+
+        let text = notice.to_string();
+
         assert!(
             text.starts_with("warning: whisker cannot use the prebuilt lints for "),
             "{text}"
         );
-        assert!(text.contains("the digest does not match"), "{text}");
     }
 
     #[test]

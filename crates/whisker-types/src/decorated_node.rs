@@ -311,8 +311,7 @@ mod tests {
         let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
         let span = root.span();
 
-        assert_eq!(span.start(), 0);
-        assert_eq!(span.end(), source.len());
+        assert_eq!(span.start()..span.end(), 0..source.len());
     }
 
     #[test]

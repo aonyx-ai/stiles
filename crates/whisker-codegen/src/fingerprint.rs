@@ -220,13 +220,21 @@ mod tests {
     }
 
     #[test]
-    fn display_renders_sixteen_hex_digits() {
+    fn display_renders_hex_digits() {
+        let fingerprint = Fingerprint::new();
+
+        let rendered = fingerprint.to_string();
+
+        assert!(rendered.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn display_renders_sixteen_characters() {
         let fingerprint = Fingerprint::new();
 
         let rendered = fingerprint.to_string();
 
         assert_eq!(rendered.len(), 16);
-        assert!(rendered.chars().all(|c| c.is_ascii_hexdigit()));
     }
 
     #[test]

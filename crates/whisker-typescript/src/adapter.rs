@@ -63,8 +63,8 @@ mod tests {
         let checked: Result<_, Panic> = adapter.check_node(&function).into();
 
         let diagnostics = checked.expect("the rule should not panic");
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].rule_id(), RuleId::new("test.function"));
+        let rules: Vec<RuleId> = diagnostics.iter().map(|found| found.rule_id()).collect();
+        assert_eq!(rules, [RuleId::new("test.function")]);
     }
 
     #[test]

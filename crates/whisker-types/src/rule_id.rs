@@ -115,13 +115,26 @@ mod tests {
     }
 
     #[test]
+    fn cmp_with_the_same_name_is_equal() {
+        let first = RuleId::new("lint.a");
+
+        assert_eq!(first.cmp(&first), Ordering::Equal);
+    }
+
+    #[test]
     fn ordering_follows_the_name() {
         let first = RuleId::new("lint.a");
         let second = RuleId::new("lint.b");
 
         assert!(first < second);
+    }
+
+    #[test]
+    fn partial_cmp_follows_the_name() {
+        let first = RuleId::new("lint.a");
+        let second = RuleId::new("lint.b");
+
         assert_eq!(first.partial_cmp(&second), Some(Ordering::Less));
-        assert_eq!(first.cmp(&first), Ordering::Equal);
     }
 
     #[test]
