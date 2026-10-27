@@ -180,27 +180,6 @@ fn workspace_of_lints() -> TempDir {
     directory
 }
 
-/// Pins that a project runs only the rules it names
-#[test]
-fn check_with_an_enabled_rule_runs_only_that_rule() {
-    let target = package(TODO_SOURCE);
-    let lints = workspace_of_lints();
-    let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
-    write_config(
-        target.path(),
-        &format!("[rules]\nenable = [\"workspace.second\"]\n\n[[lints]]\npath = {lint_path}\n"),
-    );
-
-    whisker()
-        .env("CARGO_TARGET_DIR", shared_build_directory())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("warning[workspace.second]"))
-        .stdout(predicate::str::contains("workspace.first").not());
-}
-
 /// Pins that a disabled rule reports nothing and the others still do
 #[test]
 fn check_with_a_disabled_rule_runs_the_rest() {
@@ -220,153 +199,6 @@ fn check_with_a_disabled_rule_runs_the_rest() {
         .success()
         .stdout(predicate::str::contains("warning[workspace.second]"))
         .stdout(predicate::str::contains("workspace.first").not());
-}
-
-/// Pins that a name no lint reports is refused
-///
-/// A misspelled rule would otherwise disable nothing and say nothing,
-/// which reads exactly like a rule that found no fault. The error names
-/// what the loaded lints do report, so the fix is in front of the reader.
-#[test]
-fn check_with_a_rule_no_lint_reports_fails() {
-    let target = package(TODO_SOURCE);
-    let lints = workspace_of_lints();
-    let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
-    write_config(
-        target.path(),
-        &format!("[rules]\ndisable = [\"workspace.frist\"]\n\n[[lints]]\npath = {lint_path}\n"),
-    );
-
-    whisker()
-        .env("CARGO_TARGET_DIR", shared_build_directory())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .code(1)
-        .stderr(predicate::str::contains("workspace.frist"))
-        .stderr(predicate::str::contains("workspace.first"));
-}
-
-/// Pins that naming both lists is refused rather than resolved
-#[test]
-fn check_with_both_rule_lists_fails() {
-    let target = package(TODO_SOURCE);
-    write_config(
-        target.path(),
-        "[rules]\nenable = [\"a.b\"]\ndisable = [\"c.d\"]\n",
-    );
-
-    whisker()
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .code(1)
-        .stderr(predicate::str::contains("both"));
-}
-
-/// Pins that a plugin from a protocol whisker does not read is refused
-///
-/// Whisker is before 1.0, so a plugin's protocol has to equal the
-/// binary's. The fixture names 0.0 and carries nothing after the version,
-/// so the refusal can only come from the version itself.
-///
-/// The error names both sides, because the reader has to know which one
-/// to rebuild. This test pins the plugin's protocol exactly. The unit
-/// tests on `HandshakeMismatch` pin how whisker spells its own, which
-/// becomes a range once whisker reads more than one protocol.
-#[test]
-fn check_with_a_plugin_from_another_protocol_refuses_it() {
-    let target = package(TODO_SOURCE);
-    let lints = tempfile::tempdir().expect("temporary directory should be created");
-    write_other_protocol_lint_package(lints.path(), "other_lint");
-    configure_lint(target.path(), lints.path());
-
-    whisker()
-        .env("CARGO_TARGET_DIR", shared_build_directory())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .code(1)
-        .stderr(predicate::str::contains("plugin (ABI 0.0)"))
-        .stderr(predicate::str::contains("incompatible with whisker (ABI "));
-}
-
-/// Pins that a rule reads the option the project set for it
-///
-/// The lint fires on nothing of its own. It flags the macros the
-/// configuration names, so a diagnostic here can only mean the table
-/// reached the pass.
-#[test]
-fn check_with_an_option_configures_the_rule() {
-    let target = package(TODO_SOURCE);
-    let lints = tempfile::tempdir().expect("temporary directory should be created");
-    write_configurable_lint_package(lints.path(), "configured_lint", "custom.configured");
-    let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
-    write_config(
-        target.path(),
-        &format!(
-            "[[lints]]\npath = {lint_path}\n\n[rules.options.\"custom.configured\"]\n\
-             macros = [\"todo\"]\n"
-        ),
-    );
-
-    whisker()
-        .env("CARGO_TARGET_DIR", shared_build_directory())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("warning[custom.configured]"));
-}
-
-/// Pins that a rule the project configured nothing for still runs
-///
-/// The pass is configured either way, with a table holding nothing for
-/// it, so an unconfigured rule reports what it reports by default rather
-/// than failing to load.
-#[test]
-fn check_without_an_option_leaves_the_rule_at_its_default() {
-    let target = package(TODO_SOURCE);
-    let lints = tempfile::tempdir().expect("temporary directory should be created");
-    write_configurable_lint_package(lints.path(), "unconfigured_lint", "custom.configured");
-    configure_lint(target.path(), lints.path());
-
-    whisker()
-        .env("CARGO_TARGET_DIR", shared_build_directory())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("custom.configured").not());
-}
-
-/// Pins that an option set on a rule nothing reports is refused
-///
-/// An option on a misspelled rule configures nothing and reads exactly
-/// like a rule that took it and found no fault, which is the same reason
-/// `[rules]` refuses a name nothing reports.
-#[test]
-fn check_with_an_option_for_a_rule_no_lint_reports_fails() {
-    let target = package(TODO_SOURCE);
-    let lints = tempfile::tempdir().expect("temporary directory should be created");
-    write_configurable_lint_package(lints.path(), "misnamed_lint", "custom.configured");
-    let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
-    write_config(
-        target.path(),
-        &format!(
-            "[[lints]]\npath = {lint_path}\n\n[rules.options.\"custom.misspelled\"]\n\
-             macros = [\"todo\"]\n"
-        ),
-    );
-
-    whisker()
-        .env("CARGO_TARGET_DIR", shared_build_directory())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .code(1)
-        .stderr(predicate::str::contains("custom.misspelled"))
-        .stderr(predicate::str::contains("custom.configured"));
 }
 
 /// Pins the error for a repository that cannot be reached
@@ -398,6 +230,58 @@ fn check_with_a_git_lint_that_cannot_be_fetched_names_the_source() {
         ));
 }
 
+/// Pins that a plugin from a protocol whisker does not read is refused
+///
+/// Whisker is before 1.0, so a plugin's protocol has to equal the
+/// binary's. The fixture names 0.0 and carries nothing after the version,
+/// so the refusal can only come from the version itself.
+///
+/// The error names both sides, because the reader has to know which one
+/// to rebuild. This test pins the plugin's protocol exactly. The unit
+/// tests on `HandshakeMismatch` pin how whisker spells its own, which
+/// becomes a range once whisker reads more than one protocol.
+#[test]
+fn check_with_a_plugin_from_another_protocol_refuses_it() {
+    let target = package(TODO_SOURCE);
+    let lints = tempfile::tempdir().expect("temporary directory should be created");
+    write_other_protocol_lint_package(lints.path(), "other_lint");
+    configure_lint(target.path(), lints.path());
+
+    whisker()
+        .env("CARGO_TARGET_DIR", shared_build_directory())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("plugin (ABI 0.0)"))
+        .stderr(predicate::str::contains("incompatible with whisker (ABI "));
+}
+
+/// Pins that a name no lint reports is refused
+///
+/// A misspelled rule would otherwise disable nothing and say nothing,
+/// which reads exactly like a rule that found no fault. The error names
+/// what the loaded lints do report, so the fix is in front of the reader.
+#[test]
+fn check_with_a_rule_no_lint_reports_fails() {
+    let target = package(TODO_SOURCE);
+    let lints = workspace_of_lints();
+    let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
+    write_config(
+        target.path(),
+        &format!("[rules]\ndisable = [\"workspace.frist\"]\n\n[[lints]]\npath = {lint_path}\n"),
+    );
+
+    whisker()
+        .env("CARGO_TARGET_DIR", shared_build_directory())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("workspace.frist"))
+        .stderr(predicate::str::contains("workspace.first"));
+}
+
 /// Pins that a configured directory may be a workspace of plugins
 ///
 /// One entry naming a repository of rules is the reason this matters: a
@@ -417,6 +301,101 @@ fn check_with_a_workspace_of_lints_reports_every_member() {
         .success()
         .stdout(predicate::str::contains("warning[workspace.first]"))
         .stdout(predicate::str::contains("warning[workspace.second]"));
+}
+
+/// Pins that a project runs only the rules it names
+#[test]
+fn check_with_an_enabled_rule_runs_only_that_rule() {
+    let target = package(TODO_SOURCE);
+    let lints = workspace_of_lints();
+    let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
+    write_config(
+        target.path(),
+        &format!("[rules]\nenable = [\"workspace.second\"]\n\n[[lints]]\npath = {lint_path}\n"),
+    );
+
+    whisker()
+        .env("CARGO_TARGET_DIR", shared_build_directory())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[workspace.second]"))
+        .stdout(predicate::str::contains("workspace.first").not());
+}
+
+/// Pins that a rule reads the option the project set for it
+///
+/// The lint fires on nothing of its own. It flags the macros the
+/// configuration names, so a diagnostic here can only mean the table
+/// reached the pass.
+#[test]
+fn check_with_an_option_configures_the_rule() {
+    let target = package(TODO_SOURCE);
+    let lints = tempfile::tempdir().expect("temporary directory should be created");
+    write_configurable_lint_package(lints.path(), "configured_lint", "custom.configured");
+    let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
+    write_config(
+        target.path(),
+        &format!(
+            "[[lints]]\npath = {lint_path}\n\n[rules.options.\"custom.configured\"]\n\
+             macros = [\"todo\"]\n"
+        ),
+    );
+
+    whisker()
+        .env("CARGO_TARGET_DIR", shared_build_directory())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[custom.configured]"));
+}
+
+/// Pins that an option set on a rule nothing reports is refused
+///
+/// An option on a misspelled rule configures nothing and reads exactly
+/// like a rule that took it and found no fault, which is the same reason
+/// `[rules]` refuses a name nothing reports.
+#[test]
+fn check_with_an_option_for_a_rule_no_lint_reports_fails() {
+    let target = package(TODO_SOURCE);
+    let lints = tempfile::tempdir().expect("temporary directory should be created");
+    write_configurable_lint_package(lints.path(), "misnamed_lint", "custom.configured");
+    let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
+    write_config(
+        target.path(),
+        &format!(
+            "[[lints]]\npath = {lint_path}\n\n[rules.options.\"custom.misspelled\"]\n\
+             macros = [\"todo\"]\n"
+        ),
+    );
+
+    whisker()
+        .env("CARGO_TARGET_DIR", shared_build_directory())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("custom.misspelled"))
+        .stderr(predicate::str::contains("custom.configured"));
+}
+
+/// Pins that naming both lists is refused rather than resolved
+#[test]
+fn check_with_both_rule_lists_fails() {
+    let target = package(TODO_SOURCE);
+    write_config(
+        target.path(),
+        "[rules]\nenable = [\"a.b\"]\ndisable = [\"c.d\"]\n",
+    );
+
+    whisker()
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("both"));
 }
 
 /// Pins the whole path: configure, compile, handshake, lint, report
@@ -491,6 +470,27 @@ fn check_with_lint_that_exports_no_declaration_fails() {
         .code(1)
         .stderr(predicate::str::contains("not a whisker lint plugin"))
         .stderr(predicate::str::contains("export_lints!"));
+}
+
+/// Pins that a rule the project configured nothing for still runs
+///
+/// The pass is configured either way, with a table holding nothing for
+/// it, so an unconfigured rule reports what it reports by default rather
+/// than failing to load.
+#[test]
+fn check_without_an_option_leaves_the_rule_at_its_default() {
+    let target = package(TODO_SOURCE);
+    let lints = tempfile::tempdir().expect("temporary directory should be created");
+    write_configurable_lint_package(lints.path(), "unconfigured_lint", "custom.configured");
+    configure_lint(target.path(), lints.path());
+
+    whisker()
+        .env("CARGO_TARGET_DIR", shared_build_directory())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("custom.configured").not());
 }
 
 /// Pins that `whisker rules` lists what the configured lints declare

@@ -91,6 +91,22 @@ mod tests {
     }
 
     #[test]
+    fn display_names_the_node_the_file_and_the_message() {
+        let error = PassPanic::builder()
+            .kind("function_item")
+            .span(Span::new("src/lib.rs", 3, 9))
+            .panic(panic())
+            .build();
+
+        let text = error.to_string();
+
+        assert_eq!(
+            text,
+            "a lint pass panicked while checking a function_item at byte 3 of src/lib.rs: no functions"
+        );
+    }
+
+    #[test]
     fn kind_returns_the_kind() {
         let error = pass_panic();
 
@@ -109,22 +125,6 @@ mod tests {
         let error = pass_panic();
 
         assert_eq!(error.span(), &Span::new("src/lib.rs", 3, 9));
-    }
-
-    #[test]
-    fn display_names_the_node_the_file_and_the_message() {
-        let error = PassPanic::builder()
-            .kind("function_item")
-            .span(Span::new("src/lib.rs", 3, 9))
-            .panic(panic())
-            .build();
-
-        let text = error.to_string();
-
-        assert_eq!(
-            text,
-            "a lint pass panicked while checking a function_item at byte 3 of src/lib.rs: no functions"
-        );
     }
 
     #[test]

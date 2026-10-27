@@ -671,6 +671,28 @@ fn json_check() -> (bool, Vec<serde_json::Value>) {
     (output.status.success(), findings)
 }
 
+#[test]
+fn check_with_json_names_the_file() {
+    let (_, findings) = json_check();
+
+    let files: Vec<Option<&str>> = findings
+        .iter()
+        .map(|finding| finding["file"].as_str())
+        .collect();
+    let [Some(file)] = files.as_slice() else {
+        panic!("expected one finding with a file, got {files:?}");
+    };
+
+    assert!(file.ends_with("lib.rs"), "{file}");
+}
+
+#[test]
+fn check_with_json_succeeds_on_a_warning() {
+    let (success, _) = json_check();
+
+    assert!(success);
+}
+
 /// Pins that `--json` writes each diagnostic as one JSON object per line
 ///
 /// A caller reads the report line by line from stdout, so every line must
@@ -692,28 +714,6 @@ fn check_with_json_writes_one_object_per_diagnostic() {
             &serde_json::json!(2)
         )]
     );
-}
-
-#[test]
-fn check_with_json_names_the_file() {
-    let (_, findings) = json_check();
-
-    let files: Vec<Option<&str>> = findings
-        .iter()
-        .map(|finding| finding["file"].as_str())
-        .collect();
-    let [Some(file)] = files.as_slice() else {
-        panic!("expected one finding with a file, got {files:?}");
-    };
-
-    assert!(file.ends_with("lib.rs"), "{file}");
-}
-
-#[test]
-fn check_with_json_succeeds_on_a_warning() {
-    let (success, _) = json_check();
-
-    assert!(success);
 }
 
 /// Pins the exit code to the failure recorded while walking the files, not

@@ -133,6 +133,15 @@ mod tests {
     }
 
     #[test]
+    fn display_drops_one_trailing_newline() {
+        let finding = finding("fn a() {}\n", 3, 4);
+
+        let text = finding.to_string();
+
+        assert!(!text.ends_with("\n\n"));
+    }
+
+    #[test]
     fn display_shows_the_location() {
         let finding = finding("fn a() {}\n", 3, 4);
 
@@ -148,15 +157,6 @@ mod tests {
         let text = finding.to_string();
 
         assert!(text.starts_with("warning[lint.test]: test message"));
-    }
-
-    #[test]
-    fn display_drops_one_trailing_newline() {
-        let finding = finding("fn a() {}\n", 3, 4);
-
-        let text = finding.to_string();
-
-        assert!(!text.ends_with("\n\n"));
     }
 
     #[test]

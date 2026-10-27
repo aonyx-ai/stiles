@@ -126,22 +126,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn krate_returns_the_crate() {
-        let path = PublicPath::new("facade", ["thing", "Thing"]);
-
-        assert_eq!(path.krate(), "facade");
-    }
-
-    #[test]
-    fn segments_returns_each_segment_in_order() {
-        let path = PublicPath::new("facade", ["thing", "Thing"]);
-
-        let segments: Vec<&str> = path.segments().collect();
-
-        assert_eq!(segments, vec!["thing", "Thing"]);
-    }
-
-    #[test]
     fn display_joins_segments_with_double_colons() {
         let path = PublicPath::new("facade", ["thing", "Thing"]);
 
@@ -178,6 +162,22 @@ mod tests {
         let found = paths.contains(&PublicPath::new("facade", ["Thing"]));
 
         assert!(!found);
+    }
+
+    #[test]
+    fn krate_returns_the_crate() {
+        let path = PublicPath::new("facade", ["thing", "Thing"]);
+
+        assert_eq!(path.krate(), "facade");
+    }
+
+    #[test]
+    fn segments_returns_each_segment_in_order() {
+        let path = PublicPath::new("facade", ["thing", "Thing"]);
+
+        let segments: Vec<&str> = path.segments().collect();
+
+        assert_eq!(segments, vec!["thing", "Thing"]);
     }
 
     #[test]

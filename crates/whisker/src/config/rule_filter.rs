@@ -119,6 +119,19 @@ mod tests {
     }
 
     #[test]
+    fn admits_everything_but_a_disabled_rule() {
+        let filter = RuleFilter::builder()
+            .enable(Vec::new())
+            .disable(names(&["lint.noisy"]))
+            .build()
+            .expect("should build");
+
+        let admitted = ["lint.noisy", "lint.other"].map(|name| filter.admits(&rule(name)));
+
+        assert_eq!(admitted, [false, true]);
+    }
+
+    #[test]
     fn admits_everything_when_nothing_is_named() {
         let filter = RuleFilter::builder()
             .enable(Vec::new())
@@ -140,19 +153,6 @@ mod tests {
         let admitted = ["lint.wanted", "lint.other"].map(|name| filter.admits(&rule(name)));
 
         assert_eq!(admitted, [true, false]);
-    }
-
-    #[test]
-    fn admits_everything_but_a_disabled_rule() {
-        let filter = RuleFilter::builder()
-            .enable(Vec::new())
-            .disable(names(&["lint.noisy"]))
-            .build()
-            .expect("should build");
-
-        let admitted = ["lint.noisy", "lint.other"].map(|name| filter.admits(&rule(name)));
-
-        assert_eq!(admitted, [false, true]);
     }
 
     #[test]
@@ -180,15 +180,14 @@ mod tests {
     }
 
     #[test]
-    fn validate_accepts_a_name_a_lint_declares() {
-        let filter = RuleFilter::builder()
-            .enable(Vec::new())
-            .disable(names(&["lint.known"]))
+    fn new_with_both_lists_returns_error() {
+        let error = RuleFilter::builder()
+            .enable(names(&["lint.a"]))
+            .disable(names(&["lint.b"]))
             .build()
-            .expect("should build");
-        let declared = BTreeSet::from(["lint.known".to_owned()]);
+            .expect_err("should fail");
 
-        filter.validate(&declared).expect("should accept");
+        assert!(format!("{error:#}").contains("both"), "{error:#}");
     }
 
     /// Returns the error of a filter that disables `lint.typo` in a run
@@ -207,42 +206,6 @@ mod tests {
     }
 
     #[test]
-    fn validate_names_the_declared_rules() {
-        let error = undeclared_name_error();
-
-        assert!(error.contains("lint.known"), "{error}");
-    }
-
-    #[test]
-    fn validate_refuses_a_name_no_lint_declares() {
-        let error = undeclared_name_error();
-
-        assert!(error.contains("lint.typo"), "{error}");
-    }
-
-    #[test]
-    fn validate_accepts_an_unfiltered_project() {
-        let filter = RuleFilter::builder()
-            .enable(Vec::new())
-            .disable(Vec::new())
-            .build()
-            .expect("should build");
-
-        filter.validate(&BTreeSet::new()).expect("should accept");
-    }
-
-    #[test]
-    fn new_with_both_lists_returns_error() {
-        let error = RuleFilter::builder()
-            .enable(names(&["lint.a"]))
-            .disable(names(&["lint.b"]))
-            .build()
-            .expect_err("should fail");
-
-        assert!(format!("{error:#}").contains("both"), "{error:#}");
-    }
-
-    #[test]
     fn trait_send() {
         fn assert_send<T: Send>() {}
         assert_send::<RuleFilter>();
@@ -258,5 +221,42 @@ mod tests {
     fn trait_unpin() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<RuleFilter>();
+    }
+
+    #[test]
+    fn validate_accepts_a_name_a_lint_declares() {
+        let filter = RuleFilter::builder()
+            .enable(Vec::new())
+            .disable(names(&["lint.known"]))
+            .build()
+            .expect("should build");
+        let declared = BTreeSet::from(["lint.known".to_owned()]);
+
+        filter.validate(&declared).expect("should accept");
+    }
+
+    #[test]
+    fn validate_accepts_an_unfiltered_project() {
+        let filter = RuleFilter::builder()
+            .enable(Vec::new())
+            .disable(Vec::new())
+            .build()
+            .expect("should build");
+
+        filter.validate(&BTreeSet::new()).expect("should accept");
+    }
+
+    #[test]
+    fn validate_names_the_declared_rules() {
+        let error = undeclared_name_error();
+
+        assert!(error.contains("lint.known"), "{error}");
+    }
+
+    #[test]
+    fn validate_refuses_a_name_no_lint_declares() {
+        let error = undeclared_name_error();
+
+        assert!(error.contains("lint.typo"), "{error}");
     }
 }

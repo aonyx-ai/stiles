@@ -83,21 +83,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<Span>();
-    }
-
-    #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<Span>();
-    }
-
-    #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<Span>();
+    fn empty_span_is_allowed() {
+        let span = Span::new(PathBuf::from("test.rs"), 5, 5);
+        assert_eq!(span.start(), span.end());
     }
 
     #[test]
@@ -108,32 +96,19 @@ mod tests {
     }
 
     #[test]
-    fn file_returns_the_file() {
-        let span = Span::new(PathBuf::from("test.rs"), 10, 20);
-
-        assert_eq!(span.file(), Path::new("test.rs"));
-    }
-
-    #[test]
-    fn start_returns_the_start() {
-        let span = Span::new(PathBuf::from("test.rs"), 10, 20);
-
-        assert_eq!(span.start(), 10);
-    }
-
-    #[test]
-    fn empty_span_is_allowed() {
-        let span = Span::new(PathBuf::from("test.rs"), 5, 5);
-        assert_eq!(span.start(), span.end());
-    }
-
-    #[test]
     fn file_path_is_shared_by_a_clone() {
         let span = Span::new(PathBuf::from("test.rs"), 0, 10);
 
         let copy = span.clone();
 
         assert!(std::ptr::eq(copy.file(), span.file()));
+    }
+
+    #[test]
+    fn file_returns_the_file() {
+        let span = Span::new(PathBuf::from("test.rs"), 10, 20);
+
+        assert_eq!(span.file(), Path::new("test.rs"));
     }
 
     #[test]
@@ -149,6 +124,31 @@ mod tests {
     #[should_panic(expected = "span start")]
     fn new_with_inverted_range_panics() {
         Span::new(PathBuf::from("test.rs"), 20, 10);
+    }
+
+    #[test]
+    fn start_returns_the_start() {
+        let span = Span::new(PathBuf::from("test.rs"), 10, 20);
+
+        assert_eq!(span.start(), 10);
+    }
+
+    #[test]
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Span>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Span>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Span>();
     }
 
     mod prop {

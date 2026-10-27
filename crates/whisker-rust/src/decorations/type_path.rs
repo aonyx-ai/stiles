@@ -152,29 +152,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn krate_returns_the_crate() {
-        let path = TypePath::new("syn", ["error"], "Error");
-
-        assert_eq!(path.krate(), "syn");
-    }
-
-    #[test]
-    fn modules_returns_each_module_in_order() {
-        let path = TypePath::new("syn", ["error"], "Error");
-
-        let modules: Vec<&str> = path.modules().collect();
-
-        assert_eq!(modules, vec!["error"]);
-    }
-
-    #[test]
-    fn name_returns_the_name() {
-        let path = TypePath::new("syn", ["error"], "Error");
-
-        assert_eq!(path.name(), "Error");
-    }
-
-    #[test]
     fn display_joins_segments_with_double_colons() {
         let path = TypePath::new("syn", ["error"], "Error");
 
@@ -250,6 +227,29 @@ mod tests {
         let found = paths.contains(&TypePath::new("syn", [] as [&str; 0], "Error"));
 
         assert!(!found);
+    }
+
+    #[test]
+    fn krate_returns_the_crate() {
+        let path = TypePath::new("syn", ["error"], "Error");
+
+        assert_eq!(path.krate(), "syn");
+    }
+
+    #[test]
+    fn modules_returns_each_module_in_order() {
+        let path = TypePath::new("syn", ["error"], "Error");
+
+        let modules: Vec<&str> = path.modules().collect();
+
+        assert_eq!(modules, vec!["error"]);
+    }
+
+    #[test]
+    fn name_returns_the_name() {
+        let path = TypePath::new("syn", ["error"], "Error");
+
+        assert_eq!(path.name(), "Error");
     }
 
     #[test]

@@ -125,6 +125,38 @@ mod tests {
         }
     }
 
+    /// A whisker that reads one protocol names one, not a range of one
+    ///
+    /// Every whisker before 1.0 is such a whisker.
+    #[test]
+    fn an_abi_mismatch_names_one_version_when_that_is_all_whisker_reads() {
+        let error = HandshakeMismatch::AbiVersion {
+            plugin: AbiVersion { major: 0, minor: 2 },
+            host: AbiVersion { major: 0, minor: 1 },
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "plugin (ABI 0.2) incompatible with whisker (ABI 0.1)"
+        );
+    }
+
+    /// The host side names every protocol whisker reads, not just the
+    /// newest, because a plugin between the two is accepted and a reader
+    /// who saw only the newest would rebuild for no reason
+    #[test]
+    fn an_abi_mismatch_names_the_range_whisker_reads() {
+        let error = HandshakeMismatch::AbiVersion {
+            plugin: AbiVersion { major: 0, minor: 9 },
+            host: AbiVersion { major: 1, minor: 2 },
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "plugin (ABI 0.9) incompatible with whisker (ABI 1.0-1.2)"
+        );
+    }
+
     #[test]
     fn host_reports_the_baked_in_abi_version() {
         let host = AbiIdentity::host();
@@ -182,9 +214,41 @@ mod tests {
         assert_unpin::<HandshakeMismatch>();
     }
 
+    /// Whisker accepts the oldest protocol it reads
+    ///
+    /// From 1.0 that is an older minor, whose declaration ends sooner in a
+    /// shape whisker knows. Before 1.0 it is this version itself.
+    #[test]
+    fn validate_accepts_the_oldest_supported_abi_version() {
+        let mut plugin = identity();
+        plugin.abi_version = plugin::ABI_VERSION.floor();
+
+        validate(&identity(), &plugin).expect("should accept");
+    }
+
     #[test]
     fn validate_matching_identities_succeeds() {
         validate(&identity(), &identity()).expect("should match");
+    }
+
+    #[test]
+    fn validate_reports_a_differing_language_fingerprint() {
+        let mut plugin = identity();
+        plugin.language_fingerprint = 0xcc;
+
+        let error = validate(&identity(), &plugin).expect_err("should mismatch");
+
+        assert_eq!(error, HandshakeMismatch::LanguageFingerprint);
+    }
+
+    #[test]
+    fn validate_reports_a_differing_types_fingerprint() {
+        let mut plugin = identity();
+        plugin.types_fingerprint = 0xcc;
+
+        let error = validate(&identity(), &plugin).expect_err("should mismatch");
+
+        assert_eq!(error, HandshakeMismatch::TypesFingerprint);
     }
 
     /// A version outside the supported range is reported before anything
@@ -207,60 +271,6 @@ mod tests {
         );
     }
 
-    /// Whisker accepts the oldest protocol it reads
-    ///
-    /// From 1.0 that is an older minor, whose declaration ends sooner in a
-    /// shape whisker knows. Before 1.0 it is this version itself.
-    #[test]
-    fn validate_accepts_the_oldest_supported_abi_version() {
-        let mut plugin = identity();
-        plugin.abi_version = plugin::ABI_VERSION.floor();
-
-        validate(&identity(), &plugin).expect("should accept");
-    }
-
-    /// The host side names every protocol whisker reads, not just the
-    /// newest, because a plugin between the two is accepted and a reader
-    /// who saw only the newest would rebuild for no reason
-    #[test]
-    fn an_abi_mismatch_names_the_range_whisker_reads() {
-        let error = HandshakeMismatch::AbiVersion {
-            plugin: AbiVersion { major: 0, minor: 9 },
-            host: AbiVersion { major: 1, minor: 2 },
-        };
-
-        assert_eq!(
-            error.to_string(),
-            "plugin (ABI 0.9) incompatible with whisker (ABI 1.0-1.2)"
-        );
-    }
-
-    /// A whisker that reads one protocol names one, not a range of one
-    ///
-    /// Every whisker before 1.0 is such a whisker.
-    #[test]
-    fn an_abi_mismatch_names_one_version_when_that_is_all_whisker_reads() {
-        let error = HandshakeMismatch::AbiVersion {
-            plugin: AbiVersion { major: 0, minor: 2 },
-            host: AbiVersion { major: 0, minor: 1 },
-        };
-
-        assert_eq!(
-            error.to_string(),
-            "plugin (ABI 0.2) incompatible with whisker (ABI 0.1)"
-        );
-    }
-
-    #[test]
-    fn validate_reports_a_differing_language_fingerprint() {
-        let mut plugin = identity();
-        plugin.language_fingerprint = 0xcc;
-
-        let error = validate(&identity(), &plugin).expect_err("should mismatch");
-
-        assert_eq!(error, HandshakeMismatch::LanguageFingerprint);
-    }
-
     #[test]
     fn validate_with_a_differing_language_fingerprint_names_the_language_crate() {
         let mut plugin = identity();
@@ -269,16 +279,6 @@ mod tests {
         let error = validate(&identity(), &plugin).expect_err("should mismatch");
 
         assert!(error.to_string().contains("whisker-rust"));
-    }
-
-    #[test]
-    fn validate_reports_a_differing_types_fingerprint() {
-        let mut plugin = identity();
-        plugin.types_fingerprint = 0xcc;
-
-        let error = validate(&identity(), &plugin).expect_err("should mismatch");
-
-        assert_eq!(error, HandshakeMismatch::TypesFingerprint);
     }
 
     #[test]

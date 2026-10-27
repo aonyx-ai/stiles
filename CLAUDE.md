@@ -499,7 +499,8 @@ pub enum PluginError {
 #### Test organization
 
 - Unit tests in the same file as the code they test.
-- Test functions ordered alphabetically within modules.
+- Test functions ordered alphabetically within modules, by byte: `a_b` before
+  `ab`, `parse` before `parse_empty`, and `case_10` before `case_2`.
 - Name tests descriptively: `function_name_<condition>_<result>`, e.g.
   `parse_with_valid_input_returns_ast`.
 

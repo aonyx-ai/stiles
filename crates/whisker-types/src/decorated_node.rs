@@ -246,21 +246,30 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<DecoratedNode<'_>>();
+    fn decoration_returns_attached_value() {
+        let source = "fn main() {}";
+        let tree = parse_tree(source);
+        let mut decorations = DecorationMap::new();
+        let node_id = tree.root_node().id();
+        decorations.insert(node_id, TestDeco(42));
+
+        let file = FilePath::from("test.rs");
+        let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
+        let deco = root
+            .decoration::<TestDeco>()
+            .expect("should find decoration");
+        assert_eq!(deco.0, 42);
     }
 
     #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<DecoratedNode<'_>>();
-    }
+    fn decoration_returns_none_when_missing() {
+        let source = "fn main() {}";
+        let tree = parse_tree(source);
+        let decorations = DecorationMap::new();
+        let file = FilePath::from("test.rs");
+        let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
 
-    #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<DecoratedNode<'_>>();
+        assert!(root.decoration::<Missing>().is_none());
     }
 
     #[test]
@@ -292,14 +301,15 @@ mod tests {
     }
 
     #[test]
-    fn text_returns_source_slice() {
+    fn named_child_returns_first_item() {
         let source = "fn main() {}";
         let tree = parse_tree(source);
         let decorations = DecorationMap::new();
         let file = FilePath::from("test.rs");
         let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
 
-        assert_eq!(root.text(), source);
+        let first_child = root.named_child(0).expect("should have a child");
+        assert_eq!(first_child.kind(), "function_item");
     }
 
     #[test]
@@ -315,42 +325,32 @@ mod tests {
     }
 
     #[test]
-    fn named_child_returns_first_item() {
+    fn text_returns_source_slice() {
         let source = "fn main() {}";
         let tree = parse_tree(source);
         let decorations = DecorationMap::new();
         let file = FilePath::from("test.rs");
         let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
 
-        let first_child = root.named_child(0).expect("should have a child");
-        assert_eq!(first_child.kind(), "function_item");
+        assert_eq!(root.text(), source);
     }
 
     #[test]
-    fn decoration_returns_attached_value() {
-        let source = "fn main() {}";
-        let tree = parse_tree(source);
-        let mut decorations = DecorationMap::new();
-        let node_id = tree.root_node().id();
-        decorations.insert(node_id, TestDeco(42));
-
-        let file = FilePath::from("test.rs");
-        let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
-        let deco = root
-            .decoration::<TestDeco>()
-            .expect("should find decoration");
-        assert_eq!(deco.0, 42);
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<DecoratedNode<'_>>();
     }
 
     #[test]
-    fn decoration_returns_none_when_missing() {
-        let source = "fn main() {}";
-        let tree = parse_tree(source);
-        let decorations = DecorationMap::new();
-        let file = FilePath::from("test.rs");
-        let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<DecoratedNode<'_>>();
+    }
 
-        assert!(root.decoration::<Missing>().is_none());
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<DecoratedNode<'_>>();
     }
 
     mod prop {

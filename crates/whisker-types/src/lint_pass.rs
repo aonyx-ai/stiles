@@ -136,15 +136,6 @@ mod tests {
     }
 
     #[test]
-    fn a_boxed_pass_forwards_its_language() {
-        let pass: Box<dyn LintPass> = Box::new(boxed_lint_pass(Dummy));
-
-        let language = pass.language();
-
-        assert_eq!(language, Language::Rust);
-    }
-
-    #[test]
     fn a_boxed_pass_forwards_configure_to_the_pass() {
         static CONFIGURED: AtomicU32 = AtomicU32::new(0);
         struct Counting;
@@ -169,6 +160,15 @@ mod tests {
         let _configured = pass.configure(&RuleOptions::default());
 
         assert_eq!(CONFIGURED.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_boxed_pass_forwards_its_language() {
+        let pass: Box<dyn LintPass> = Box::new(boxed_lint_pass(Dummy));
+
+        let language = pass.language();
+
+        assert_eq!(language, Language::Rust);
     }
 
     #[test]

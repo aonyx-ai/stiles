@@ -450,6 +450,39 @@ mod tests {
     }
 
     #[test]
+    fn load_with_a_scalar_rule_option_returns_error() {
+        let directory = repository();
+        write_config(
+            directory.path(),
+            "[rules.options.\"lint.bool-param\"]\nboundary-attributes = \"shard\"\n",
+        );
+
+        let error = WhiskerConfig::load(directory.path()).expect_err("configuration should fail");
+
+        assert!(
+            format!("{error:#}").contains("invalid type"),
+            "error should name the type it could not read: {error:#}"
+        );
+    }
+
+    #[test]
+    fn load_with_a_whisker_source_anchors_it_at_the_root() {
+        let project = tempfile::tempdir().expect("temporary directory should be created");
+        std::fs::create_dir_all(project.path().join(".config"))
+            .expect("the config directory should be created");
+        std::fs::write(
+            project.path().join(".config").join("whisker.toml"),
+            "whisker-source = \"vendor/whisker\"\n",
+        )
+        .expect("the config should be written");
+
+        let config = WhiskerConfig::load(project.path()).expect("the config should load");
+
+        let expected = config.root().get().join("vendor").join("whisker");
+        assert_eq!(config.whisker_source(), Some(expected.as_path()));
+    }
+
+    #[test]
     fn load_with_config_above_the_target_reads_its_patterns() {
         let directory = repository();
         write_config(directory.path(), "ignore = [\"examples/\"]\n");
@@ -545,39 +578,6 @@ mod tests {
         let config = WhiskerConfig::load(&inner).expect("configuration should load");
 
         assert_eq!(config.ignore(), vec![IgnorePattern::new("inner/")]);
-    }
-
-    #[test]
-    fn load_with_a_whisker_source_anchors_it_at_the_root() {
-        let project = tempfile::tempdir().expect("temporary directory should be created");
-        std::fs::create_dir_all(project.path().join(".config"))
-            .expect("the config directory should be created");
-        std::fs::write(
-            project.path().join(".config").join("whisker.toml"),
-            "whisker-source = \"vendor/whisker\"\n",
-        )
-        .expect("the config should be written");
-
-        let config = WhiskerConfig::load(project.path()).expect("the config should load");
-
-        let expected = config.root().get().join("vendor").join("whisker");
-        assert_eq!(config.whisker_source(), Some(expected.as_path()));
-    }
-
-    #[test]
-    fn load_without_a_whisker_source_returns_none() {
-        let project = tempfile::tempdir().expect("temporary directory should be created");
-        std::fs::create_dir_all(project.path().join(".config"))
-            .expect("the config directory should be created");
-        std::fs::write(
-            project.path().join(".config").join("whisker.toml"),
-            "ignore = []\n",
-        )
-        .expect("the config should be written");
-
-        let config = WhiskerConfig::load(project.path()).expect("the config should load");
-
-        assert!(config.whisker_source().is_none());
     }
 
     #[test]
@@ -864,54 +864,6 @@ mod tests {
     }
 
     #[test]
-    fn load_with_rule_options_flattens_them_in_order() {
-        let directory = repository();
-        write_config(
-            directory.path(),
-            "[rules.options.\"lint.repeated-primitive-params\"]\nboundary-attributes =              [\"shard\", \"procedure\"]\n\n[rules.options.\"lint.bool-param\"]\n             boundary-attributes = []\n",
-        );
-
-        let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
-
-        let options = config.options();
-        let names = ["lint.repeated-primitive-params", "lint.bool-param"]
-            .map(|rule| options.names(RuleId::new(rule), "boundary-attributes"));
-        assert_eq!(
-            names,
-            [
-                Some(vec!["shard".to_owned(), "procedure".to_owned()]),
-                Some(Vec::new()),
-            ]
-        );
-    }
-
-    #[test]
-    fn load_with_a_scalar_rule_option_returns_error() {
-        let directory = repository();
-        write_config(
-            directory.path(),
-            "[rules.options.\"lint.bool-param\"]\nboundary-attributes = \"shard\"\n",
-        );
-
-        let error = WhiskerConfig::load(directory.path()).expect_err("configuration should fail");
-
-        assert!(
-            format!("{error:#}").contains("invalid type"),
-            "error should name the type it could not read: {error:#}"
-        );
-    }
-
-    #[test]
-    fn load_without_rule_options_holds_none() {
-        let directory = repository();
-        write_config(directory.path(), "ignore = [\"examples/\"]\n");
-
-        let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
-
-        assert!(config.options().options().is_empty());
-    }
-
-    #[test]
     fn load_with_malformed_ignore_value_describes_the_mismatch() {
         let error = load_error("ignore = \"examples/\"\n");
 
@@ -956,6 +908,28 @@ mod tests {
         let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
 
         assert!(config.ignore().is_empty());
+    }
+
+    #[test]
+    fn load_with_rule_options_flattens_them_in_order() {
+        let directory = repository();
+        write_config(
+            directory.path(),
+            "[rules.options.\"lint.repeated-primitive-params\"]\nboundary-attributes =              [\"shard\", \"procedure\"]\n\n[rules.options.\"lint.bool-param\"]\n             boundary-attributes = []\n",
+        );
+
+        let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
+
+        let options = config.options();
+        let names = ["lint.repeated-primitive-params", "lint.bool-param"]
+            .map(|rule| options.names(RuleId::new(rule), "boundary-attributes"));
+        assert_eq!(
+            names,
+            [
+                Some(vec!["shard".to_owned(), "procedure".to_owned()]),
+                Some(Vec::new()),
+            ]
+        );
     }
 
     #[test]
@@ -1005,6 +979,22 @@ mod tests {
     }
 
     #[test]
+    fn load_without_a_whisker_source_returns_none() {
+        let project = tempfile::tempdir().expect("temporary directory should be created");
+        std::fs::create_dir_all(project.path().join(".config"))
+            .expect("the config directory should be created");
+        std::fs::write(
+            project.path().join(".config").join("whisker.toml"),
+            "ignore = []\n",
+        )
+        .expect("the config should be written");
+
+        let config = WhiskerConfig::load(project.path()).expect("the config should load");
+
+        assert!(config.whisker_source().is_none());
+    }
+
+    #[test]
     fn load_without_lint_entries_returns_no_lints() {
         let directory = repository();
         write_config(directory.path(), "ignore = []\n");
@@ -1012,6 +1002,16 @@ mod tests {
         let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
 
         assert!(config.lints().is_empty());
+    }
+
+    #[test]
+    fn load_without_rule_options_holds_none() {
+        let directory = repository();
+        write_config(directory.path(), "ignore = [\"examples/\"]\n");
+
+        let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
+
+        assert!(config.options().options().is_empty());
     }
 
     #[test]

@@ -41,11 +41,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn digest_is_stable_across_releases() {
-        assert_eq!(digest("https://example.com/rules"), "cc3eedebbb64629b");
-    }
-
-    #[test]
     fn digest_is_lowercase_hexadecimal() {
         let digest = digest("whatever");
 
@@ -62,6 +57,11 @@ mod tests {
         let digest = digest("whatever");
 
         assert_eq!(digest.len(), 16, "{digest}");
+    }
+
+    #[test]
+    fn digest_is_stable_across_releases() {
+        assert_eq!(digest("https://example.com/rules"), "cc3eedebbb64629b");
     }
 
     #[test]

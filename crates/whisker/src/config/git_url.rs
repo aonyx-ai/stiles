@@ -237,6 +237,15 @@ mod tests {
     }
 
     #[test]
+    fn new_with_a_bad_remote_never_quotes_its_credentials() {
+        let error = GitUrl::new("https://secret@example.com:99999/rules")
+            .expect_err("the remote should be rejected");
+
+        let shown = format!("{error:?} {error:#}");
+        assert!(!shown.contains("secret"), "{shown}");
+    }
+
+    #[test]
     fn new_with_an_empty_remote_returns_error() {
         let error = GitUrl::new("").expect_err("the remote should be rejected");
 
@@ -244,15 +253,6 @@ mod tests {
             error.to_string().contains("cannot read the git remote"),
             "unexpected: {error:#}"
         );
-    }
-
-    #[test]
-    fn new_with_a_bad_remote_never_quotes_its_credentials() {
-        let error = GitUrl::new("https://secret@example.com:99999/rules")
-            .expect_err("the remote should be rejected");
-
-        let shown = format!("{error:?} {error:#}");
-        assert!(!shown.contains("secret"), "{shown}");
     }
 
     #[test]

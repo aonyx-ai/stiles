@@ -64,24 +64,6 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<CheckOutcome>();
-    }
-
-    #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<CheckOutcome>();
-    }
-
-    #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<CheckOutcome>();
-    }
-
-    #[test]
     fn combine_with_any_failure_returns_failure() {
         let pairs = [
             (CheckOutcome::Success, CheckOutcome::Failure),
@@ -207,5 +189,23 @@ mod tests {
             .call();
 
         assert_eq!(outcome, CheckOutcome::Failure);
+    }
+
+    #[test]
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<CheckOutcome>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<CheckOutcome>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<CheckOutcome>();
     }
 }

@@ -117,21 +117,23 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<DecorationMap>();
+    fn get_all_on_missing_node_returns_empty() {
+        let map = DecorationMap::new();
+
+        let results = map.get_all::<TypeInfo>(99);
+
+        assert!(results.is_empty());
     }
 
     #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<DecorationMap>();
-    }
+    fn get_all_returns_multiple_same_type() {
+        let mut map = DecorationMap::new();
+        map.insert(1, TypeInfo("i32".into()));
+        map.insert(1, TypeInfo("u64".into()));
 
-    #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<DecorationMap>();
+        let results = map.get_all::<TypeInfo>(1);
+
+        assert_eq!(results, [&TypeInfo("i32".into()), &TypeInfo("u64".into())]);
     }
 
     #[test]
@@ -172,14 +174,6 @@ mod tests {
     }
 
     #[test]
-    fn get_with_wrong_type_returns_none() {
-        let mut map = DecorationMap::new();
-        map.insert(42, TypeInfo("bool".into()));
-
-        assert!(map.get::<Scope>(42).is_none());
-    }
-
-    #[test]
     fn get_with_wrong_node_returns_none() {
         let mut map = DecorationMap::new();
         map.insert(42, TypeInfo("bool".into()));
@@ -188,36 +182,11 @@ mod tests {
     }
 
     #[test]
-    fn get_all_returns_multiple_same_type() {
+    fn get_with_wrong_type_returns_none() {
         let mut map = DecorationMap::new();
-        map.insert(1, TypeInfo("i32".into()));
-        map.insert(1, TypeInfo("u64".into()));
+        map.insert(42, TypeInfo("bool".into()));
 
-        let results = map.get_all::<TypeInfo>(1);
-
-        assert_eq!(results, [&TypeInfo("i32".into()), &TypeInfo("u64".into())]);
-    }
-
-    #[test]
-    fn get_all_on_missing_node_returns_empty() {
-        let map = DecorationMap::new();
-
-        let results = map.get_all::<TypeInfo>(99);
-
-        assert!(results.is_empty());
-    }
-
-    /// Returns a map that holds `first` on node 1, merged with one that
-    /// holds `second` on the same node
-    fn merged_conflict() -> DecorationMap {
-        let mut map = DecorationMap::new();
-        map.insert(1, TypeInfo("first".into()));
-        let mut other = DecorationMap::new();
-        other.insert(1, TypeInfo("second".into()));
-
-        map.merge(other);
-
-        map
+        assert!(map.get::<Scope>(42).is_none());
     }
 
     #[test]
@@ -248,6 +217,19 @@ mod tests {
         map.merge(other);
 
         assert_eq!(map.get::<TypeInfo>(2), Some(&TypeInfo("u64".into())));
+    }
+
+    /// Returns a map that holds `first` on node 1, merged with one that
+    /// holds `second` on the same node
+    fn merged_conflict() -> DecorationMap {
+        let mut map = DecorationMap::new();
+        map.insert(1, TypeInfo("first".into()));
+        let mut other = DecorationMap::new();
+        other.insert(1, TypeInfo("second".into()));
+
+        map.merge(other);
+
+        map
     }
 
     #[test]
@@ -314,6 +296,24 @@ mod tests {
         map.insert(1, Scope(3));
 
         assert_eq!(map.get::<Scope>(1), Some(&Scope(3)));
+    }
+
+    #[test]
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<DecorationMap>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<DecorationMap>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<DecorationMap>();
     }
 
     mod prop {

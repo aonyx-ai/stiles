@@ -49,6 +49,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn message_returns_the_message() {
+        let span = Span::new(PathBuf::from("test.rs"), 0, 10);
+        let location = Location::new(span, "defined here".into());
+
+        assert_eq!(location.message(), "defined here");
+    }
+
+    #[test]
+    fn span_returns_the_span() {
+        let span = Span::new(PathBuf::from("test.rs"), 0, 10);
+        let location = Location::new(span.clone(), "defined here".into());
+
+        assert_eq!(location.span(), &span);
+    }
+
+    #[test]
     fn trait_send() {
         fn assert_send<T: Send>() {}
         assert_send::<Location>();
@@ -64,22 +80,6 @@ mod tests {
     fn trait_unpin() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Location>();
-    }
-
-    #[test]
-    fn message_returns_the_message() {
-        let span = Span::new(PathBuf::from("test.rs"), 0, 10);
-        let location = Location::new(span, "defined here".into());
-
-        assert_eq!(location.message(), "defined here");
-    }
-
-    #[test]
-    fn span_returns_the_span() {
-        let span = Span::new(PathBuf::from("test.rs"), 0, 10);
-        let location = Location::new(span.clone(), "defined here".into());
-
-        assert_eq!(location.span(), &span);
     }
 
     mod prop {

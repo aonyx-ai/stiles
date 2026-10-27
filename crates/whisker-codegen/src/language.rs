@@ -121,6 +121,16 @@ mod tests {
     }
 
     #[test]
+    fn write_language_with_invalid_json_returns_invalid_data() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+
+        let error = write_language("Go", &["not json".to_owned()], directory.path())
+            .expect_err("should fail");
+
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
     fn write_language_with_two_grammars_generates_from_their_union() {
         let jsx = r#"[{"type": "jsx_element", "named": true}]"#;
 
@@ -131,16 +141,6 @@ mod tests {
             .filter(|method| !code.contains(method))
             .collect();
         assert_eq!(missing, Vec::<&str>::new());
-    }
-
-    #[test]
-    fn write_language_with_invalid_json_returns_invalid_data() {
-        let directory = tempfile::tempdir().expect("temporary directory should be created");
-
-        let error = write_language("Go", &["not json".to_owned()], directory.path())
-            .expect_err("should fail");
-
-        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
     }
 
     #[test]

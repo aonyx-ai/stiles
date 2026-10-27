@@ -26,30 +26,24 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
-        struct Dummy;
-        impl RustLintPass for Dummy {}
+    fn adapter_collects_diagnostics_through_pipeline() {
+        struct WarnOnFn;
+        impl RustLintPass for WarnOnFn {
+            fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
+                vec![Diagnostic::new(
+                    RuleId::new("test.warn"),
+                    Severity::Warn,
+                    "function found".into(),
+                    node.span(),
+                )]
+            }
+        }
 
-        fn assert_send<T: Send>() {}
-        assert_send::<RustLintPassAdapter<Dummy>>();
-    }
+        let tree = parse_rust("fn a() {} fn b() {}");
+        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(RustLintPassAdapter::new(WarnOnFn))];
 
-    #[test]
-    fn trait_sync() {
-        struct Dummy;
-        impl RustLintPass for Dummy {}
-
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<RustLintPassAdapter<Dummy>>();
-    }
-
-    #[test]
-    fn trait_unpin() {
-        struct Dummy;
-        impl RustLintPass for Dummy {}
-
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<RustLintPassAdapter<Dummy>>();
+        let diagnostics = whisker_core::walk(&tree, &mut passes).expect("should walk");
+        assert_eq!(diagnostics.len(), 2);
     }
 
     #[test]
@@ -92,27 +86,6 @@ mod tests {
         assert!(diagnostics.is_empty());
     }
 
-    #[test]
-    fn adapter_collects_diagnostics_through_pipeline() {
-        struct WarnOnFn;
-        impl RustLintPass for WarnOnFn {
-            fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-                vec![Diagnostic::new(
-                    RuleId::new("test.warn"),
-                    Severity::Warn,
-                    "function found".into(),
-                    node.span(),
-                )]
-            }
-        }
-
-        let tree = parse_rust("fn a() {} fn b() {}");
-        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(RustLintPassAdapter::new(WarnOnFn))];
-
-        let diagnostics = whisker_core::walk(&tree, &mut passes).expect("should walk");
-        assert_eq!(diagnostics.len(), 2);
-    }
-
     /// A rule that panics hands the panic back rather than unwinding
     ///
     /// The adapter is where a plugin's edge is, so this is the one place
@@ -151,5 +124,32 @@ mod tests {
 
         let panic = configured.expect_err("the rule should panic");
         assert_eq!(panic.message(), "no options accepted");
+    }
+
+    #[test]
+    fn trait_send() {
+        struct Dummy;
+        impl RustLintPass for Dummy {}
+
+        fn assert_send<T: Send>() {}
+        assert_send::<RustLintPassAdapter<Dummy>>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        struct Dummy;
+        impl RustLintPass for Dummy {}
+
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<RustLintPassAdapter<Dummy>>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        struct Dummy;
+        impl RustLintPass for Dummy {}
+
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<RustLintPassAdapter<Dummy>>();
     }
 }

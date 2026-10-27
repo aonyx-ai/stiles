@@ -249,36 +249,30 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<DiagnosticAssertion<'_>>();
+    fn assert_no_diagnostics_with_empty_slice_succeeds() {
+        assert_no_diagnostics(&[]);
     }
 
     #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<DiagnosticAssertion<'_>>();
+    #[should_panic(expected = "expected no diagnostics")]
+    fn assert_no_diagnostics_with_non_empty_slice_panics() {
+        let diag = Diagnostic::new(
+            RuleId::new("test"),
+            Severity::Warn,
+            "msg".into(),
+            whisker_types::Span::new(std::path::PathBuf::from("f.rs"), 0, 1),
+        );
+        assert_no_diagnostics(&[diag]);
     }
 
     #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<DiagnosticAssertion<'_>>();
-    }
+    fn decorate_replaces_decoration_map() {
+        let mut tree = parse("fn main() {}", Language::Rust);
+        let mut map = DecorationMap::new();
+        map.insert(0, Tag(42));
+        decorate(&mut tree, map);
 
-    #[test]
-    fn parse_returns_tree_with_source_file_root() {
-        let tree = parse("fn main() {}", Language::Rust);
-        assert_eq!(tree.root_node().kind(), "source_file");
-    }
-
-    #[test]
-    fn execute_with_no_passes_returns_empty() {
-        let tree = parse("fn main() {}", Language::Rust);
-
-        let diagnostics = execute(&tree, &mut Vec::new());
-
-        assert!(diagnostics.is_empty());
+        assert_eq!(tree.decorations_mut().get::<Tag>(0), Some(&Tag(42)));
     }
 
     #[test]
@@ -321,30 +315,36 @@ mod tests {
     }
 
     #[test]
-    fn assert_no_diagnostics_with_empty_slice_succeeds() {
-        assert_no_diagnostics(&[]);
+    fn execute_with_no_passes_returns_empty() {
+        let tree = parse("fn main() {}", Language::Rust);
+
+        let diagnostics = execute(&tree, &mut Vec::new());
+
+        assert!(diagnostics.is_empty());
     }
 
     #[test]
-    #[should_panic(expected = "expected no diagnostics")]
-    fn assert_no_diagnostics_with_non_empty_slice_panics() {
-        let diag = Diagnostic::new(
-            RuleId::new("test"),
-            Severity::Warn,
-            "msg".into(),
-            whisker_types::Span::new(std::path::PathBuf::from("f.rs"), 0, 1),
-        );
-        assert_no_diagnostics(&[diag]);
+    fn parse_returns_tree_with_source_file_root() {
+        let tree = parse("fn main() {}", Language::Rust);
+        assert_eq!(tree.root_node().kind(), "source_file");
     }
 
     #[test]
-    fn decorate_replaces_decoration_map() {
-        let mut tree = parse("fn main() {}", Language::Rust);
-        let mut map = DecorationMap::new();
-        map.insert(0, Tag(42));
-        decorate(&mut tree, map);
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<DiagnosticAssertion<'_>>();
+    }
 
-        assert_eq!(tree.decorations_mut().get::<Tag>(0), Some(&Tag(42)));
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<DiagnosticAssertion<'_>>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<DiagnosticAssertion<'_>>();
     }
 
     mod prop {

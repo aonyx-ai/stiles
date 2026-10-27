@@ -92,17 +92,17 @@ mod tests {
     }
 
     #[test]
-    fn of_without_an_extension_returns_none() {
-        let grammar = Grammar::of(Path::new("Makefile"));
-
-        assert_eq!(grammar, None);
-    }
-
-    #[test]
     fn of_with_tsx_returns_the_tsx_grammar() {
         let grammar = Grammar::of(Path::new("src/view.tsx"));
 
         assert_eq!(grammar, Some(Grammar::Tsx));
+    }
+
+    #[test]
+    fn of_without_an_extension_returns_none() {
+        let grammar = Grammar::of(Path::new("Makefile"));
+
+        assert_eq!(grammar, None);
     }
 
     #[test]
