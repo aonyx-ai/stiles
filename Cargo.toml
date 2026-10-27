@@ -124,6 +124,9 @@ syn = { version = "3", features = ["full", "extra-traits"] }
 # because a lint library carries no extended attributes.
 tar = { version = "0.4", default-features = false }
 tempfile = "3"
+# Derives the typed errors that a public function returns, so that a caller
+# can match on what went wrong.
+thiserror = "2"
 # Serves a release API to the tests that cover the download, so those
 # tests exercise the HTTP client whisker ships rather than a stand-in.
 tiny_http = "0.12"

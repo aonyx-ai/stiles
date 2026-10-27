@@ -98,7 +98,7 @@ impl GitHubApi {
     /// # Errors
     ///
     /// Returns an error if the HTTP client cannot be built.
-    pub fn from_environment() -> anyhow::Result<Self> {
+    pub(crate) fn from_environment() -> anyhow::Result<Self> {
         let base = base_from(std::env::var(API_VARIABLE).ok());
         let api_host = host_of(&base);
         let token = TOKEN_VARIABLES
@@ -132,7 +132,7 @@ impl GitHubApi {
     /// anything but a listing. A repository that does not exist is not an
     /// error. Whisker sees that for a private repository it holds no
     /// token for, and the caller compiles the source instead.
-    pub fn find_asset(
+    pub(crate) fn find_asset(
         &self,
         repository: &GitHubRepository,
         name: &AssetName,
@@ -172,7 +172,11 @@ impl GitHubApi {
     /// # Errors
     ///
     /// Returns an error if the asset cannot be fetched or written.
-    pub fn download(&self, asset: &ReleaseAsset, path: &Path) -> anyhow::Result<Sha256Digest> {
+    pub(crate) fn download(
+        &self,
+        asset: &ReleaseAsset,
+        path: &Path,
+    ) -> anyhow::Result<Sha256Digest> {
         let response = self
             .get(&asset.url, "application/octet-stream")
             .with_context(|| format!("failed to download {}", asset.name))?;
@@ -204,7 +208,7 @@ impl GitHubApi {
     /// # Errors
     ///
     /// Returns an error if the asset cannot be fetched or is not text.
-    pub fn download_text(&self, asset: &ReleaseAsset) -> anyhow::Result<String> {
+    pub(crate) fn download_text(&self, asset: &ReleaseAsset) -> anyhow::Result<String> {
         let response = self
             .get(&asset.url, "application/octet-stream")
             .with_context(|| format!("failed to download {}", asset.name))?;

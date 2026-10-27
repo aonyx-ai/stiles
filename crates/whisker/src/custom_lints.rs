@@ -56,7 +56,10 @@ impl CustomLints {
     /// returns one if a lint declares no rule, or if two lints declare one
     /// rule for one language.
     #[builder]
-    pub fn load(config: &WhiskerConfig, notices: &mut Vec<PrebuiltNotice>) -> anyhow::Result<Self> {
+    pub(crate) fn load(
+        config: &WhiskerConfig,
+        notices: &mut Vec<PrebuiltNotice>,
+    ) -> anyhow::Result<Self> {
         let host = AbiIdentity::host();
         let mut lints = Vec::new();
 
@@ -104,7 +107,7 @@ impl CustomLints {
     /// it reads the table. The plugin caught the panic at its boundary and
     /// handed it back. A pass that cannot be built or configured is a
     /// broken setup rather than a file to skip.
-    pub fn instantiate(&self, options: &RuleOptions) -> anyhow::Result<Vec<Lint<'static>>> {
+    pub(crate) fn instantiate(&self, options: &RuleOptions) -> anyhow::Result<Vec<Lint<'static>>> {
         self.lints
             .iter()
             .map(|lint| {

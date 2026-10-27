@@ -57,7 +57,7 @@ const DOWNLOAD: &str = "archive.tar.gz";
 ///
 /// Returns an error if no cache location can be determined, which is the
 /// condition that also stops a git checkout.
-pub fn cached(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<Option<PathBuf>> {
+pub(crate) fn cached(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<Option<PathBuf>> {
     let directory = cache::prebuilt_directory(source, tag)?;
 
     match holds_libraries(&directory) {
@@ -85,7 +85,7 @@ pub fn cached(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<Option<Pat
 /// # Errors
 ///
 /// Returns an error if no cache location can be determined.
-pub fn fetch(
+pub(crate) fn fetch(
     source: &GitLintSource,
     tag: &AbiTag,
     notices: &mut Vec<PrebuiltNotice>,
@@ -282,7 +282,7 @@ fn unpack(
 /// # Errors
 ///
 /// Returns an error if the directory cannot be read.
-pub fn libraries(directory: &Path) -> anyhow::Result<Vec<PathBuf>> {
+pub(crate) fn libraries(directory: &Path) -> anyhow::Result<Vec<PathBuf>> {
     let entries = std::fs::read_dir(directory)
         .with_context(|| format!("failed to read {}", directory.display()))?;
 

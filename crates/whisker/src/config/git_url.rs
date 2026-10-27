@@ -46,7 +46,7 @@ impl GitUrl {
     /// ```ignore
     /// let url = GitUrl::new("https://github.com/aonyx-ai/whisker-aonyx-rules")?;
     /// ```
-    pub fn new(url: impl AsRef<str>) -> anyhow::Result<Self> {
+    pub(crate) fn new(url: impl AsRef<str>) -> anyhow::Result<Self> {
         // gitoxide's error renders the remote it rejected, so none of it
         // crosses into whisker's error.
         gix::url::parse(url.as_ref())

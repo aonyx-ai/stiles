@@ -6,6 +6,8 @@ mod undeclared_rule;
 
 pub use lint::Lint;
 pub use pass_panic::PassPanic;
-pub use pipeline::{Pipeline, detect_language};
-pub use tree_walker::{walk, walk_lints};
+pub use pipeline::{
+    BuildPipelineError, DetectLanguageError, Pipeline, RunPipelineError, detect_language,
+};
+pub use tree_walker::{WalkLintsError, walk, walk_lints};
 pub use undeclared_rule::UndeclaredRule;

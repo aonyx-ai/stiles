@@ -442,10 +442,37 @@ fn helper() {}
 
 ### Error handling
 
-- Use `anyhow` for error handling.
+- Use `anyhow` where an error is reported: in `main.rs`, in a `#[command]`
+  function, and in tests. A `pub` function or a method of a `pub` trait
+  returns a typed error, because a caller cannot match on `anyhow::Error`.
+- Give each fallible action one error enum, named after the action and its
+  object, such as `LoadConfigError`.
+- Make every variant a struct variant.
+- Keep the cause of a variant in a field named `source`.
+- Start the message of a variant with a source with "failed to ...". The
+  message of a variant without a source states the condition.
 - Provide rich error context using `.context("description")?`.
 - Error context messages should be lowercase sentence fragments suitable for
   "failed to {context}".
+
+```rust
+// DO
+#[derive(Debug, Error)]
+pub enum LoadPluginError {
+    #[error("failed to open {path}")]
+    UnreadableLibrary { path: PathBuf, source: libloading::Error },
+    #[error("the plugin was built by {plugin}, this whisker by {host}")]
+    RustcMismatch { host: String, plugin: String },
+}
+
+// DON'T
+#[derive(Debug, Error)]
+pub enum PluginError {
+    #[error("open failed")]
+    Open(#[from] libloading::Error),
+    Mismatch(String, String),
+}
+```
 
 ### Testing
 

@@ -1,12 +1,19 @@
 use std::path::Path;
 
-use anyhow::Context as _;
 use bon::bon;
 use whisker_types::{
     Coverage, DecoratedTree, DecorationProvider, Diagnostic, Language, UncoveredFile,
 };
 
 use crate::{Lint, tree_walker};
+
+mod build_pipeline_error;
+mod detect_language_error;
+mod run_pipeline_error;
+
+pub use self::build_pipeline_error::BuildPipelineError;
+pub use self::detect_language_error::DetectLanguageError;
+pub use self::run_pipeline_error::RunPipelineError;
 
 /// Orchestrates the parse-decorate-execute pipeline
 ///
@@ -27,13 +34,17 @@ impl Pipeline {
     ///
     /// # Errors
     ///
-    /// Returns an error if the tree-sitter language cannot be set.
+    /// Returns [`BuildPipelineError::IncompatibleGrammar`] if tree-sitter
+    /// refuses the grammar.
     #[builder]
-    pub fn new(language: Language, grammar: &tree_sitter::Language) -> anyhow::Result<Self> {
+    pub fn new(
+        language: Language,
+        grammar: &tree_sitter::Language,
+    ) -> Result<Self, BuildPipelineError> {
         let mut parser = tree_sitter::Parser::new();
         parser
             .set_language(grammar)
-            .context("failed to set tree-sitter language")?;
+            .map_err(|source| BuildPipelineError::IncompatibleGrammar { source })?;
         Ok(Self { language, parser })
     }
 
@@ -41,16 +52,19 @@ impl Pipeline {
     ///
     /// # Errors
     ///
-    /// Returns an error if the file cannot be read. Any other error comes
-    /// from [`Pipeline::run_on_source`].
+    /// Returns [`RunPipelineError::UnreadableSource`] if the file cannot be
+    /// read. Any other error comes from [`Pipeline::run_on_source`].
     pub fn run(
         &mut self,
         path: &Path,
         providers: &[&dyn DecorationProvider],
         lints: &mut [Lint<'_>],
-    ) -> anyhow::Result<Vec<Diagnostic>> {
+    ) -> Result<Vec<Diagnostic>, RunPipelineError> {
         let source =
-            std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+            std::fs::read_to_string(path).map_err(|source| RunPipelineError::UnreadableSource {
+                path: path.to_path_buf(),
+                source,
+            })?;
 
         self.run_on_source(&source, path, providers, lints)
     }
@@ -66,20 +80,23 @@ impl Pipeline {
     ///
     /// # Errors
     ///
-    /// Returns an error if parsing fails, if a provider's toolchain
-    /// malfunctions, if no provider claims the file, or if a pass panics.
-    /// An empty provider list counts as no claims.
+    /// Returns [`RunPipelineError::NoSyntaxTree`] if parsing fails, and
+    /// [`RunPipelineError::ProviderFailed`] if a provider's toolchain
+    /// malfunctions. Returns [`RunPipelineError::Uncovered`] if no provider
+    /// claims the file, and an empty provider list counts as no claims.
+    /// Returns [`RunPipelineError::LintsFailed`] if a pass panics or reports
+    /// a rule it did not declare.
     pub fn run_on_source(
         &mut self,
         source: &str,
         path: &Path,
         providers: &[&dyn DecorationProvider],
         lints: &mut [Lint<'_>],
-    ) -> anyhow::Result<Vec<Diagnostic>> {
+    ) -> Result<Vec<Diagnostic>, RunPipelineError> {
         let tree = self
             .parser
             .parse(source, None)
-            .context("tree-sitter parse failed")?;
+            .ok_or(RunPipelineError::NoSyntaxTree)?;
 
         let mut decorated =
             DecoratedTree::new(tree, self.language, source.to_string(), path.to_path_buf());
@@ -88,9 +105,12 @@ impl Pipeline {
         let mut gaps = Vec::new();
 
         for provider in providers {
-            let coverage = provider
-                .decorate(&decorated)
-                .with_context(|| format!("run the `{}` decoration provider", provider.name()))?;
+            let coverage = provider.decorate(&decorated).map_err(|source| {
+                RunPipelineError::ProviderFailed {
+                    provider: provider.name(),
+                    source,
+                }
+            })?;
 
             match coverage {
                 Coverage::Covered(decorations) => covered.push(decorations),
@@ -99,18 +119,20 @@ impl Pipeline {
         }
 
         if covered.is_empty() {
-            return Err(UncoveredFile::builder()
-                .file(path.to_path_buf())
-                .gaps(gaps)
-                .build()
-                .into());
+            return Err(RunPipelineError::Uncovered {
+                source: UncoveredFile::builder()
+                    .file(path.to_path_buf())
+                    .gaps(gaps)
+                    .build(),
+            });
         }
 
         for decorations in covered {
             decorated.merge_decorations(decorations);
         }
 
-        tree_walker::walk_lints(&decorated, lints).context("run the lint passes")
+        tree_walker::walk_lints(&decorated, lints)
+            .map_err(|source| RunPipelineError::LintsFailed { source })
     }
 }
 
@@ -118,15 +140,19 @@ impl Pipeline {
 ///
 /// # Errors
 ///
-/// Returns an error if the extension is missing or unrecognized.
-pub fn detect_language(path: &Path) -> anyhow::Result<Language> {
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .context("file has no extension")?;
+/// Returns [`DetectLanguageError::MissingExtension`] if the file has no
+/// extension, and [`DetectLanguageError::UnsupportedExtension`] if no
+/// language uses it.
+pub fn detect_language(path: &Path) -> Result<Language, DetectLanguageError> {
+    let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
+        return Err(DetectLanguageError::MissingExtension {
+            path: path.to_path_buf(),
+        });
+    };
 
-    Language::from_extension(ext)
-        .with_context(|| format!("unsupported language for extension `.{ext}`"))
+    Language::from_extension(extension).ok_or_else(|| DetectLanguageError::UnsupportedExtension {
+        extension: extension.to_owned(),
+    })
 }
 
 #[cfg(test)]
@@ -136,8 +162,9 @@ mod tests {
     use stabby::str::Str;
     use stabby::vec;
     use whisker_types::{
-        Checked, Configured, CoverageGap, DecoratedNode, Decoration, DecorationKey, DecorationMap,
-        Diagnostic, Language, LintPass, Panic, ProviderName, RuleId, RuleOptions, Severity,
+        Checked, Configured, CoverageGap, DecorateTreeError, DecoratedNode, Decoration,
+        DecorationKey, DecorationMap, Diagnostic, Language, LintPass, Panic, ProviderName, RuleId,
+        RuleOptions, Severity,
     };
 
     use super::*;
@@ -158,7 +185,7 @@ mod tests {
             ProviderName("covering")
         }
 
-        fn decorate(&self, _tree: &DecoratedTree) -> anyhow::Result<Coverage> {
+        fn decorate(&self, _tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
             Ok(Coverage::Covered(DecorationMap::new()))
         }
     }
@@ -171,7 +198,7 @@ mod tests {
             ProviderName("declining")
         }
 
-        fn decorate(&self, _tree: &DecoratedTree) -> anyhow::Result<Coverage> {
+        fn decorate(&self, _tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
             Ok(Coverage::NotCovered(CoverageGap::StaleSource))
         }
     }
@@ -184,7 +211,7 @@ mod tests {
             ProviderName("decorating")
         }
 
-        fn decorate(&self, tree: &DecoratedTree) -> anyhow::Result<Coverage> {
+        fn decorate(&self, tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
             let mut decorations = DecorationMap::new();
             decorations.insert(tree.root_node().id(), Marker(Str::new(self.0)));
             Ok(Coverage::Covered(decorations))
@@ -320,9 +347,9 @@ mod tests {
             )
             .expect_err("a declining provider should not cover the file");
 
-        let uncovered = error
-            .downcast_ref::<UncoveredFile>()
-            .expect("should be an UncoveredFile");
+        let RunPipelineError::Uncovered { source: uncovered } = error else {
+            panic!("should be an UncoveredFile, got {error:?}");
+        };
         assert_eq!(uncovered.file(), Path::new("test.rs"));
         assert_eq!(uncovered.gaps().len(), 1);
         assert_eq!(uncovered.gaps()[0].0, ProviderName("declining"));
@@ -413,9 +440,9 @@ mod tests {
             .run_on_source("fn main() {}", Path::new("test.rs"), &[], &mut Vec::new())
             .expect_err("no providers means nothing can be analyzed");
 
-        let uncovered = error
-            .downcast_ref::<UncoveredFile>()
-            .expect("should be an UncoveredFile");
+        let RunPipelineError::Uncovered { source: uncovered } = error else {
+            panic!("should be an UncoveredFile, got {error:?}");
+        };
         assert!(uncovered.gaps().is_empty());
         assert!(
             uncovered
@@ -474,7 +501,10 @@ mod tests {
             )
             .expect_err("a panicking pass should fail the file");
 
-        let message = format!("{error:#}");
+        let RunPipelineError::LintsFailed { source } = error else {
+            panic!("should be a failed walk, got {error:?}");
+        };
+        let message = source.to_string();
         assert!(message.contains("function_item"), "{message}");
         assert!(message.contains("byte 0 of test.rs"), "{message}");
         assert!(message.contains("no functions allowed"), "{message}");
@@ -547,7 +577,9 @@ mod tests {
             )
             .expect_err("a declining provider should not cover the file");
 
-        assert!(error.downcast_ref::<UncoveredFile>().is_some());
+        let RunPipelineError::Uncovered { .. } = error else {
+            panic!("should be an UncoveredFile, got {error:?}");
+        };
     }
 
     mod prop {
@@ -633,7 +665,14 @@ mod tests {
                 );
 
                 let error = result.expect_err("no providers can never cover a file");
-                prop_assert!(error.downcast_ref::<UncoveredFile>().is_some());
+                let is_uncovered = match error {
+                    RunPipelineError::Uncovered { .. } => true,
+                    RunPipelineError::UnreadableSource { .. }
+                    | RunPipelineError::NoSyntaxTree
+                    | RunPipelineError::ProviderFailed { .. }
+                    | RunPipelineError::LintsFailed { .. } => false,
+                };
+                prop_assert!(is_uncovered);
             }
         }
     }

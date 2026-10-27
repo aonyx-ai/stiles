@@ -5442,10 +5442,10 @@ dependencies = [
 name = "whisker-core"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bon",
  "proptest",
  "stabby",
+ "thiserror",
  "tree-sitter",
  "tree-sitter-rust",
  "tree-sitter-typescript",
@@ -5480,9 +5480,9 @@ dependencies = [
 name = "whisker-reporting"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "codespan-reporting",
  "proptest",
+ "thiserror",
  "whisker-types",
 ]
 
@@ -5501,6 +5501,7 @@ dependencies = [
  "ra_ap_syntax",
  "ra_ap_vfs",
  "stabby",
+ "thiserror",
  "tree-sitter",
  "tree-sitter-rust",
  "whisker-codegen",
@@ -5551,10 +5552,10 @@ dependencies = [
 name = "whisker-types"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bon",
  "proptest",
  "stabby",
+ "thiserror",
  "tree-sitter",
  "tree-sitter-rust",
 ]
@@ -5563,11 +5564,11 @@ dependencies = [
 name = "whisker-typescript"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bon",
  "proptest",
  "stabby",
  "tempfile",
+ "thiserror",
  "tree-sitter",
  "tree-sitter-typescript",
  "whisker-codegen",

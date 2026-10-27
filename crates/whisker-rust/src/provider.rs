@@ -3,7 +3,6 @@ use std::ops::Range;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use anyhow::Context as _;
 use ra_ap_hir::import_map::ImportMap;
 use ra_ap_hir::{
     Adt, AsAssocItem as _, Crate, CrateDependency, Enum, Function, HasAttrs, HirDisplay, ItemInNs,
@@ -17,14 +16,18 @@ use ra_ap_project_model::{CargoConfig, ProjectManifest, ProjectWorkspace};
 use ra_ap_syntax::{AstNode, Edition, NodeOrToken, SyntaxNode, TextRange, TextSize, ast};
 use ra_ap_vfs::{AbsPathBuf, FileExcluded, FileId, Vfs, VfsPath};
 use whisker_types::{
-    Coverage, CoverageGap, DecoratedNode, DecoratedTree, DecorationMap, DecorationProvider,
-    ProviderName,
+    Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, DecorationMap,
+    DecorationProvider, ProviderName,
 };
 
 use crate::decorations::{
     AdtFlags, ErrorType, FnSignature, ImportSource, PublicPath, Reexports, ResolvedType,
     ReturnMode, TypePath,
 };
+
+mod load_rust_workspace_error;
+
+pub use self::load_rust_workspace_error::LoadRustWorkspaceError;
 
 /// Decoration provider for Rust using rust-analyzer
 ///
@@ -65,11 +68,11 @@ impl RustDecorationProvider {
     ///
     /// # Errors
     ///
-    /// Returns an error if the current directory cannot be read, if
-    /// `workspace_root` is not valid UTF-8, or if discovery finds no
-    /// Cargo project. The load also fails when workspace resolution, the
+    /// Returns a [`LoadRustWorkspaceError`] if the current directory cannot
+    /// be read, if `workspace_root` is not valid UTF-8, or if discovery finds
+    /// no Cargo project. The load also fails when workspace resolution, the
     /// build scripts, or the analysis database build fails.
-    pub fn load(workspace_root: &Path) -> anyhow::Result<Self> {
+    pub fn load(workspace_root: &Path) -> Result<Self, LoadRustWorkspaceError> {
         let cargo_config = CargoConfig {
             sysroot: Some(ra_ap_project_model::RustLibSource::Discover),
             set_test: true,
@@ -83,29 +86,34 @@ impl RustDecorationProvider {
             proc_macro_processes: 0,
         };
 
-        let cwd = std::env::current_dir().context("read the current directory")?;
+        let cwd = std::env::current_dir()
+            .map_err(|source| LoadRustWorkspaceError::UnreadableCurrentDirectory { source })?;
         let discover_from = cwd.join(workspace_root);
-        anyhow::ensure!(
-            discover_from.to_str().is_some(),
-            "{} is not valid UTF-8, and rust-analyzer only addresses UTF-8 paths",
-            discover_from.display()
-        );
+        if discover_from.to_str().is_none() {
+            return Err(LoadRustWorkspaceError::NotUtf8 {
+                path: discover_from,
+            });
+        }
         let discover_from = AbsPathBuf::assert_utf8(discover_from);
-        let manifest = ProjectManifest::discover_single(&discover_from)
-            .with_context(|| format!("discover a Cargo project at {}", workspace_root.display()))?;
+        let manifest = ProjectManifest::discover_single(&discover_from).map_err(|source| {
+            LoadRustWorkspaceError::Undiscovered {
+                root: workspace_root.to_path_buf(),
+                source,
+            }
+        })?;
 
-        let mut workspace = ProjectWorkspace::load(manifest, &cargo_config, &|_msg| {})
-            .with_context(|| {
-                format!(
-                    "resolve the Cargo workspace discovered from {}",
-                    workspace_root.display()
-                )
+        let mut workspace =
+            ProjectWorkspace::load(manifest, &cargo_config, &|_msg| {}).map_err(|source| {
+                LoadRustWorkspaceError::Unresolved {
+                    root: workspace_root.to_path_buf(),
+                    source,
+                }
             })?;
 
         if load_config.load_out_dirs_from_check {
             let build_scripts = workspace
                 .run_build_scripts(&cargo_config, &|_msg| {})
-                .context("run build scripts for the workspace")?;
+                .map_err(|source| LoadRustWorkspaceError::BuildScriptsFailed { source })?;
             workspace.set_build_scripts(build_scripts);
         }
 
@@ -113,7 +121,7 @@ impl RustDecorationProvider {
 
         let (mut db, vfs, _proc_macro_client) =
             ra_ap_load_cargo::load_workspace(workspace, &cargo_config.extra_env, &load_config)
-                .context("build the analysis database for the workspace")?;
+                .map_err(|source| LoadRustWorkspaceError::DatabaseFailed { source })?;
 
         give_text_to_files_that_have_none(&mut db, &vfs, &root);
 
@@ -241,10 +249,14 @@ impl DecorationProvider for RustDecorationProvider {
     /// Returns an error if the file path cannot be made absolute or the
     /// database lock is poisoned. A file this provider knows nothing about
     /// is a [`Coverage::NotCovered`] verdict, not an error.
-    fn decorate(&self, tree: &DecoratedTree) -> anyhow::Result<Coverage> {
+    fn decorate(&self, tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
         let file_path = tree.file();
-        let file_path = std::path::absolute(file_path)
-            .with_context(|| format!("resolve {} to an absolute path", file_path.display()))?;
+        let file_path = std::path::absolute(file_path).map_err(|source| {
+            DecorateTreeError::UnresolvablePath {
+                path: file_path.to_path_buf(),
+                source,
+            }
+        })?;
 
         let vfs_path = VfsPath::new_real_path(file_path.to_string_lossy().to_string());
 
@@ -264,7 +276,7 @@ impl DecorationProvider for RustDecorationProvider {
         let db = self
             .db
             .lock()
-            .map_err(|e| anyhow::anyhow!("database lock poisoned: {e}"))?;
+            .map_err(|_| DecorateTreeError::PoisonedDatabase)?;
 
         let mut targets = Vec::new();
         collect_targets(&tree.root_node(), &mut targets);
@@ -431,7 +443,7 @@ fn text_range_of(node: &DecoratedNode<'_>) -> Option<TextRange> {
 
 fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
     match node.kind() {
-        "function_item" => {
+        "function_item" | "function_signature_item" => {
             if let Some(range) = text_range_of(node) {
                 targets.push(Target::Function {
                     node_id: node.id(),

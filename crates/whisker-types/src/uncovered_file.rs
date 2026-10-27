@@ -7,8 +7,8 @@ use crate::{CoverageGap, ProviderName};
 
 /// Error returned when no decoration provider claims a file
 ///
-/// The error can travel inside an [`anyhow::Error`], and a caller can
-/// downcast it to report each provider's reason in detail.
+/// A pipeline returns the error as the cause of its own, and a caller can
+/// match it there to report each provider's reason in detail.
 ///
 /// # Examples
 ///
@@ -30,8 +30,6 @@ use crate::{CoverageGap, ProviderName};
 ///      rust: the file is inside /ws, but nothing the toolchain loaded reaches it",
 /// );
 /// ```
-///
-/// [`anyhow::Error`]: anyhow::Error
 #[derive(Clone, Eq, PartialEq, Debug, Builder)]
 pub struct UncoveredFile {
     /// The file that no provider claimed

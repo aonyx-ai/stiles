@@ -5,7 +5,8 @@ use anyhow::Context as _;
 use bon::bon;
 use whisker_rust::RustDecorationProvider;
 use whisker_types::{
-    Coverage, CoverageGap, DecoratedTree, DecorationProvider, Language, ProviderName,
+    Coverage, CoverageGap, DecorateTreeError, DecoratedTree, DecorationProvider, Language,
+    ProviderName,
 };
 use whisker_typescript::TypeScriptDecorationProvider;
 
@@ -109,7 +110,7 @@ impl DecorationProvider for NoTypeScriptProject {
         TypeScriptDecorationProvider::NAME
     }
 
-    fn decorate(&self, _tree: &DecoratedTree) -> anyhow::Result<Coverage> {
+    fn decorate(&self, _tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
         Ok(Coverage::NotCovered(CoverageGap::NoProject))
     }
 }
@@ -140,7 +141,7 @@ fn load_typescript_project(
 
 #[cfg(test)]
 mod tests {
-    use whisker_types::UncoveredFile;
+    use whisker_core::RunPipelineError;
 
     use super::*;
 
@@ -209,9 +210,9 @@ mod tests {
             .run_on_source("export {};\n", &file, &found, &mut [])
             .expect_err("a file without a project should not be covered");
 
-        let uncovered = error
-            .downcast_ref::<UncoveredFile>()
-            .expect("should be an UncoveredFile");
+        let RunPipelineError::Uncovered { source: uncovered } = error else {
+            panic!("should be an UncoveredFile, got {error:?}");
+        };
         assert_eq!(
             uncovered.gaps(),
             [(TypeScriptDecorationProvider::NAME, CoverageGap::NoProject)]

@@ -15,7 +15,7 @@ use crate::config::{GitLintSource, GitRev, GitUrl};
 /// # Errors
 ///
 /// Returns an error if no cache location can be determined.
-pub fn cached(source: &GitLintSource) -> anyhow::Result<Option<PathBuf>> {
+pub(crate) fn cached(source: &GitLintSource) -> anyhow::Result<Option<PathBuf>> {
     let destination = cache::checkout_directory(source)?;
 
     match holds(&destination, source.rev()) {
@@ -41,7 +41,7 @@ pub fn cached(source: &GitLintSource) -> anyhow::Result<Option<PathBuf>> {
 /// Returns an error if the cache directory cannot be created, if the
 /// remote cannot be reached, if it does not serve the pinned commit, or if
 /// the working tree cannot be written.
-pub fn checkout(source: &GitLintSource) -> anyhow::Result<PathBuf> {
+pub(crate) fn checkout(source: &GitLintSource) -> anyhow::Result<PathBuf> {
     let destination = cache::checkout_directory(source)?;
 
     if holds(&destination, source.rev()) {

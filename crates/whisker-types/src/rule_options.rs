@@ -6,8 +6,10 @@ use stabby::vec;
 use crate::RuleId;
 
 mod rule_option;
+mod validate_rule_options_error;
 
 pub use rule_option::RuleOption;
+pub use validate_rule_options_error::ValidateRuleOptionsError;
 
 /// Every option a project set, for every rule it runs
 ///
@@ -151,10 +153,10 @@ impl RuleOptions {
     ///
     /// # Errors
     ///
-    /// Returns an error naming every such rule. An option set on a
-    /// misspelled rule configures nothing and reads exactly like a rule
-    /// that took the option and found no fault, so whisker refuses the
-    /// file rather than the reader having to notice.
+    /// Returns [`ValidateRuleOptionsError::UnknownRules`] naming every such
+    /// rule. An option set on a misspelled rule configures nothing and reads
+    /// exactly like a rule that took the option and found no fault, so
+    /// whisker refuses the file rather than the reader having to notice.
     ///
     /// # Examples
     ///
@@ -167,7 +169,7 @@ impl RuleOptions {
     ///
     /// assert!(options.validate(&BTreeSet::new()).is_ok());
     /// ```
-    pub fn validate(&self, declared: &BTreeSet<String>) -> anyhow::Result<()> {
+    pub fn validate(&self, declared: &BTreeSet<String>) -> Result<(), ValidateRuleOptionsError> {
         let unknown: BTreeSet<&str> = self
             .options
             .iter()
@@ -175,22 +177,13 @@ impl RuleOptions {
             .filter(|rule| !declared.contains(*rule))
             .collect();
 
-        anyhow::ensure!(
-            unknown.is_empty(),
-            "[rules.options] configures {}, which no configured lint reports; the lints loaded \
-             here report {}",
-            unknown.into_iter().collect::<Vec<_>>().join(", "),
-            match declared.is_empty() {
-                true => "nothing".to_owned(),
-                false => declared
-                    .iter()
-                    .map(String::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            }
-        );
-
-        Ok(())
+        match unknown.is_empty() {
+            true => Ok(()),
+            false => Err(ValidateRuleOptionsError::UnknownRules {
+                unknown: unknown.into_iter().map(str::to_owned).collect(),
+                declared: declared.iter().cloned().collect(),
+            }),
+        }
     }
 }
 

@@ -142,6 +142,21 @@ fn find_function_by_name<'a>(root: &DecoratedNode<'a>, name: &str) -> Option<Dec
     None
 }
 
+fn find_signature_by_name<'a>(root: &DecoratedNode<'a>, name: &str) -> Option<DecoratedNode<'a>> {
+    for child in root.named_children() {
+        if child.kind() == "function_signature_item"
+            && let Some(name_node) = child.child_by_field_name("name")
+            && name_node.text() == name
+        {
+            return Some(child);
+        }
+        if let Some(found) = find_signature_by_name(&child, name) {
+            return Some(found);
+        }
+    }
+    None
+}
+
 fn find_first_node_of_kind<'a>(node: &DecoratedNode<'a>, kind: &str) -> Option<DecoratedNode<'a>> {
     if node.kind() == kind {
         return Some(*node);
@@ -493,6 +508,30 @@ fn fn_signature_on_sync_function_reports_direct_mode() {
 /// `myres::Result<()>` renders as `Result<()>`, which any prefix test on the
 /// rendering accepts. Only a comparison against the enum `FamousDefs`
 /// resolves can tell the two apart.
+/// A trait method without a body gets a signature too
+///
+/// Tree-sitter reads the declaration as a `function_signature_item`, not as
+/// a `function_item`. Rust-analyzer reads both as a function, so the
+/// provider resolves the declaration the same way.
+#[test]
+fn fn_signature_on_trait_method_without_body() {
+    let provider = load_provider();
+    let tree = parse_and_decorate_fixture(provider);
+    let root = tree.root_node();
+
+    let declaration = find_signature_by_name(&root, "fetch").expect("should find fetch");
+
+    let sig = declaration
+        .decoration::<FnSignature>()
+        .expect("should have FnSignature decoration");
+
+    let error = sig.error_type().expect("should have an error type");
+    assert!(
+        error.is(TypePathRef::new("anyhow", &[], "Error")),
+        "the error should be anyhow's, got: {error:?}"
+    );
+}
+
 #[test]
 fn fn_signature_on_user_defined_result_is_not_a_result() {
     let provider = load_provider();

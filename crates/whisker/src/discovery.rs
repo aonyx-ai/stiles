@@ -79,7 +79,7 @@ impl Discovery {
     /// }
     /// ```
     #[builder]
-    pub fn run(
+    pub(crate) fn run(
         path: &Path,
         config: &WhiskerConfig,
         on_error: WalkErrorPolicy,

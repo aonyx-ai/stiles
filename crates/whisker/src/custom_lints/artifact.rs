@@ -52,7 +52,7 @@ struct Target {
 /// produced no dynamic library at all. The last error quotes the manifest
 /// section to add, because a missing crate type is the most likely
 /// authoring mistake.
-pub fn cdylib_artifacts(stdout: &str, directory: &Path) -> anyhow::Result<Vec<PathBuf>> {
+pub(crate) fn cdylib_artifacts(stdout: &str, directory: &Path) -> anyhow::Result<Vec<PathBuf>> {
     let directory = canonical(directory);
     let mut artifacts = BTreeMap::new();
 

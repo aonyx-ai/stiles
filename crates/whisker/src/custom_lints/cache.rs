@@ -98,7 +98,7 @@ impl CacheLocation {
 ///
 /// println!("checkouts live under {}", root.display());
 /// ```
-pub fn cache_root() -> anyhow::Result<PathBuf> {
+pub(crate) fn cache_root() -> anyhow::Result<PathBuf> {
     CacheLocation::from_environment().resolve()
 }
 
@@ -107,7 +107,7 @@ pub fn cache_root() -> anyhow::Result<PathBuf> {
 /// # Errors
 ///
 /// Returns an error if no cache location can be determined.
-pub fn checkout_directory(source: &GitLintSource) -> anyhow::Result<PathBuf> {
+pub(crate) fn checkout_directory(source: &GitLintSource) -> anyhow::Result<PathBuf> {
     let root = cache_root()?;
 
     Ok(checkout_directory_in(&root, source))
@@ -128,7 +128,7 @@ fn checkout_directory_in(root: &Path, source: &GitLintSource) -> PathBuf {
 /// # Errors
 ///
 /// Returns an error if no cache location can be determined.
-pub fn prebuilt_directory(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<PathBuf> {
+pub(crate) fn prebuilt_directory(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<PathBuf> {
     let root = cache_root()?;
 
     Ok(prebuilt_directory_in(&root, source, tag))
