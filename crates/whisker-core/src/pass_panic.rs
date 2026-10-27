@@ -11,10 +11,8 @@ use whisker_types::{Panic, Span};
 /// that panicked is broken, and whisker would check the rest of the file
 /// with a pass in a state its author never meant.
 ///
-/// The message carries everything, so the error can travel inside an
-/// [`anyhow::Error`] without a source chain to unfold.
-///
-/// [`anyhow::Error`]: anyhow::Error
+/// The message carries everything, so a caller reports the error without
+/// a source chain to unfold.
 ///
 /// # Examples
 ///

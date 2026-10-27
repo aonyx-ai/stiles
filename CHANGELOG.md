@@ -12,6 +12,10 @@ and this project adheres to
 
 ### Added
 
+- The Rust provider attaches `FnSignature` to a trait method without a body
+  too, so a rule reads its return type the way it reads a method that has
+  one.
+
 - `Diagnostic`, `Span`, `Location`, `Suggestion`, `RuleOption`,
   `DecoratedTree`, `DecoratedNode`, and the `TypePath`, `PublicPath`, and
   `FnSignature` of `whisker-rust` each have a builder, `builder()`, beside
@@ -83,6 +87,13 @@ and this project adheres to
   A directory may also hold a cargo workspace.
 
 ### Changed
+
+- The library crates return typed errors instead of `anyhow::Error`.
+  `DecorationProvider::decorate` returns `DecorateTreeError`, so a provider
+  outside whisker changes the error type of its `decorate`.
+  `RuleOptions::validate`, the pipeline and walk of `whisker-core`, both
+  providers, and the renderers of `whisker-reporting` each return an error
+  enum a caller can match on.
 
 - `whisker check` and `whisker rules` write their errors and notes to stderr
   after the report, not while they run. A file whisker could not check, a

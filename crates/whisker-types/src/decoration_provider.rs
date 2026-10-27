@@ -1,3 +1,6 @@
+mod decorate_tree_error;
+
+pub use self::decorate_tree_error::DecorateTreeError;
 use crate::{Coverage, DecoratedTree, ProviderName};
 
 /// Attaches semantic decorations to a parsed syntax tree
@@ -21,10 +24,11 @@ pub trait DecorationProvider: Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns an error only when the toolchain itself malfunctions, for
-    /// example a poisoned lock. Lack of information about a file is not
-    /// an error; the provider reports [`Coverage::NotCovered`] instead.
-    fn decorate(&self, tree: &DecoratedTree) -> anyhow::Result<Coverage>;
+    /// Returns a [`DecorateTreeError`] only when the toolchain itself
+    /// malfunctions, for example a poisoned lock. Lack of information about a
+    /// file is not an error; the provider reports [`Coverage::NotCovered`]
+    /// instead.
+    fn decorate(&self, tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError>;
 }
 
 #[cfg(test)]
@@ -39,7 +43,7 @@ mod tests {
             ProviderName("stub")
         }
 
-        fn decorate(&self, _tree: &DecoratedTree) -> anyhow::Result<Coverage> {
+        fn decorate(&self, _tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
             Ok(Coverage::Covered(DecorationMap::new()))
         }
     }

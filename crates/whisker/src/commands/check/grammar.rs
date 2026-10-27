@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use whisker_core::Pipeline;
+use whisker_core::{BuildPipelineError, Pipeline};
 use whisker_types::Language;
 
 /// The grammar a file parses with, which its extension decides
@@ -50,8 +50,9 @@ impl Grammar {
     ///
     /// # Errors
     ///
-    /// Returns an error if tree-sitter refuses the grammar.
-    pub(super) fn pipeline(self) -> anyhow::Result<Pipeline> {
+    /// Returns [`BuildPipelineError::IncompatibleGrammar`] if tree-sitter
+    /// refuses the grammar.
+    pub(super) fn pipeline(self) -> Result<Pipeline, BuildPipelineError> {
         let grammar = match self {
             Self::Rust => whisker_rust::language(),
             Self::TypeScript => whisker_typescript::language(),

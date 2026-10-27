@@ -4,6 +4,10 @@ use whisker_types::{
 
 use crate::Lint;
 
+mod walk_lints_error;
+
+pub use self::walk_lints_error::WalkLintsError;
+
 /// Walks a decorated syntax tree and collects diagnostics from lint passes
 ///
 /// This is [`walk_lints`] for passes that no plugin declared, such as a
@@ -11,14 +15,15 @@ use crate::Lint;
 ///
 /// # Errors
 ///
-/// Returns a [`PassPanic`] when a pass panics, naming the node it was
-/// checking. The walk stops there, for the reason that type gives.
+/// Returns [`WalkLintsError::Panicked`] when a pass panics, naming the
+/// node it was checking. The walk stops there, for the reason
+/// [`PassPanic`] gives.
 ///
 /// [`PassPanic`]: crate::PassPanic
 pub fn walk(
     tree: &DecoratedTree,
     passes: &mut [Box<dyn LintPass>],
-) -> anyhow::Result<Vec<Diagnostic>> {
+) -> Result<Vec<Diagnostic>, WalkLintsError> {
     let mut lints: Vec<Lint<'_>> = passes
         .iter_mut()
         .map(|pass| Lint::unchecked(Box::new(BorrowedPass(pass))))
@@ -35,14 +40,17 @@ pub fn walk(
 ///
 /// # Errors
 ///
-/// Returns a [`PassPanic`] when a pass panics, naming the node it was
-/// checking, and an [`UndeclaredRule`] when a pass reports a rule its
-/// plugin did not declare for it. The walk stops at either one, for the
-/// reasons those types give.
+/// Returns [`WalkLintsError::Panicked`] when a pass panics, naming the node
+/// it was checking, and [`WalkLintsError::Undeclared`] when a pass reports
+/// a rule its plugin did not declare for it. The walk stops at either one,
+/// for the reasons [`PassPanic`] and [`UndeclaredRule`] give.
 ///
 /// [`PassPanic`]: crate::PassPanic
 /// [`UndeclaredRule`]: crate::UndeclaredRule
-pub fn walk_lints(tree: &DecoratedTree, lints: &mut [Lint<'_>]) -> anyhow::Result<Vec<Diagnostic>> {
+pub fn walk_lints(
+    tree: &DecoratedTree,
+    lints: &mut [Lint<'_>],
+) -> Result<Vec<Diagnostic>, WalkLintsError> {
     let mut lints: Vec<&mut Lint<'_>> = lints
         .iter_mut()
         .filter(|lint| lint.language() == tree.language())
@@ -76,7 +84,7 @@ fn visit_node(
     node: &DecoratedNode<'_>,
     lints: &mut [&mut Lint<'_>],
     diagnostics: &mut Vec<Diagnostic>,
-) -> anyhow::Result<()> {
+) -> Result<(), WalkLintsError> {
     if node.is_named() {
         for lint in lints.iter_mut() {
             diagnostics.extend(lint.check_node(node)?);
@@ -100,7 +108,6 @@ mod tests {
     use whisker_types::{Panic, RuleId};
 
     use super::*;
-    use crate::{PassPanic, UndeclaredRule};
 
     /// Pairs `pass` with the rules it may report
     fn lint(pass: impl LintPass + 'static, rules: &[&'static str]) -> Lint<'static> {
@@ -516,9 +523,9 @@ mod tests {
 
         let error = walk_lints(&tree, &mut passes).expect_err("the panic should end the walk");
 
-        let error = error
-            .downcast_ref::<PassPanic>()
-            .expect("should be a PassPanic");
+        let WalkLintsError::Panicked { source: error } = error else {
+            panic!("should be a PassPanic, got {error:?}");
+        };
         assert_eq!(error.kind(), "function_item");
         assert_eq!(error.span().start(), 0);
         assert_eq!(error.panic().message(), "no functions");
@@ -562,9 +569,9 @@ mod tests {
 
         let error = walk_lints(&tree, &mut passes).expect_err("the stray rule should end the walk");
 
-        let error = error
-            .downcast_ref::<UndeclaredRule>()
-            .expect("should be an UndeclaredRule");
+        let WalkLintsError::Undeclared { source: error } = error else {
+            panic!("should be an UndeclaredRule, got {error:?}");
+        };
         assert_eq!(error.rule(), RuleId::new("pass.copied"));
         assert_eq!(error.span().start(), 0);
     }

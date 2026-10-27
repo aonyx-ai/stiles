@@ -6,9 +6,9 @@ license.workspace = true
 publish = false
 
 [dependencies]
-anyhow.workspace = true
 bon.workspace = true
 stabby.workspace = true
+thiserror.workspace = true
 tree-sitter.workspace = true
 
 [dev-dependencies]

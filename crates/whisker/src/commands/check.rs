@@ -14,7 +14,7 @@ use std::sync::Arc;
 use anyhow::Context as _;
 use clawless::exit::Exit;
 use clawless::prelude::*;
-use whisker_core::{Lint, Pipeline};
+use whisker_core::{Lint, Pipeline, RunPipelineError};
 use whisker_types::{Diagnostic, RuleOptions, UncoveredFile};
 
 use self::check_outcome::CheckOutcome;
@@ -260,12 +260,12 @@ async fn run(
                     all_diagnostics.extend(diagnostics);
                 }
             }
-            Err(e) => {
-                if let Some(uncovered) = e.downcast_ref::<UncoveredFile>() {
-                    remedies.record(uncovered);
+            Err(error) => {
+                if let RunPipelineError::Uncovered { source } = &error {
+                    remedies.record(source);
                 }
 
-                match recovery.record(&mut failures, file, e) {
+                match recovery.record(&mut failures, file, anyhow::Error::new(error)) {
                     Walk::Continue => {}
                     Walk::Stop => break,
                 }

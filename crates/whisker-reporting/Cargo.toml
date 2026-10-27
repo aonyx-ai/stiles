@@ -6,8 +6,8 @@ license.workspace = true
 publish = false
 
 [dependencies]
-anyhow.workspace = true
 codespan-reporting.workspace = true
+thiserror.workspace = true
 whisker-types.workspace = true
 
 [dev-dependencies]

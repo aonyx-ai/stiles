@@ -6,8 +6,8 @@ license.workspace = true
 publish = false
 
 [dependencies]
-anyhow.workspace = true
 bon.workspace = true
+thiserror.workspace = true
 tree-sitter.workspace = true
 whisker-types.workspace = true
 

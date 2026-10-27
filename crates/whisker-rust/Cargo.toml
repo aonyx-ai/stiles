@@ -19,6 +19,7 @@ provider = [
   "dep:ra_ap_project_model",
   "dep:ra_ap_syntax",
   "dep:ra_ap_vfs",
+  "dep:thiserror",
 ]
 
 [dependencies]
@@ -31,6 +32,7 @@ ra_ap_project_model = { workspace = true, optional = true }
 ra_ap_syntax = { workspace = true, optional = true }
 ra_ap_vfs = { workspace = true, optional = true }
 stabby.workspace = true
+thiserror = { workspace = true, optional = true }
 tree-sitter.workspace = true
 tree-sitter-rust.workspace = true
 whisker-macros.workspace = true

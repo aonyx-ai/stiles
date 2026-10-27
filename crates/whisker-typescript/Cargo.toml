@@ -11,12 +11,12 @@ publish = false
 # default feature they can switch off rather than an unconditional cost.
 [features]
 default = ["provider"]
-provider = ["dep:anyhow", "dep:whisker-tsrs"]
+provider = ["dep:thiserror", "dep:whisker-tsrs"]
 
 [dependencies]
-anyhow = { workspace = true, optional = true }
 bon.workspace = true
 stabby.workspace = true
+thiserror = { workspace = true, optional = true }
 tree-sitter.workspace = true
 tree-sitter-typescript.workspace = true
 whisker-macros.workspace = true

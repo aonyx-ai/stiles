@@ -160,6 +160,10 @@ pub trait AsyncLoad {
     fn load_async(&self) -> impl std::future::Future<Output = anyhow::Result<()>>;
 }
 
+pub trait Fetch {
+    fn fetch(&self) -> anyhow::Result<String>;
+}
+
 impl AsyncLoad for Loader {
     async fn load_async(&self) -> anyhow::Result<()> {
         let _file = std::fs::read_to_string(&self.path)?;

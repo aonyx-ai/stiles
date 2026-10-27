@@ -122,7 +122,7 @@ impl WhiskerConfig {
     ///
     /// println!("{} patterns", config.ignore().len());
     /// ```
-    pub fn load(path: &Path) -> anyhow::Result<Self> {
+    pub(crate) fn load(path: &Path) -> anyhow::Result<Self> {
         let search = Search::start(path)
             .marker(configuration_marker())
             .marker(REPOSITORY_MARKER)

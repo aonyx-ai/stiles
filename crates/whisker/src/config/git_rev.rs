@@ -34,7 +34,7 @@ impl GitRev {
     /// ```ignore
     /// let rev = GitRev::new("0123456789abcdef0123456789abcdef01234567")?;
     /// ```
-    pub fn new(rev: impl Into<String>) -> anyhow::Result<Self> {
+    pub(crate) fn new(rev: impl Into<String>) -> anyhow::Result<Self> {
         let rev = rev.into();
 
         anyhow::ensure!(

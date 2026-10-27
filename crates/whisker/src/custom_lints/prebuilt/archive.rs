@@ -27,7 +27,7 @@ impl Sha256Digest {
     /// # Errors
     ///
     /// Returns an error if the file cannot be read.
-    pub fn of_file(path: &Path) -> anyhow::Result<Self> {
+    pub(crate) fn of_file(path: &Path) -> anyhow::Result<Self> {
         let file =
             File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
         let mut reader = BufReader::new(file);
@@ -58,7 +58,7 @@ impl Sha256Digest {
     /// # Errors
     ///
     /// Returns an error if the file holds no digest of the right shape.
-    pub fn from_sidecar(contents: &str) -> anyhow::Result<Self> {
+    pub(crate) fn from_sidecar(contents: &str) -> anyhow::Result<Self> {
         let digest = contents
             .split_whitespace()
             .next()
@@ -108,7 +108,7 @@ impl std::fmt::Display for Sha256Digest {
 ///
 /// Returns an error if the archive cannot be read or a file cannot be
 /// written.
-pub fn extract(archive: &Path, directory: &Path) -> anyhow::Result<()> {
+pub(crate) fn extract(archive: &Path, directory: &Path) -> anyhow::Result<()> {
     let file =
         File::open(archive).with_context(|| format!("failed to open {}", archive.display()))?;
     let mut tar = tar::Archive::new(GzDecoder::new(BufReader::new(file)));

@@ -3,12 +3,17 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::Context as _;
 use codespan_reporting::diagnostic as codespan_diag;
 use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use whisker_types::{Diagnostic, Severity};
+
+mod print_diagnostics_error;
+mod render_diagnostics_error;
+
+pub use self::print_diagnostics_error::PrintDiagnosticsError;
+pub use self::render_diagnostics_error::RenderDiagnosticsError;
 
 /// Renders diagnostics to stderr using codespan-reporting
 ///
@@ -18,9 +23,10 @@ use whisker_types::{Diagnostic, Severity};
 ///
 /// # Errors
 ///
-/// Returns an error if a source file cannot be read or if writing to
-/// stderr fails.
-pub fn render(diagnostics: &[Diagnostic]) -> anyhow::Result<()> {
+/// Returns [`PrintDiagnosticsError::UnreadableSource`] if a source file
+/// cannot be read. Returns [`PrintDiagnosticsError::Unemitted`] or
+/// [`PrintDiagnosticsError::Unflushed`] if writing to stderr fails.
+pub fn render(diagnostics: &[Diagnostic]) -> Result<(), PrintDiagnosticsError> {
     if diagnostics.is_empty() {
         return Ok(());
     }
@@ -28,7 +34,7 @@ pub fn render(diagnostics: &[Diagnostic]) -> anyhow::Result<()> {
     let writer = StandardStream::stderr(ColorChoice::Auto);
     let config = term::Config::default();
 
-    let sources = collect_sources(diagnostics).context("collecting sources")?;
+    let sources = collect_sources(diagnostics)?;
 
     let mut files = SimpleFiles::new();
     let mut file_ids: HashMap<Arc<Path>, usize> = HashMap::new();
@@ -43,8 +49,10 @@ pub fn render(diagnostics: &[Diagnostic]) -> anyhow::Result<()> {
     for diag in diagnostics {
         let codespan_diag = to_codespan(diag, &file_ids);
         term::emit_to_io_write(&mut writer, &config, &files, &codespan_diag)
-            .context("emitting diagnostic")?;
-        writer.flush().context("flushing stderr")?;
+            .map_err(|source| PrintDiagnosticsError::Unemitted { source })?;
+        writer
+            .flush()
+            .map_err(|source| PrintDiagnosticsError::Unflushed { source })?;
     }
 
     Ok(())
@@ -119,12 +127,13 @@ fn to_codespan(
 ///
 /// # Errors
 ///
-/// Returns an error if codespan-reporting fails to render a diagnostic
-/// or if the rendered output is not valid UTF-8.
+/// Returns [`RenderDiagnosticsError::Unemitted`] if codespan-reporting
+/// fails to render a diagnostic, and [`RenderDiagnosticsError::NotUtf8`] if
+/// the rendered output is not valid UTF-8.
 pub fn render_to_string(
     diagnostics: &[Diagnostic],
     sources: &HashMap<Arc<Path>, String>,
-) -> anyhow::Result<String> {
+) -> Result<String, RenderDiagnosticsError> {
     if diagnostics.is_empty() {
         return Ok(String::new());
     }
@@ -143,13 +152,15 @@ pub fn render_to_string(
     for diag in diagnostics {
         let codespan_diag = to_codespan(diag, &file_ids);
         term::emit_to_io_write(&mut output, &config, &files, &codespan_diag)
-            .context("emitting diagnostic")?;
+            .map_err(|source| RenderDiagnosticsError::Unemitted { source })?;
     }
 
-    String::from_utf8(output).context("rendered output is not valid UTF-8")
+    String::from_utf8(output).map_err(|source| RenderDiagnosticsError::NotUtf8 { source })
 }
 
-fn collect_sources(diagnostics: &[Diagnostic]) -> anyhow::Result<HashMap<Arc<Path>, String>> {
+fn collect_sources(
+    diagnostics: &[Diagnostic],
+) -> Result<HashMap<Arc<Path>, String>, PrintDiagnosticsError> {
     let mut sources = HashMap::new();
 
     for diag in diagnostics {
@@ -157,8 +168,12 @@ fn collect_sources(diagnostics: &[Diagnostic]) -> anyhow::Result<HashMap<Arc<Pat
         if sources.contains_key(file) {
             continue;
         }
-        let source =
-            std::fs::read_to_string(file).with_context(|| format!("reading {}", file.display()))?;
+        let source = std::fs::read_to_string(file).map_err(|source| {
+            PrintDiagnosticsError::UnreadableSource {
+                path: file.to_path_buf(),
+                source,
+            }
+        })?;
         sources.insert(Arc::from(file), source);
     }
 

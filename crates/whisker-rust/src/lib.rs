@@ -7,7 +7,7 @@ mod provider;
 pub use adapter::RustLintPassAdapter;
 pub use language_fingerprint::LANGUAGE_FINGERPRINT;
 #[cfg(feature = "provider")]
-pub use provider::RustDecorationProvider;
+pub use provider::{LoadRustWorkspaceError, RustDecorationProvider};
 pub use whisker_types::RuleId;
 
 include!(concat!(env!("OUT_DIR"), "/lint_pass.rs"));

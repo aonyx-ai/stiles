@@ -1,3 +1,3 @@
 mod renderer;
 
-pub use renderer::{render, render_to_string};
+pub use renderer::{PrintDiagnosticsError, RenderDiagnosticsError, render, render_to_string};

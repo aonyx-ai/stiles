@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::Context as _;
 use bon::bon;
 use whisker_tsrs::tsrs_compiler::{
     Program, ProgramOptions, new_cached_fs_compiler_host, new_program,
@@ -12,12 +11,16 @@ use whisker_tsrs::tsrs_tsoptions::{ParseConfigHost, ParsedCommandLine};
 use whisker_tsrs::tsrs_vfs::{FS, bundled, osvfs};
 use whisker_tsrs::{tsrs_ast, tsrs_astnav, tsrs_tsoptions};
 use whisker_types::{
-    Coverage, CoverageGap, DecoratedNode, DecoratedTree, DecorationMap, DecorationProvider,
-    ProviderName,
+    Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, DecorationMap,
+    DecorationProvider, ProviderName,
 };
 
 use crate::decorations::{ImportSource, TypeText};
 use crate::queries;
+
+mod load_type_script_project_error;
+
+pub use self::load_type_script_project_error::LoadTypeScriptProjectError;
 
 /// The file that marks the root of a TypeScript project
 const CONFIG_FILE: &str = "tsconfig.json";
@@ -107,9 +110,10 @@ impl TypeScriptDecorationProvider {
     ///
     /// # Errors
     ///
-    /// Returns an error if the current directory cannot be read, or if no
-    /// `tsconfig.json` sits at or above `path`. It also returns one if a path
-    /// is not valid UTF-8, or if the configuration cannot be parsed.
+    /// Returns a [`LoadTypeScriptProjectError`] if the current directory
+    /// cannot be read, or if no `tsconfig.json` sits at or above `path`. It
+    /// also returns one if a path is not valid UTF-8, or if the configuration
+    /// cannot be parsed.
     ///
     /// # Examples
     ///
@@ -119,26 +123,28 @@ impl TypeScriptDecorationProvider {
     /// use whisker_typescript::TypeScriptDecorationProvider;
     ///
     /// let provider = TypeScriptDecorationProvider::load(Path::new("."))?;
-    /// # Ok::<(), anyhow::Error>(())
+    /// # Ok::<(), whisker_typescript::LoadTypeScriptProjectError>(())
     /// ```
-    pub fn load(path: &Path) -> anyhow::Result<Self> {
-        let path = std::path::absolute(path)
-            .with_context(|| format!("resolve {} to an absolute path", path.display()))?;
-        let config_file = discover_config(&path).with_context(|| {
-            format!(
-                "discover a TypeScript project at {}: no {CONFIG_FILE} at or above it",
-                path.display()
-            )
+    pub fn load(path: &Path) -> Result<Self, LoadTypeScriptProjectError> {
+        let path = std::path::absolute(path).map_err(|source| {
+            LoadTypeScriptProjectError::UnresolvablePath {
+                path: path.to_path_buf(),
+                source,
+            }
         })?;
-        let root: Arc<Path> = Arc::from(
-            config_file
-                .parent()
-                .context("a configuration file always sits in a directory")?,
-        );
-        let root_text = root.to_str().with_context(|| not_utf8(&root))?;
-        let config_text = config_file
-            .to_str()
-            .with_context(|| not_utf8(&config_file))?;
+        let Some(root) = discover_root(&path) else {
+            return Err(LoadTypeScriptProjectError::MissingConfig { path });
+        };
+        let config_file = root.join(CONFIG_FILE);
+        let root: Arc<Path> = Arc::from(root);
+        let Some(root_text) = root.to_str() else {
+            return Err(LoadTypeScriptProjectError::NotUtf8 {
+                path: root.to_path_buf(),
+            });
+        };
+        let Some(config_text) = config_file.to_str() else {
+            return Err(LoadTypeScriptProjectError::NotUtf8 { path: config_file });
+        };
 
         let fs: Arc<dyn FS> = Arc::new(bundled::wrap_fs(osvfs::fs()));
         let host = ConfigHost {
@@ -152,17 +158,18 @@ impl TypeScriptDecorationProvider {
             &host,
             None,
         );
-        anyhow::ensure!(
-            errors.is_empty(),
-            "parse {}: {}",
-            config_file.display(),
-            errors
-                .iter()
-                .map(|error| error.localize())
-                .collect::<Vec<_>>()
-                .join("; ")
-        );
-        let config = P::new(config.with_context(|| format!("parse {}", config_file.display()))?);
+        if !errors.is_empty() {
+            return Err(LoadTypeScriptProjectError::InvalidConfig {
+                config: config_file,
+                messages: errors.iter().map(|error| error.localize()).collect(),
+            });
+        }
+        let Some(config) = config else {
+            return Err(LoadTypeScriptProjectError::EmptyConfig {
+                config: config_file,
+            });
+        };
+        let config = P::new(config);
 
         let compiler_host = new_cached_fs_compiler_host(
             root_text,
@@ -204,9 +211,7 @@ impl TypeScriptDecorationProvider {
     /// ```
     pub fn project_root(path: &Path) -> Option<PathBuf> {
         let path = std::path::absolute(path).ok()?;
-        let config = discover_config(&path)?;
-
-        config.parent().map(Path::to_path_buf)
+        discover_root(&path)
     }
 
     /// Returns the gap for a file the program does not hold
@@ -233,10 +238,13 @@ impl DecorationProvider for TypeScriptDecorationProvider {
         Self::NAME
     }
 
-    fn decorate(&self, tree: &DecoratedTree) -> anyhow::Result<Coverage> {
+    fn decorate(&self, tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
         let file = tree.file();
-        let file = std::path::absolute(file)
-            .with_context(|| format!("resolve {} to an absolute path", file.display()))?;
+        let file =
+            std::path::absolute(file).map_err(|source| DecorateTreeError::UnresolvablePath {
+                path: file.to_path_buf(),
+                source,
+            })?;
 
         let Some(source_file) = file
             .to_str()
@@ -385,20 +393,12 @@ fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Targets) {
     }
 }
 
-/// Returns the `tsconfig.json` nearest at or above `path`
-fn discover_config(path: &Path) -> Option<PathBuf> {
+/// Returns the nearest directory at or above `path` that holds a
+/// `tsconfig.json`
+fn discover_root(path: &Path) -> Option<PathBuf> {
     path.ancestors()
-        .map(|directory| directory.join(CONFIG_FILE))
-        .find(|candidate| candidate.is_file())
-}
-
-/// Returns the error for a path tsrs cannot address, because tsrs
-/// addresses every file by UTF-8 text
-fn not_utf8(path: &Path) -> String {
-    format!(
-        "{} is not valid UTF-8, and tsrs only addresses UTF-8 paths",
-        path.display()
-    )
+        .find(|directory| directory.join(CONFIG_FILE).is_file())
+        .map(Path::to_path_buf)
 }
 
 /// The file system and directory tsrs reads a configuration through
@@ -420,13 +420,6 @@ impl ParseConfigHost for ConfigHost {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn not_utf8_names_the_path() {
-        let message = not_utf8(Path::new("/projects/app"));
-
-        assert!(message.starts_with("/projects/app is not valid UTF-8"));
-    }
 
     #[test]
     fn trait_send() {

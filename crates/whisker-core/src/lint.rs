@@ -1,7 +1,7 @@
 use bon::bon;
 use whisker_types::{DecoratedNode, Diagnostic, Language, LintPass, Panic, RuleId};
 
-use crate::{PassPanic, UndeclaredRule};
+use crate::{PassPanic, UndeclaredRule, WalkLintsError};
 
 /// A lint pass and the rules its plugin declared for it
 ///
@@ -109,20 +109,21 @@ impl<'pass> Lint<'pass> {
     ///
     /// # Errors
     ///
-    /// Returns a [`PassPanic`] if the pass panicked, or an
-    /// [`UndeclaredRule`] if it reported a rule it did not declare.
+    /// Returns [`WalkLintsError::Panicked`] if the pass panicked, or
+    /// [`WalkLintsError::Undeclared`] if it reported a rule it did not
+    /// declare.
     pub(crate) fn check_node(
         &mut self,
         node: &DecoratedNode<'_>,
-    ) -> anyhow::Result<Vec<Diagnostic>> {
+    ) -> Result<Vec<Diagnostic>, WalkLintsError> {
         let checked: Result<_, Panic> = self.pass.check_node(node).into();
         let found: Vec<Diagnostic> = checked
-            .map_err(|panic| {
-                PassPanic::builder()
+            .map_err(|panic| WalkLintsError::Panicked {
+                source: PassPanic::builder()
                     .kind(node.kind())
                     .span(node.span())
                     .panic(panic)
-                    .build()
+                    .build(),
             })?
             .into_iter()
             .collect();
@@ -134,12 +135,13 @@ impl<'pass> Lint<'pass> {
             .iter()
             .find(|diagnostic| !rules.contains(&diagnostic.rule_id()))
         {
-            return Err(UndeclaredRule::builder()
-                .rule(stray.rule_id())
-                .declared(rules.clone())
-                .span(node.span())
-                .build()
-                .into());
+            return Err(WalkLintsError::Undeclared {
+                source: UndeclaredRule::builder()
+                    .rule(stray.rule_id())
+                    .declared(rules.clone())
+                    .span(node.span())
+                    .build(),
+            });
         }
 
         Ok(found)

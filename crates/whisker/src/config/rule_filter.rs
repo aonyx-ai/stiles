@@ -36,7 +36,7 @@ impl RuleFilter {
     /// Returns an error if both name something, because a project that
     /// says which rules run has already said which do not.
     #[builder]
-    pub fn new(enable: Vec<String>, disable: Vec<String>) -> anyhow::Result<Self> {
+    pub(crate) fn new(enable: Vec<String>, disable: Vec<String>) -> anyhow::Result<Self> {
         match (enable.is_empty(), disable.is_empty()) {
             (true, true) => Ok(Self::All),
             (false, true) => Ok(Self::Only(enable.into_iter().collect())),
@@ -65,7 +65,7 @@ impl RuleFilter {
     /// disables nothing and reads exactly like a rule that found no
     /// fault, so whisker refuses the file rather than the reader having
     /// to notice.
-    pub fn validate(&self, declared: &BTreeSet<String>) -> anyhow::Result<()> {
+    pub(crate) fn validate(&self, declared: &BTreeSet<String>) -> anyhow::Result<()> {
         let unknown: Vec<&str> = self
             .named()
             .iter()

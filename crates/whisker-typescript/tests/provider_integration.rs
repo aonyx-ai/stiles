@@ -16,7 +16,8 @@ use whisker_typescript::decorations::{
     FnSignature, ImportSource, Primitive, ResolvedType, StringUnion, TypeText,
 };
 use whisker_typescript::{
-    TypeScriptDecorationProvider, TypeScriptLintPass, TypeScriptLintPassAdapter,
+    LoadTypeScriptProjectError, TypeScriptDecorationProvider, TypeScriptLintPass,
+    TypeScriptLintPassAdapter,
 };
 
 /// A temporary project: its directory and the files written into it
@@ -466,10 +467,10 @@ fn load_without_a_configuration_returns_error() {
         .err()
         .expect("loading should fail");
 
-    assert!(
-        error.to_string().contains("discover a TypeScript project"),
-        "{error:#}"
-    );
+    let LoadTypeScriptProjectError::MissingConfig { path } = error else {
+        panic!("should be a missing configuration, got {error:?}");
+    };
+    assert_eq!(path, directory.path());
 }
 
 #[test]
