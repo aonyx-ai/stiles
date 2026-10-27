@@ -128,7 +128,7 @@ tsrs_compiler = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54be
 tsrs_core = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
 tsrs_module = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
 tsrs_tsoptions = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
-tsrs_vfs = { git = "https://github.com/oxc-project/tsrs", rev = "4d5c7a54beffd558d82068aff9c8e81ef9468751" }
+tsrs_vfs = { git = "https://github.com/oxc-project/tsrs", rev = "4a61321929d0d62b86c5fb35f15bfa1607e03b50" }
 whisker-core = { path = "crates/whisker-core", version = "=0.1.0" }
 whisker-macros = { path = "crates/whisker-macros", version = "=0.1.0" }
 whisker-codegen = { path = "crates/whisker-codegen", version = "=0.1.0" }
