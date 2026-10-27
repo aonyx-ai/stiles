@@ -16,13 +16,12 @@ Normally you'll invoke Whisker through `whisker check .`. There's some more
 options you can pass though:
 
 ```bash
-whisker check [OPTIONS] [PATH] [ARGS]...
+whisker check [OPTIONS] [PATH]
 ```
 
 | Argument          | Meaning                                                        |
 | ----------------- | -------------------------------------------------------------- |
 | `PATH`            | The directory or file to check. Defaults to `.`                |
-| `ARGS`            | Accepted and discarded                                         |
 | `--keep-going`    | Report each failure and continue. The run still exits non-zero |
 | `--deny-warnings` | Fail on warnings as well as errors                             |
 
@@ -40,13 +39,13 @@ whisker abi
 With every Whisker command, you can use the following parameters to modify its
 output or behavior:
 
-| Option            | Meaning                         |
-| ----------------- | ------------------------------- |
-| `-h`, `--help`    | Print help                      |
-| `-V`, `--version` | Print the version               |
-| `-q`, `--quiet`   | Suppress informational messages |
-| `-v`, `--verbose` | Show additional detail          |
-| `--json`          | Output results as JSON          |
+| Option            | Meaning                                       |
+| ----------------- | --------------------------------------------- |
+| `-h`, `--help`    | Print help                                    |
+| `-V`, `--version` | Print the version                             |
+| `-q`, `--quiet`   | Hide the `help:` lines                        |
+| `-v`, `--verbose` | Name each file as Whisker checks it           |
+| `--json`          | Write each result as one JSON object per line |
 
 ## What ends a run early
 
@@ -83,15 +82,50 @@ error.
 ## Where output goes
 
 <!--
-stdout or stderr. diagnostics, errors, notes and help lines all go to stderr.
-whisker abi is the exception and prints its tag to stdout, which is what makes
-it usable in a shell substitution.
+stdout or stderr. the result of a command goes to stdout: the diagnostics of
+check, the tag of abi. errors and notes go to stderr. help lines and the
+--verbose file names go to stdout, or to stderr with --json, so that stdout
+then holds only JSON.
 -->
 
-| Command         | stdout  | stderr                                       |
-| --------------- | ------- | -------------------------------------------- |
-| `whisker check` | Nothing | Diagnostics, errors, notes and `help:` lines |
-| `whisker abi`   | The tag | Errors only                                  |
+| Command         | stdout                                     | stderr           |
+| --------------- | ------------------------------------------ | ---------------- |
+| `whisker check` | Diagnostics, `help:` lines, and file names | Errors and notes |
+| `whisker abi`   | The tag                                    | Errors only      |
+
+With `--json`, stdout holds only the JSON. The `help:` lines and the file
+names of `--verbose` move to stderr. A clean `whisker check` prints nothing
+to stdout in either mode.
 
 Because `whisker abi` writes its tag to stdout, you can use it in a shell
 substitution, for example `tag=$(whisker abi)`.
+
+## JSON output
+
+`whisker check --json` writes one object per diagnostic:
+
+```json
+{
+  "rule": "lint.todo-comment",
+  "severity": "warning",
+  "message": "…",
+  "file": "src/lib.rs",
+  "start": 120,
+  "end": 124,
+  "line": 7,
+  "column": 5
+}
+```
+
+| Field      | Meaning                                              |
+| ---------- | ---------------------------------------------------- |
+| `rule`     | The rule id                                          |
+| `severity` | `error`, `warning`, `note`, or `help`                |
+| `message`  | The text of the diagnostic                           |
+| `file`     | The file, as Whisker found it                        |
+| `start`    | The byte offset where the diagnostic starts          |
+| `end`      | The byte offset where the diagnostic ends            |
+| `line`     | The line of `start`, counting from 1                 |
+| `column`   | The column of `start` in characters, counting from 1 |
+
+`whisker abi --json` writes the tag as one JSON string.

@@ -209,8 +209,8 @@ fn check_with_prebuilt_lints_loads_them_without_a_source() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains(format!("warning[{RULE}]")))
-        .stderr(predicate::str::contains("finish this before it ships"));
+        .stdout(predicate::str::contains(format!("warning[{RULE}]")))
+        .stdout(predicate::str::contains("finish this before it ships"));
 }
 
 /// Pins that every library in a prebuilt directory is loaded
@@ -264,8 +264,8 @@ fn check_with_several_prebuilt_libraries_loads_every_one() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains("warning[fixture.first]"))
-        .stderr(predicate::str::contains("warning[fixture.second]"));
+        .stdout(predicate::str::contains("warning[fixture.first]"))
+        .stdout(predicate::str::contains("warning[fixture.second]"));
 }
 
 /// Pins that a prebuilt directory holding nothing loadable is not an answer
@@ -294,7 +294,7 @@ fn check_with_an_empty_prebuilt_directory_builds_from_source() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains(format!("warning[{RULE}]")));
+        .stdout(predicate::str::contains(format!("warning[{RULE}]")));
 }
 
 /// Pins that the handshake still runs on a library whisker did not build
@@ -475,8 +475,8 @@ fn check_with_a_published_archive_loads_it_without_a_source() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains(format!("warning[{RULE}]")))
-        .stderr(predicate::str::contains("finish this before it ships"));
+        .stdout(predicate::str::contains(format!("warning[{RULE}]")))
+        .stdout(predicate::str::contains("finish this before it ships"));
 
     assert!(
         cache.path().join("prebuilt").is_dir(),
@@ -505,7 +505,7 @@ fn check_with_prebuilt_lints_in_the_cache_asks_nothing() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains(format!("warning[{RULE}]")));
+        .stdout(predicate::str::contains(format!("warning[{RULE}]")));
 
     assert_eq!(
         server.seen().len(),
@@ -655,7 +655,7 @@ fn check_with_a_remote_the_api_does_not_serve_asks_nothing() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains(format!("warning[{RULE}]")));
+        .stdout(predicate::str::contains(format!("warning[{RULE}]")));
 
     assert!(server.seen().is_empty(), "{:?}", server.seen());
 }
@@ -715,7 +715,7 @@ fn check_with_a_checkout_already_present_asks_nothing() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains(format!("warning[{RULE}]")));
+        .stdout(predicate::str::contains(format!("warning[{RULE}]")));
 
     assert_eq!(
         server.seen().len(),

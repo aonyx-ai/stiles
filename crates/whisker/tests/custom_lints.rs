@@ -197,8 +197,8 @@ fn check_with_an_enabled_rule_runs_only_that_rule() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains("warning[workspace.second]"))
-        .stderr(predicate::str::contains("workspace.first").not());
+        .stdout(predicate::str::contains("warning[workspace.second]"))
+        .stdout(predicate::str::contains("workspace.first").not());
 }
 
 /// Pins that a disabled rule reports nothing and the others still do
@@ -218,8 +218,8 @@ fn check_with_a_disabled_rule_runs_the_rest() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains("warning[workspace.second]"))
-        .stderr(predicate::str::contains("workspace.first").not());
+        .stdout(predicate::str::contains("warning[workspace.second]"))
+        .stdout(predicate::str::contains("workspace.first").not());
 }
 
 /// Pins that a name no lint reports is refused
@@ -316,7 +316,7 @@ fn check_with_an_option_configures_the_rule() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains("warning[custom.configured]"));
+        .stdout(predicate::str::contains("warning[custom.configured]"));
 }
 
 /// Pins that a rule the project configured nothing for still runs
@@ -415,8 +415,8 @@ fn check_with_a_workspace_of_lints_reports_every_member() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains("warning[workspace.first]"))
-        .stderr(predicate::str::contains("warning[workspace.second]"));
+        .stdout(predicate::str::contains("warning[workspace.first]"))
+        .stdout(predicate::str::contains("warning[workspace.second]"));
 }
 
 /// Pins the whole path: configure, compile, handshake, lint, report
@@ -434,8 +434,8 @@ fn check_with_custom_lint_reports_its_diagnostic() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains("warning[custom.no-todo]"))
-        .stderr(predicate::str::contains("finish this before it ships"));
+        .stdout(predicate::str::contains("warning[custom.no-todo]"))
+        .stdout(predicate::str::contains("finish this before it ships"));
 }
 
 #[test]

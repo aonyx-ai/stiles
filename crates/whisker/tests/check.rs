@@ -203,9 +203,9 @@ fn error_count(stderr: &str) -> usize {
 /// Counts how many times whisker printed the remedy for an unreachable file
 ///
 /// Whisker prints the remedy once per run, not once per file; the count
-/// pins that limit.
-fn unreachable_help_count(stderr: &str) -> usize {
-    stderr
+/// pins that limit. A remedy is a message, which whisker writes to stdout.
+fn unreachable_help_count(stdout: &str) -> usize {
+    stdout
         .matches("help: reference the file from a source the toolchain already loads")
         .count()
 }
@@ -263,8 +263,7 @@ fn check_from_a_subdirectory_applies_the_project_lints() {
         .current_dir(package.path().join("src"))
         .assert()
         .success()
-        .stdout(predicate::str::is_empty())
-        .stderr(predicate::str::contains("warning[custom.no-todo]"));
+        .stdout(predicate::str::contains("warning[custom.no-todo]"));
 }
 
 /// Pins that whisker refuses a file it has no grammar for
@@ -310,14 +309,13 @@ fn check_orphan_directory_reports_no_coverage() {
         .arg(package.path())
         .assert()
         .code(1)
-        .stdout(predicate::str::is_empty())
         .stderr(predicate::str::contains(
             "no decoration provider covers this file",
         ))
         .stderr(predicate::str::contains("stray.rs"))
         .stderr(predicate::function(|stderr: &str| error_count(stderr) == 1))
-        .stderr(predicate::function(|stderr: &str| {
-            unreachable_help_count(stderr) == 1
+        .stdout(predicate::function(|stdout: &str| {
+            unreachable_help_count(stdout) == 1
         }));
 }
 
@@ -503,7 +501,7 @@ fn check_real_crate_produces_diagnostics_not_coverage_errors() {
         .assert()
         .success()
         .stderr(predicate::str::contains("no decoration provider covers this file").not())
-        .stderr(predicate::str::contains(
+        .stdout(predicate::str::contains(
             "warning[fixture.wildcard-match-arm]",
         ));
 }
@@ -627,33 +625,63 @@ fn check_with_deny_warnings_fails_on_warnings() {
         .arg(package.path())
         .assert()
         .code(1)
-        .stdout(predicate::str::is_empty())
-        .stderr(predicate::str::contains("error[custom.no-todo]"));
+        .stdout(predicate::str::contains("error[custom.no-todo]"));
 }
 
-/// Pins that whisker writes its whole report to stderr and leaves stdout
-/// empty
+/// Pins that whisker writes its report to stdout and its errors to stderr
 ///
-/// A caller that pipes whisker into another program reads stdout, so a
-/// report that landed there would corrupt the pipe. This run trips both
-/// writers at once: the renderer prints a diagnostic for `src/lib.rs`, and
-/// the walk prints an error for the file it cannot read. The other
-/// assertions in this file cover one writer each, and this one covers the
-/// pair that a single run prints together.
+/// The report is the result of a check, so a caller that pipes whisker into
+/// another program reads it from stdout. An error says why a file went
+/// unchecked, and it stays on stderr, out of that pipe. This run trips both
+/// writers at once: a diagnostic for `src/lib.rs`, and an error for the file
+/// the walk cannot read.
 #[test]
-fn check_with_diagnostics_and_errors_writes_nothing_to_stdout() {
-    let root = mixed_project("check_writes_nothing_to_stdout");
+fn check_with_diagnostics_and_errors_splits_report_and_errors() {
+    let root = mixed_project("check_splits_report_and_errors");
 
     whisker()
         .current_dir(&root)
         .args(["check", "--keep-going", "src"])
         .assert()
         .code(1)
-        .stdout(predicate::str::is_empty())
-        .stderr(predicate::str::contains(
+        .stdout(predicate::str::contains(
             "warning[fixture.wildcard-match-arm]",
         ))
-        .stderr(predicate::str::contains("error: src/not_utf8.rs"));
+        .stdout(predicate::str::contains("error: src/not_utf8.rs").not())
+        .stderr(predicate::str::contains("error: src/not_utf8.rs"))
+        .stderr(predicate::str::contains("wildcard-match-arm").not());
+}
+
+/// Pins that `--json` writes each diagnostic as one JSON object per line
+///
+/// A caller reads the report line by line from stdout, so every line must
+/// parse on its own and name the rule, the file, and the position.
+#[test]
+fn check_with_json_writes_one_object_per_diagnostic() {
+    let package = with_no_todo(package(WARNING_SOURCE));
+
+    let output = whisker()
+        .args(["check", "--json"])
+        .arg(package.path())
+        .output()
+        .expect("whisker should run");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let findings: Vec<serde_json::Value> = stdout
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("each line should be JSON"))
+        .collect();
+    assert!(output.status.success());
+    assert_eq!(findings.len(), 1, "{stdout}");
+    assert_eq!(findings[0]["rule"], "custom.no-todo");
+    assert_eq!(findings[0]["severity"], "warning");
+    assert_eq!(findings[0]["line"], 2);
+    assert!(
+        findings[0]["file"]
+            .as_str()
+            .is_some_and(|file| file.ends_with("lib.rs")),
+        "{stdout}"
+    );
 }
 
 /// Pins the exit code to the failure recorded while walking the files, not
@@ -696,8 +724,8 @@ fn check_with_keep_going_reports_every_orphan_file() {
         .stderr(predicate::str::contains("first_stray.rs"))
         .stderr(predicate::str::contains("second_stray.rs"))
         .stderr(predicate::function(|stderr: &str| error_count(stderr) == 2))
-        .stderr(predicate::function(|stderr: &str| {
-            unreachable_help_count(stderr) == 1
+        .stdout(predicate::function(|stdout: &str| {
+            unreachable_help_count(stdout) == 1
         }));
 }
 
@@ -711,6 +739,23 @@ fn check_with_keep_going_succeeds() {
         .assert()
         .success()
         .stderr(predicate::str::is_empty());
+}
+
+/// Pins that `--quiet` hides the remedy and keeps the error
+///
+/// The remedy is advice, so a quiet run drops it. The error is why the run
+/// failed, so it stays.
+#[test]
+fn check_with_quiet_hides_the_remedy() {
+    let package = package_with_orphans(&["stray"]);
+
+    whisker()
+        .args(["check", "--quiet"])
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("help:").not())
+        .stderr(predicate::str::contains("stray.rs"));
 }
 
 /// Pins that without `--keep-going` the walk stops at the first unreadable
@@ -734,6 +779,20 @@ fn check_with_unreadable_file_and_no_keep_going_fails() {
         .stderr(predicate::function(|stderr: &str| error_count(stderr) == 1));
 }
 
+/// Pins that `--verbose` names each file as whisker checks it
+#[test]
+fn check_with_verbose_names_each_file() {
+    let package = package(CLEAN_SOURCE);
+
+    whisker()
+        .args(["check", "--verbose"])
+        .arg(package.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("checking "))
+        .stdout(predicate::str::contains("lib.rs"));
+}
+
 #[test]
 fn check_without_deny_warnings_reports_warnings_and_succeeds() {
     let package = with_no_todo(package(WARNING_SOURCE));
@@ -743,8 +802,7 @@ fn check_without_deny_warnings_reports_warnings_and_succeeds() {
         .arg(package.path())
         .assert()
         .success()
-        .stdout(predicate::str::is_empty())
-        .stderr(predicate::str::contains("warning[custom.no-todo]"));
+        .stdout(predicate::str::contains("warning[custom.no-todo]"));
 }
 
 /// Pins that a stopped run keeps the diagnostics from earlier files
@@ -761,7 +819,7 @@ fn check_without_keep_going_keeps_diagnostics_from_earlier_files() {
         .assert()
         .code(1)
         .stderr(predicate::str::contains("error: src/not_utf8.rs"))
-        .stderr(predicate::str::contains(
+        .stdout(predicate::str::contains(
             "warning[fixture.wildcard-match-arm]",
         ));
 }

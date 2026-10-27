@@ -4,11 +4,10 @@
 $ whisker check --help
 Run whisker lints against a project
 
-Usage: whisker check [OPTIONS] [PATH] [ARGS]...
+Usage: whisker check [OPTIONS] [PATH]
 
 Arguments:
-  [PATH]     Path to the target project directory [default: .]
-  [ARGS]...  Additional arguments forwarded to the analysis pipeline
+  [PATH]  Path to the target project directory [default: .]
 
 Options:
       --keep-going     Continue checking after encountering errors

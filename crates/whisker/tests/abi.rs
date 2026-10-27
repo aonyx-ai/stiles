@@ -33,3 +33,15 @@ fn abi_names_the_target_the_binary_was_built_for() {
             env!("WHISKER_TARGET")
         )));
 }
+
+/// Pins that `--json` prints the tag as one JSON string
+#[test]
+fn abi_with_json_prints_the_tag_as_a_json_string() {
+    let mut command = Command::cargo_bin("whisker").expect("whisker binary should exist");
+
+    let assertion = command.args(["abi", "--json"]).assert();
+
+    assertion.success().stdout(
+        predicate::str::is_match(r#"^"[0-9a-f]{16}-\S+"\n$"#).expect("the pattern should compile"),
+    );
+}

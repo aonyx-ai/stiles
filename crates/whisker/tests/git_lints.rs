@@ -173,7 +173,7 @@ fn check_with_git_lint_source_ignores_an_ambient_git_environment() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains("warning[fixture.no-todo]"));
+        .stdout(predicate::str::contains("warning[fixture.no-todo]"));
 }
 
 /// Pins the whole path: fetch, build, handshake, lint, report
@@ -189,8 +189,8 @@ fn check_with_git_lint_source_reports_its_diagnostic() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains("warning[fixture.no-todo]"))
-        .stderr(predicate::str::contains("finish this before it ships"));
+        .stdout(predicate::str::contains("warning[fixture.no-todo]"))
+        .stdout(predicate::str::contains("finish this before it ships"));
 }
 
 /// A repository of rules is a workspace, and every member is a rule
@@ -229,8 +229,8 @@ fn check_with_git_lint_workspace_loads_every_member() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains("warning[fixture.first]"))
-        .stderr(predicate::str::contains("warning[fixture.second]"));
+        .stdout(predicate::str::contains("warning[fixture.first]"))
+        .stdout(predicate::str::contains("warning[fixture.second]"));
 }
 
 /// Names the remote and the commit when the remote cannot serve the pin
@@ -268,7 +268,7 @@ fn check_with_git_lint_source_reuses_the_checkout_without_the_remote() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains("warning[fixture.no-todo]"));
+        .stdout(predicate::str::contains("warning[fixture.no-todo]"));
     rules.remove();
 
     whisker(&cache)
@@ -276,5 +276,5 @@ fn check_with_git_lint_source_reuses_the_checkout_without_the_remote() {
         .arg(target.path())
         .assert()
         .success()
-        .stderr(predicate::str::contains("warning[fixture.no-todo]"));
+        .stdout(predicate::str::contains("warning[fixture.no-todo]"));
 }

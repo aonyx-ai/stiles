@@ -1,6 +1,7 @@
 mod check_outcome;
 mod error_recovery;
 mod failure_threshold;
+mod finding;
 mod grammar;
 mod providers;
 
@@ -17,6 +18,7 @@ use whisker_types::{Diagnostic, LintPass, RuleOptions, UncoveredFile};
 use self::check_outcome::CheckOutcome;
 use self::error_recovery::{ErrorRecovery, Walk};
 use self::failure_threshold::FailureThreshold;
+use self::finding::Finding;
 use self::grammar::Grammar;
 use self::providers::Providers;
 use crate::config::WhiskerConfig;
@@ -37,10 +39,6 @@ pub struct CheckArgs {
     /// Treat warnings as errors
     #[arg(long)]
     deny_warnings: bool,
-
-    /// Additional arguments forwarded to the analysis pipeline
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-    args: Vec<String>,
 }
 
 /// Builds the lint passes the CLI runs
@@ -86,23 +84,33 @@ impl CoverageRemedies {
         }
     }
 
-    /// Prints each remedy once, after the per-file errors
+    /// Reports each remedy once, after the per-file errors
     ///
     /// The per-file error names the file and the reason; this names the fix.
-    fn print(&self) {
+    /// A remedy is a message, so `--quiet` hides it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the presenter has stopped listening.
+    async fn report(&self, context: &Context) -> anyhow::Result<()> {
         for remedy in &self.remedies {
-            eprintln!("help: {remedy}");
+            context
+                .output()
+                .message(format!("help: {remedy}"))
+                .await
+                .context("failed to report a remedy")?;
         }
+
+        Ok(())
     }
 }
 
 #[command]
-pub async fn check(args: CheckArgs, _context: Context) -> CommandResult {
+pub async fn check(args: CheckArgs, context: Context) -> CommandResult<ExitCode> {
     let CheckArgs {
         path,
         keep_going,
         deny_warnings,
-        args: _extra_args,
     } = args;
 
     let threshold = match deny_warnings {
@@ -167,6 +175,12 @@ pub async fn check(args: CheckArgs, _context: Context) -> CommandResult {
     let mut remedies = CoverageRemedies::default();
 
     for file in files {
+        context
+            .output()
+            .detail(format!("checking {}", file.display()))
+            .await
+            .context("failed to report progress")?;
+
         let source = match std::fs::read_to_string(file) {
             Ok(source) => source,
             Err(e) => match recovery.record(&mut outcome, file, anyhow::Error::new(e)) {
@@ -221,23 +235,27 @@ pub async fn check(args: CheckArgs, _context: Context) -> CommandResult {
         }
     }
 
-    remedies.print();
+    remedies.report(&context).await?;
 
     let all_diagnostics: Vec<Diagnostic> = all_diagnostics
         .into_iter()
         .map(|diagnostic| threshold.promote(diagnostic))
         .collect();
 
-    let output = whisker_reporting::render_to_string(&all_diagnostics, &sources)?;
-    if !output.is_empty() {
-        eprint!("{output}");
+    for diagnostic in &all_diagnostics {
+        let finding = Finding::new(diagnostic, &sources)?;
+        context
+            .output()
+            .artifact(finding)
+            .await
+            .context("failed to report a diagnostic")?;
     }
 
     let outcome = outcome.combine(CheckOutcome::from_diagnostics(&all_diagnostics, threshold));
 
     match outcome {
-        CheckOutcome::Failure => std::process::exit(1),
-        CheckOutcome::Success => Ok(()),
+        CheckOutcome::Failure => Ok(ExitCode::FAILURE),
+        CheckOutcome::Success => Ok(ExitCode::SUCCESS),
     }
 }
 
