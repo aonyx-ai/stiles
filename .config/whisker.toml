@@ -3,8 +3,14 @@
 # `/examples/` and the fixtures hold code that breaks whisker's own lints on
 # purpose. `/docs/` is the documentation site: its TypeScript configuration
 # extends a package that exists only after `npm install`, and the site's own
-# build checks that code.
-ignore = ["/docs/", "/examples/", "crates/whisker-rust/tests/fixtures/"]
+# build checks that code. `/tools/` holds the harness of the maintenance
+# commands, a workspace of its own that follows the conventions of Rakko.
+ignore = [
+  "/docs/",
+  "/examples/",
+  "/tools/",
+  "crates/whisker-rust/tests/fixtures/",
+]
 
 # Every lint builds against the whisker in this directory, not against the
 # whisker its own manifest names. The rules repository pins a whisker commit
