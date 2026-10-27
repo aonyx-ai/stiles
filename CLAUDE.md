@@ -227,6 +227,15 @@ fn create_repo(name: &str, visibility: Visibility) {}
 fn create_repo(name: &str, is_public: bool) {}
 ```
 
+#### Closed vocabularies stay closed
+
+An enum grows by a new variant, never by a catch-all. Do not add a variant
+like `Other(String)`, `Custom(Box<dyn Any>)`, or
+`Extension(serde_json::Value)`, and do not give a variant or a public field a
+`Box<dyn Any>`, a `serde_json::Value`, or a map keyed by `String`. A
+payload-less `Other` is fine. A type that deserializes an external format may
+hold a `serde_json::Value`.
+
 #### Derive conventions
 
 - Builders with `bon`
