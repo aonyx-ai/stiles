@@ -27,6 +27,16 @@ and this project adheres to
   `ABI_VERSION` fails CI. `crates/whisker-plugin/abi-surface.toml` records
   the boundary, and `just check-abi` compares it with the record on `main`.
 
+- The TypeScript provider records more than the type text. `ResolvedType`
+  holds the primitive a type comes down to and the type alias the source
+  wrote, so `greeting: Greeting` and `name: Name` read as two spellings of
+  `string`. `FnSignature` holds a function's parameters and return type,
+  `ImportSource` says whether an import resolved to a relative file, a
+  dependency, or a workspace package, and `StringUnion` lists the members
+  of a union of string literals. The new types are part of the TypeScript
+  language fingerprint, so the plugin ABI moves to 0.4. Rebuild every
+  plugin.
+
 - `DecoratedNode` is `Copy`. A rule reading a node out of the vector that
   `named_children` returns no longer clones borrowed data. The
   plugin ABI tag does not move, so every published archive still loads.

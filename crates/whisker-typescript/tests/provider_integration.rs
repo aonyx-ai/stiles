@@ -9,10 +9,15 @@ use std::path::{Path, PathBuf};
 
 use tempfile::TempDir;
 use whisker_types::{
-    Coverage, CoverageGap, DecoratedNode, DecoratedTree, DecorationProvider, Language,
+    Coverage, CoverageGap, DecoratedNode, DecoratedTree, DecorationProvider, Diagnostic, Language,
+    LintPass, RuleId, Severity,
 };
-use whisker_typescript::TypeScriptDecorationProvider;
-use whisker_typescript::decorations::TypeText;
+use whisker_typescript::decorations::{
+    FnSignature, ImportSource, Primitive, ResolvedType, StringUnion, TypeText,
+};
+use whisker_typescript::{
+    TypeScriptDecorationProvider, TypeScriptLintPass, TypeScriptLintPassAdapter,
+};
 
 /// A temporary project: its directory and the files written into it
 struct Project {
@@ -77,6 +82,79 @@ fn decorate(project: &Project, relative: &str) -> Result<DecoratedTree, Coverage
             Ok(tree)
         }
         Coverage::NotCovered(gap) => Err(gap),
+    }
+}
+
+/// Returns the first node of `kind` whose text is `text`
+fn find<'a>(tree: &'a DecoratedTree, kind: &str, text: &str) -> DecoratedNode<'a> {
+    fn walk<'a>(node: &DecoratedNode<'a>, kind: &str, text: &str) -> Option<DecoratedNode<'a>> {
+        if node.kind() == kind && node.text() == text {
+            return Some(*node);
+        }
+        node.named_children()
+            .iter()
+            .find_map(|child| walk(child, kind, text))
+    }
+
+    walk(&tree.root_node(), kind, text).unwrap_or_else(|| panic!("no {kind} node reads {text}"))
+}
+
+/// Returns the first function declaration in `tree`
+fn first_function(tree: &DecoratedTree) -> DecoratedNode<'_> {
+    tree.root_node()
+        .named_children()
+        .into_iter()
+        .find_map(|node| match node.kind() {
+            "function_declaration" => Some(node),
+            "export_statement" => node
+                .named_children()
+                .into_iter()
+                .find(|child| child.kind() == "function_declaration"),
+            _ => None,
+        })
+        .expect("the file should declare a function")
+}
+
+const ALIASES: &str = "type Greeting = string;\ntype Name = string;\n";
+
+/// A rule in miniature: two parameters a caller can swap
+///
+/// It reads the [`FnSignature`] the provider attaches. Two parameters
+/// written as different aliases of one primitive are interchangeable to
+/// the checker, so the rule reports the pair.
+struct SwappableParameters;
+
+impl TypeScriptLintPass for SwappableParameters {
+    fn check_function_declaration(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
+        let Some(signature) = node.decoration::<FnSignature>() else {
+            return Vec::new();
+        };
+        let parameters = signature.parameters();
+
+        parameters
+            .iter()
+            .enumerate()
+            .flat_map(|(index, first)| {
+                parameters[index + 1..]
+                    .iter()
+                    .map(move |second| (first, second))
+            })
+            .filter(|(first, second)| {
+                let (one, other) = (first.ty(), second.ty());
+                one.primitive() != Primitive::NotPrimitive
+                    && one.primitive() == other.primitive()
+                    && one.alias().is_some()
+                    && one.alias() != other.alias()
+            })
+            .map(|(first, second)| {
+                Diagnostic::new(
+                    RuleId::new("test.swappable-parameters"),
+                    Severity::Warn,
+                    format!("`{}` and `{}` can be swapped", first.name(), second.name()),
+                    node.span(),
+                )
+            })
+            .collect()
     }
 }
 
@@ -162,6 +240,152 @@ fn decorate_a_file_the_exclude_list_names_reports_excluded() {
     let CoverageGap::ExcludedByToolchain { .. } = gap else {
         panic!("expected an excluded gap, got {gap:?}");
     };
+}
+
+#[test]
+fn decorate_feeds_a_rule_that_flags_swappable_parameters() {
+    let source = format!(
+        "{ALIASES}export function sign(greeting: Greeting, name: Name): string {{ return greeting + name; }}\n"
+    );
+    let project = Project::new(STRICT, &[("src/main.ts", &source)]);
+    let tree = decorate(&project, "src/main.ts").expect("the file should be covered");
+    let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(TypeScriptLintPassAdapter::new(
+        SwappableParameters,
+    ))];
+
+    let diagnostics = whisker_core::walk(&tree, &mut passes).expect("the walk should succeed");
+
+    assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
+    assert_eq!(
+        diagnostics[0].message(),
+        "`greeting` and `name` can be swapped"
+    );
+}
+
+#[test]
+fn decorate_lists_the_members_of_a_string_union() {
+    let project = Project::new(
+        STRICT,
+        &[(
+            "src/main.ts",
+            "type Color = \"red\" | \"green\";\nexport function paint(color: Color): Color { return color; }\n",
+        )],
+    );
+
+    let tree = decorate(&project, "src/main.ts").expect("the file should be covered");
+
+    let color = find(&tree, "identifier", "color");
+    let mut members: Vec<&str> = color
+        .decoration::<StringUnion>()
+        .expect("the parameter should carry its union")
+        .members()
+        .collect();
+    members.sort_unstable();
+    assert_eq!(members, ["green", "red"]);
+}
+
+#[test]
+fn decorate_resolves_a_primitive_alias_on_a_parameter() {
+    let source = format!("{ALIASES}export function greet(greeting: Greeting): void {{}}\n");
+    let project = Project::new(STRICT, &[("src/main.ts", &source)]);
+
+    let tree = decorate(&project, "src/main.ts").expect("the file should be covered");
+
+    let greeting = find(&tree, "identifier", "greeting");
+    let ty = greeting
+        .decoration::<ResolvedType>()
+        .expect("the parameter should be resolved");
+    assert_eq!(ty.alias(), Some("Greeting"));
+    assert_eq!(ty.primitive(), Primitive::String);
+    assert_eq!(ty.display(), "string");
+}
+
+#[test]
+fn decorate_signs_a_function_declaration() {
+    let source = format!(
+        "{ALIASES}export function sign(greeting: Greeting, count: number): Name {{ return greeting; }}\n"
+    );
+    let project = Project::new(STRICT, &[("src/main.ts", &source)]);
+
+    let tree = decorate(&project, "src/main.ts").expect("the file should be covered");
+
+    let function = first_function(&tree);
+    let signature = function
+        .decoration::<FnSignature>()
+        .expect("the function should carry its signature");
+    let parameters: Vec<(&str, Option<&str>, Primitive)> = signature
+        .parameters()
+        .iter()
+        .map(|parameter| {
+            (
+                parameter.name(),
+                parameter.ty().alias(),
+                parameter.ty().primitive(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        parameters,
+        [
+            ("greeting", Some("Greeting"), Primitive::String),
+            ("count", None, Primitive::Number),
+        ]
+    );
+    assert_eq!(signature.return_type().alias(), Some("Name"));
+}
+
+#[test]
+fn decorate_sorts_imports_by_where_they_resolve() {
+    const BUNDLER: &str = r#"{ "compilerOptions": { "strict": true, "target": "es2022", "module": "esnext", "moduleResolution": "bundler" }, "include": ["src"] }"#;
+    let project = Project::new(
+        BUNDLER,
+        &[
+            (
+                "src/main.ts",
+                "import { a } from \"./a\";\nimport { dep } from \"dep\";\nimport { lib } from \"@ws/lib\";\nimport { gone } from \"gone\";\nexport const all = [a, dep, lib, gone];\n",
+            ),
+            ("src/a.ts", "export const a = 1;\n"),
+            (
+                "node_modules/dep/package.json",
+                r#"{ "name": "dep", "types": "index.d.ts" }"#,
+            ),
+            (
+                "node_modules/dep/index.d.ts",
+                "export declare const dep: number;\n",
+            ),
+            (
+                "packages/lib/package.json",
+                r#"{ "name": "@ws/lib", "types": "index.ts" }"#,
+            ),
+            ("packages/lib/index.ts", "export const lib = 1;\n"),
+        ],
+    );
+    std::fs::create_dir_all(project.path("node_modules/@ws")).expect("the scope should be created");
+    std::os::unix::fs::symlink(
+        project.path("packages/lib"),
+        project.path("node_modules/@ws/lib"),
+    )
+    .expect("the workspace link should be created");
+
+    let tree = decorate(&project, "src/main.ts").expect("the file should be covered");
+
+    let sources: Vec<Option<ImportSource>> = ["\"./a\"", "\"dep\"", "\"@ws/lib\"", "\"gone\""]
+        .iter()
+        .map(|specifier| {
+            find(&tree, "string", specifier)
+                .decoration::<ImportSource>()
+                .copied()
+        })
+        .collect();
+    assert_eq!(
+        sources,
+        [
+            Some(ImportSource::Relative),
+            Some(ImportSource::Dependency),
+            Some(ImportSource::Workspace),
+            Some(ImportSource::Unresolved),
+        ]
+    );
 }
 
 #[test]

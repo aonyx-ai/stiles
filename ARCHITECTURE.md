@@ -123,9 +123,16 @@ needs a change to whisker-rust.
 TypeScript's provider uses [tsrs][tsrs], a Rust port of the TypeScript 7
 checker, as a library. A TypeScript file belongs to the project of the
 `tsconfig.json` nearest it, and the command loads each such project once.
-The provider attaches the checker's rendering of the type of every
-identifier it can type. A file the project leaves out gets the gap that
-names its remedy, as for Rust.
+The provider records the type of every identifier it can type, both as
+the checker prints it and resolved: the primitive it comes down to, and the
+type alias the source wrote for it. TypeScript gives an alias of a
+primitive no type of its own, so the alias comes from the annotation, not
+from the type. An identifier of a union of string literals also gets the
+members. A function or method declaration gets its signature, and the
+specifier of an import gets where the program resolved it: a relative
+file, a dependency in `node_modules`, or a package of the workspace. A
+file the project leaves out gets the gap that names its remedy, as for
+Rust.
 
 A provider and the syntax tree keep separate parses of the same file, so
 byte offsets tie them together. Each provider compares the text it analyzed

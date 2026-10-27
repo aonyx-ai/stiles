@@ -12,7 +12,8 @@ use whisker_types::{
     ProviderName,
 };
 
-use crate::decorations::TypeText;
+use crate::decorations::{ImportSource, TypeText};
+use crate::queries;
 
 /// The file that marks the root of a TypeScript project
 const CONFIG_FILE: &str = "tsconfig.json";
@@ -24,12 +25,32 @@ const TYPED_KINDS: [&str; 3] = [
     "shorthand_property_identifier",
 ];
 
+/// The node kinds that declare a function or method with a signature
+const FUNCTION_KINDS: [&str; 6] = [
+    "function_declaration",
+    "generator_function_declaration",
+    "function_signature",
+    "method_definition",
+    "method_signature",
+    "abstract_method_signature",
+];
+
+/// The node kinds whose `source` field names a module
+const MODULE_REFERENCE_KINDS: [&str; 2] = ["import_statement", "export_statement"];
+
 /// Decorates TypeScript trees with what the TypeScript checker knows
 ///
 /// The provider loads one TypeScript project through tsrs, a Rust port of
 /// the TypeScript 7 checker, and answers for the files that project's
-/// program holds. It attaches a [`TypeText`] to each identifier the
-/// checker can type.
+/// program holds. It attaches a [`TypeText`] and a [`ResolvedType`] to
+/// each identifier the checker can type, and a [`StringUnion`] when that
+/// type is a union of string literals. A function or method declaration
+/// gets an [`FnSignature`], and the module specifier of an import or
+/// export gets an [`ImportSource`].
+///
+/// [`FnSignature`]: crate::decorations::FnSignature
+/// [`ResolvedType`]: crate::decorations::ResolvedType
+/// [`StringUnion`]: crate::decorations::StringUnion
 ///
 /// The provider declines a file the program does not hold, with the gap
 /// that leads to its remedy:
@@ -223,7 +244,7 @@ impl DecorationProvider for TypeScriptDecorationProvider {
             return Ok(Coverage::NotCovered(CoverageGap::StaleSource));
         }
 
-        let mut targets = Vec::new();
+        let mut targets = Targets::default();
         collect_targets(&tree.root_node(), &mut targets);
 
         let context = Context::background();
@@ -236,7 +257,7 @@ impl DecorationProvider for TypeScriptDecorationProvider {
             node_id,
             start,
             end,
-        } in targets
+        } in targets.values
         {
             let token = tsrs_astnav::get_touching_property_name(source_file, start);
             if token.end().source_offset() != Some(end) {
@@ -246,30 +267,110 @@ impl DecorationProvider for TypeScriptDecorationProvider {
             let ty = checker.get_type_at_location(token);
             let text = checker.type_to_string_exported(ty);
             decorations.insert(node_id, TypeText::new(&text));
+
+            let declaration = checker
+                .get_symbol_at_location_exported(token)
+                .and_then(|symbol| symbol.value_declaration());
+            decorations.insert(
+                node_id,
+                queries::resolved_type(&mut checker, ty, declaration),
+            );
+            if let Some(union) = queries::string_union(ty) {
+                decorations.insert(node_id, union);
+            }
+        }
+
+        for Target {
+            node_id,
+            start,
+            end,
+        } in targets.functions
+        {
+            let token = tsrs_astnav::get_touching_property_name(source_file, start);
+            if token.end().source_offset() != Some(end) {
+                continue;
+            }
+            let Some(declaration) = token.parent() else {
+                continue;
+            };
+            if let Some(signature) = queries::fn_signature(&mut checker, declaration) {
+                decorations.insert(node_id, signature);
+            }
+        }
+
+        for Target {
+            node_id,
+            start,
+            end,
+        } in targets.modules
+        {
+            let token = tsrs_astnav::get_touching_token(source_file, start);
+            if token.end().source_offset() != Some(end) || !tsrs_ast::is_string_literal_like(token)
+            {
+                continue;
+            }
+            let source: ImportSource = queries::import_source(self.program, source_file, token);
+            decorations.insert(node_id, source);
         }
 
         Ok(Coverage::Covered(decorations))
     }
 }
 
-/// An identifier the checker is asked to type, by its byte range
+/// A node the provider asks tsrs about, and the byte range tsrs finds it by
+///
+/// The range is the node's own for an identifier and a module specifier.
+/// For a function it is the range of the function's name, because tsrs
+/// finds the declaration as the parent of that name, and the decoration
+/// goes on the declaration's node.
 struct Target {
     node_id: usize,
     start: u32,
     end: u32,
 }
 
-/// Collects every node of a [`TYPED_KINDS`] kind under `node`
-fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
-    if TYPED_KINDS.contains(&node.kind())
-        && let Ok(start) = u32::try_from(node.raw().start_byte())
-        && let Ok(end) = u32::try_from(node.raw().end_byte())
-    {
-        targets.push(Target {
+impl Target {
+    /// Returns the target for `node`, found in tsrs by the range of `found_by`
+    fn new(node: &DecoratedNode<'_>, found_by: &DecoratedNode<'_>) -> Option<Self> {
+        Some(Self {
             node_id: node.id(),
-            start,
-            end,
-        });
+            start: u32::try_from(found_by.raw().start_byte()).ok()?,
+            end: u32::try_from(found_by.raw().end_byte()).ok()?,
+        })
+    }
+}
+
+/// Every node of a file the provider decorates, by what it asks about it
+#[derive(Default)]
+struct Targets {
+    /// Identifiers, each typed by the checker
+    values: Vec<Target>,
+    /// Function and method declarations, each found by its name
+    functions: Vec<Target>,
+    /// Module specifiers of imports and exports
+    modules: Vec<Target>,
+}
+
+/// Collects every target under `node`
+fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Targets) {
+    let kind = node.kind();
+
+    if TYPED_KINDS.contains(&kind)
+        && let Some(target) = Target::new(node, node)
+    {
+        targets.values.push(target);
+    }
+    if FUNCTION_KINDS.contains(&kind)
+        && let Some(name) = node.child_by_field_name("name")
+        && let Some(target) = Target::new(node, &name)
+    {
+        targets.functions.push(target);
+    }
+    if MODULE_REFERENCE_KINDS.contains(&kind)
+        && let Some(source) = node.child_by_field_name("source")
+        && let Some(target) = Target::new(&source, &source)
+    {
+        targets.modules.push(target);
     }
 
     for child in node.named_children() {
@@ -325,6 +426,7 @@ mod tests {
         fn assert_send<T: Send>() {}
         assert_send::<TypeScriptDecorationProvider>();
         assert_send::<Target>();
+        assert_send::<Targets>();
         assert_send::<ConfigHost>();
     }
 
@@ -333,6 +435,7 @@ mod tests {
         fn assert_sync<T: Sync>() {}
         assert_sync::<TypeScriptDecorationProvider>();
         assert_sync::<Target>();
+        assert_sync::<Targets>();
         assert_sync::<ConfigHost>();
     }
 
@@ -341,6 +444,7 @@ mod tests {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<TypeScriptDecorationProvider>();
         assert_unpin::<Target>();
+        assert_unpin::<Targets>();
         assert_unpin::<ConfigHost>();
     }
 }
