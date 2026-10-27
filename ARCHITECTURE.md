@@ -356,6 +356,14 @@ before 1.0: a plugin loads only on the whisker it was built for, and
 every change to the boundary costs one minor. From 1.0 the major carries
 the promise, and a plugin built for any minor of it keeps loading.
 
+`crates/whisker-plugin/abi-surface.toml` records the version and both
+fingerprints, and a test in whisker-plugin fails when the record and the
+code differ. A change to the boundary therefore changes the record, and
+`just check-abi` compares the record with the one on `main`. A moved
+fingerprint with the same version fails the check. From 1.0, a moved
+fingerprint with the same major fails it too, because a fingerprinted type
+that changed refuses every older plugin.
+
 The tag a publisher names an archive with carries the floor of that
 range rather than the version, for the same reason. Two whiskers that
 read the same protocols accept each other's archives, so from 1.0 a
