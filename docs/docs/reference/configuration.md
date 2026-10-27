@@ -109,7 +109,7 @@ enable = ["lint.doc-summary-break"]
 
 #### disable
 
-To disable only specific rules in a lint, add an `enable` property to the
+To disable only specific rules in a lint, add a `disable` property to the
 `[rules]` section. Learn more in [Adopt rules gradually][adopt-rules-gradually].
 
 ```toml
