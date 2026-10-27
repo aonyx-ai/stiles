@@ -58,7 +58,11 @@ pub(crate) fn resolved_type(
             written_alias(checker, get_type_annotation_node(declaration)?)
         });
 
-    ResolvedType::new(&display, alias, primitive(ty))
+    ResolvedType::builder()
+        .display(&display)
+        .maybe_alias(alias)
+        .primitive(primitive(ty))
+        .build()
 }
 
 /// Returns the alias an annotation names, if it names one
@@ -150,16 +154,25 @@ pub(crate) fn fn_signature(checker: &mut Checker, declaration: P<Node>) -> Optio
     for &parameter in signature.parameters() {
         let ty = checker.get_type_of_symbol_exported(parameter);
         let ty = resolved_type(checker, ty, parameter.value_declaration());
-        parameters.push(Parameter::new(parameter.name(), ty));
+        parameters.push(Parameter::builder().name(parameter.name()).ty(ty).build());
     }
 
     let returned = checker.get_return_type_of_signature_exported(signature);
     let alias = get_type_annotation_node(declaration)
         .and_then(|annotation| written_alias(checker, annotation));
     let display = checker.type_to_string_exported(returned);
-    let return_type = ResolvedType::new(&display, alias, primitive(returned));
+    let return_type = ResolvedType::builder()
+        .display(&display)
+        .maybe_alias(alias)
+        .primitive(primitive(returned))
+        .build();
 
-    Some(FnSignature::new(parameters, return_type))
+    Some(
+        FnSignature::builder()
+            .parameters(parameters)
+            .return_type(return_type)
+            .build(),
+    )
 }
 
 /// Returns where the module that `specifier`, a string literal, names comes from

@@ -212,21 +212,21 @@ mod tests {
     /// These build real tags, so a change to how whisker spells one
     /// reaches these paths too.
     fn tag(types: u64, target: &str) -> AbiTag {
-        AbiTag::new(
-            &AbiIdentity {
+        AbiTag::builder()
+            .identity(&AbiIdentity {
                 abi_version: AbiVersion { major: 0, minor: 1 },
                 types_fingerprint: types,
                 language_fingerprint: 0,
-            },
-            target,
-        )
+            })
+            .target(target)
+            .build()
     }
 
     fn source(url: &str) -> GitLintSource {
-        GitLintSource::new(
-            GitUrl::new(url).expect("the remote should be accepted"),
-            GitRev::new(REV).expect("the revision should be accepted"),
-        )
+        GitLintSource::builder()
+            .url(GitUrl::new(url).expect("the remote should be accepted"))
+            .rev(GitRev::new(REV).expect("the revision should be accepted"))
+            .build()
     }
 
     #[test]
@@ -257,17 +257,23 @@ mod tests {
     fn checkout_directory_in_keeps_one_remote_in_one_place() {
         let first = checkout_directory_in(
             Path::new(ROOT),
-            &GitLintSource::new(
-                GitUrl::new("https://example.com/rules").expect("the remote should be accepted"),
-                GitRev::new("a".repeat(40)).expect("the revision should be accepted"),
-            ),
+            &GitLintSource::builder()
+                .url(
+                    GitUrl::new("https://example.com/rules")
+                        .expect("the remote should be accepted"),
+                )
+                .rev(GitRev::new("a".repeat(40)).expect("the revision should be accepted"))
+                .build(),
         );
         let second = checkout_directory_in(
             Path::new(ROOT),
-            &GitLintSource::new(
-                GitUrl::new("https://example.com/rules").expect("the remote should be accepted"),
-                GitRev::new("b".repeat(40)).expect("the revision should be accepted"),
-            ),
+            &GitLintSource::builder()
+                .url(
+                    GitUrl::new("https://example.com/rules")
+                        .expect("the remote should be accepted"),
+                )
+                .rev(GitRev::new("b".repeat(40)).expect("the revision should be accepted"))
+                .build(),
         );
 
         assert_eq!(first.parent(), second.parent());

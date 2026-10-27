@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::Context as _;
+use bon::Builder;
 use kawauso_project::project::ProjectRoot;
 use kawauso_project::search::Marker;
 use kawauso_project::{Project, Search};
@@ -43,57 +44,30 @@ const REPOSITORY_MARKER: &str = ".git";
 /// it is in. The file holds the [`IgnorePattern`]s that exclude files from
 /// discovery and the [`LintSource`]s of the project's custom lints. Both
 /// anchor at the project directory, which [`WhiskerConfig::root`] returns.
-#[derive(Clone, Eq, PartialEq, Debug)]
+///
+/// # Examples
+///
+/// ```ignore
+/// let config = WhiskerConfig::builder()
+///     .root(ProjectRoot::new(PathBuf::from("/src/project")))
+///     .ignore(vec![IgnorePattern::new("examples/")])
+///     .build();
+/// ```
+#[derive(Clone, Eq, PartialEq, Debug, Builder)]
 pub struct WhiskerConfig {
     root: ProjectRoot,
+    #[builder(default)]
     ignore: Vec<IgnorePattern>,
+    #[builder(default)]
     lints: Vec<LintSource>,
+    #[builder(default = RuleFilter::All)]
     rules: RuleFilter,
+    #[builder(default)]
     options: RuleOptions,
     whisker_source: Option<PathBuf>,
 }
 
 impl WhiskerConfig {
-    /// Creates a configuration that anchors its patterns at `root`
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// let config = WhiskerConfig::new(
-    ///     ProjectRoot::new(PathBuf::from("/src/project")),
-    ///     vec![IgnorePattern::new("examples/")],
-    ///     Vec::new(),
-    /// );
-    /// ```
-    pub fn new(root: ProjectRoot, ignore: Vec<IgnorePattern>, lints: Vec<LintSource>) -> Self {
-        Self::with_rules(root, ignore, lints, RuleFilter::All, RuleOptions::default())
-    }
-
-    /// Creates a configuration that runs only the rules `rules` admits,
-    /// each reading the options `options` holds for it
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// let config = WhiskerConfig::with_rules(root, ignore, lints, filter, options);
-    /// ```
-    pub fn with_rules(
-        root: ProjectRoot,
-        ignore: Vec<IgnorePattern>,
-        lints: Vec<LintSource>,
-        rules: RuleFilter,
-        options: RuleOptions,
-    ) -> Self {
-        Self {
-            root,
-            ignore,
-            lints,
-            rules,
-            options,
-            whisker_source: None,
-        }
-    }
-
     /// Returns which of the loaded rules this project runs
     ///
     /// # Examples
@@ -167,7 +141,7 @@ impl WhiskerConfig {
             whisker_source,
         }) = project.configuration()
         else {
-            return Ok(Self::new(root, Vec::new(), Vec::new()));
+            return Ok(Self::builder().root(root).build());
         };
 
         let RulesTable {
@@ -175,7 +149,10 @@ impl WhiskerConfig {
             disable,
             options,
         } = rules.clone();
-        let rules = RuleFilter::new(enable, disable)
+        let rules = RuleFilter::builder()
+            .enable(enable)
+            .disable(disable)
+            .build()
             .with_context(|| format!("failed to read {}", project.configuration_path()))?;
         let options = read_options(options);
 
@@ -307,7 +284,7 @@ struct ConfigTable {
 
 /// The `[rules]` table as written on disk
 ///
-/// Both lists are read, and [`RuleFilter::new`] refuses a file that fills
+/// Both lists are read, and [`RuleFilter::builder`] refuses a file that fills
 /// in both, so the contradiction is reported rather than resolved.
 #[derive(Clone, Eq, PartialEq, Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -389,7 +366,9 @@ impl LintEntry {
                 let url = GitUrl::new(git)?;
                 let rev = GitRev::new(rev)?;
 
-                Ok(LintSource::Git(GitLintSource::new(url, rev)))
+                Ok(LintSource::Git(
+                    GitLintSource::builder().url(url).rev(rev).build(),
+                ))
             }
             (None, Some(_), None) => anyhow::bail!("must define rev with git"),
             (None, None, Some(_)) => anyhow::bail!("must define git with rev"),
@@ -672,10 +651,15 @@ mod tests {
 
         assert_eq!(
             config.lints(),
-            vec![LintSource::Git(GitLintSource::new(
-                GitUrl::new("https://example.com/rules").expect("the remote should be accepted"),
-                GitRev::new(REV).expect("the revision should be accepted"),
-            ))]
+            vec![LintSource::Git(
+                GitLintSource::builder()
+                    .url(
+                        GitUrl::new("https://example.com/rules")
+                            .expect("the remote should be accepted")
+                    )
+                    .rev(GitRev::new(REV).expect("the revision should be accepted"))
+                    .build()
+            )]
         );
     }
 

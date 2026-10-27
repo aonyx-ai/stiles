@@ -1,6 +1,7 @@
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
+use bon::bon;
 use stabby::{string, vec};
 
 use crate::decorations::TypePathRef;
@@ -34,6 +35,7 @@ pub struct TypePath {
     name: string::String,
 }
 
+#[bon]
 impl TypePath {
     /// Creates a path from a crate name, its module segments, and an item name
     ///
@@ -46,6 +48,7 @@ impl TypePath {
     ///
     /// assert_eq!(path.to_string(), "anyhow::Error");
     /// ```
+    #[builder(start_fn = builder)]
     pub fn new<M>(krate: &str, modules: M, name: &str) -> Self
     where
         M: IntoIterator,

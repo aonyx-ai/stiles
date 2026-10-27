@@ -42,6 +42,9 @@ opt-level = 2
 
 [workspace.dependencies]
 anyhow = "1"
+# Generates the builders that name each field at the call site, in place of
+# constructors that take their arguments by position.
+bon = "3"
 codespan-reporting = "0.13"
 # Finds the directory whisker keeps fetched lint sources in. etcetera rather
 # than `dirs` or `directories`, because whisker wants the XDG layout on every

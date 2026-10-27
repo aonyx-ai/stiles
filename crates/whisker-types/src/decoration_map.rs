@@ -34,7 +34,8 @@ impl DecorationMap {
 
     /// Attaches a decoration to the node with the given tree-sitter node ID
     pub fn insert<T: Decoration>(&mut self, node_id: usize, value: T) {
-        self.entries.push(Entry::new(node_id, value));
+        self.entries
+            .push(Entry::builder().node_id(node_id).value(value).build());
         self.sealed.take();
     }
 
@@ -73,7 +74,10 @@ impl DecorationMap {
             order
         });
 
-        DecorationLookup::of(order, &self.entries)
+        DecorationLookup::of()
+            .order(order)
+            .entries(&self.entries)
+            .call()
     }
 }
 

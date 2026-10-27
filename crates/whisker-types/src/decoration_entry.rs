@@ -1,3 +1,4 @@
+use bon::bon;
 use stabby::boxed::Box;
 
 use crate::DecorationKey;
@@ -34,8 +35,10 @@ pub struct Entry {
     value: Erased,
 }
 
+#[bon]
 impl Entry {
     /// Returns the entry that holds `value` for `node_id` under `key`
+    #[builder]
     pub(crate) fn new<T: crate::Decoration>(node_id: usize, value: T) -> Self {
         Self {
             node_id,
@@ -108,7 +111,7 @@ mod tests {
 
     #[test]
     fn read_with_a_mismatched_type_returns_none() {
-        let entry = Entry::new(3, Tag(7));
+        let entry = Entry::builder().node_id(3).value(Tag(7)).build();
 
         let read = entry.read::<Other>();
 
@@ -117,7 +120,7 @@ mod tests {
 
     #[test]
     fn read_with_the_stored_type_returns_the_value() {
-        let entry = Entry::new(3, Tag(7));
+        let entry = Entry::builder().node_id(3).value(Tag(7)).build();
 
         let read = entry.read::<Tag>().expect("the entry should hold a Tag");
 

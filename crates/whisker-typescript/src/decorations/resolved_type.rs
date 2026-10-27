@@ -1,3 +1,4 @@
+use bon::bon;
 use stabby::{option, string};
 use whisker_macros::Decoration;
 
@@ -24,7 +25,11 @@ use crate::decorations::Primitive;
 /// ```
 /// use whisker_typescript::decorations::{Primitive, ResolvedType};
 ///
-/// let ty = ResolvedType::new("string", Some("Greeting"), Primitive::String);
+/// let ty = ResolvedType::builder()
+///     .display("string")
+///     .alias("Greeting")
+///     .primitive(Primitive::String)
+///     .build();
 ///
 /// assert_eq!(ty.alias(), Some("Greeting"));
 /// assert_eq!(ty.primitive(), Primitive::String);
@@ -38,6 +43,7 @@ pub struct ResolvedType {
     primitive: Primitive,
 }
 
+#[bon]
 impl ResolvedType {
     /// Describes a type by its rendering, its written alias, and its primitive
     ///
@@ -46,10 +52,14 @@ impl ResolvedType {
     /// ```
     /// use whisker_typescript::decorations::{Primitive, ResolvedType};
     ///
-    /// let ty = ResolvedType::new("number", None, Primitive::Number);
+    /// let ty = ResolvedType::builder()
+    ///     .display("number")
+    ///     .primitive(Primitive::Number)
+    ///     .build();
     ///
     /// assert_eq!(ty.display(), "number");
     /// ```
+    #[builder]
     pub fn new(display: &str, alias: Option<&str>, primitive: Primitive) -> Self {
         Self {
             display: string::String::from(display),
@@ -65,7 +75,11 @@ impl ResolvedType {
     /// ```
     /// use whisker_typescript::decorations::{Primitive, ResolvedType};
     ///
-    /// let ty = ResolvedType::new("string", Some("Name"), Primitive::String);
+    /// let ty = ResolvedType::builder()
+    ///     .display("string")
+    ///     .alias("Name")
+    ///     .primitive(Primitive::String)
+    ///     .build();
     ///
     /// assert_eq!(ty.display(), "string");
     /// ```
@@ -80,7 +94,11 @@ impl ResolvedType {
     /// ```
     /// use whisker_typescript::decorations::{Primitive, ResolvedType};
     ///
-    /// let ty = ResolvedType::new("string", Some("Name"), Primitive::String);
+    /// let ty = ResolvedType::builder()
+    ///     .display("string")
+    ///     .alias("Name")
+    ///     .primitive(Primitive::String)
+    ///     .build();
     ///
     /// assert_eq!(ty.alias(), Some("Name"));
     /// ```
@@ -95,7 +113,10 @@ impl ResolvedType {
     /// ```
     /// use whisker_typescript::decorations::{Primitive, ResolvedType};
     ///
-    /// let ty = ResolvedType::new("{ a: number }", None, Primitive::NotPrimitive);
+    /// let ty = ResolvedType::builder()
+    ///     .display("{ a: number }")
+    ///     .primitive(Primitive::NotPrimitive)
+    ///     .build();
     ///
     /// assert_eq!(ty.primitive(), Primitive::NotPrimitive);
     /// ```
@@ -110,7 +131,10 @@ mod tests {
 
     #[test]
     fn alias_without_one_returns_none() {
-        let ty = ResolvedType::new("string", None, Primitive::String);
+        let ty = ResolvedType::builder()
+            .display("string")
+            .primitive(Primitive::String)
+            .build();
 
         let alias = ty.alias();
 
@@ -118,8 +142,12 @@ mod tests {
     }
 
     #[test]
-    fn new_keeps_every_field() {
-        let ty = ResolvedType::new("string", Some("Greeting"), Primitive::String);
+    fn builder_keeps_every_field() {
+        let ty = ResolvedType::builder()
+            .display("string")
+            .alias("Greeting")
+            .primitive(Primitive::String)
+            .build();
 
         let fields = (ty.display(), ty.alias(), ty.primitive());
 

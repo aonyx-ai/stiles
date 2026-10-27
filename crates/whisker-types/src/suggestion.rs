@@ -1,3 +1,4 @@
+use bon::bon;
 use stabby::string;
 
 use crate::Span;
@@ -19,9 +20,15 @@ pub struct Suggestion {
     message: string::String,
 }
 
+#[bon]
 impl Suggestion {
     /// Creates a suggestion to replace the text at `span` with `replacement`
-    pub fn new(span: Span, replacement: String, message: String) -> Self {
+    #[builder(start_fn = builder)]
+    pub fn new(
+        span: Span,
+        #[builder(into)] replacement: String,
+        #[builder(into)] message: String,
+    ) -> Self {
         Self {
             span,
             replacement: string::String::from(replacement.as_str()),

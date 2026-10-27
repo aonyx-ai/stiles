@@ -1,3 +1,4 @@
+use bon::bon;
 use stabby::{string, vec};
 
 use crate::{Location, RuleId, Severity, Span, Suggestion};
@@ -29,9 +30,16 @@ pub struct Diagnostic {
     severity: Severity,
 }
 
+#[bon]
 impl Diagnostic {
     /// Creates a new diagnostic with the required fields
-    pub fn new(rule_id: RuleId, severity: Severity, message: String, span: Span) -> Self {
+    #[builder(start_fn = builder)]
+    pub fn new(
+        rule_id: RuleId,
+        severity: Severity,
+        #[builder(into)] message: String,
+        span: Span,
+    ) -> Self {
         Self {
             rule_id,
             message: string::String::from(message.as_str()),

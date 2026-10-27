@@ -1,3 +1,4 @@
+use bon::bon;
 use whisker_types::Diagnostic;
 
 use super::failure_threshold::FailureThreshold;
@@ -14,11 +15,13 @@ pub(crate) enum CheckOutcome {
     Failure,
 }
 
+#[bon]
 impl CheckOutcome {
     /// Returns the outcome a set of diagnostics implies
     ///
     /// [`FailureThreshold::promote`] does not change the result, because
     /// promotion only raises diagnostics that already meet the threshold.
+    #[builder]
     pub(crate) fn from_diagnostics(
         diagnostics: &[Diagnostic],
         threshold: FailureThreshold,
@@ -105,7 +108,10 @@ mod tests {
     fn from_diagnostics_with_error_and_errors_returns_failure() {
         let diagnostics = [test_diagnostic(Severity::Error)];
 
-        let outcome = CheckOutcome::from_diagnostics(&diagnostics, FailureThreshold::Errors);
+        let outcome = CheckOutcome::from_diagnostics()
+            .diagnostics(&diagnostics)
+            .threshold(FailureThreshold::Errors)
+            .call();
 
         assert_eq!(outcome, CheckOutcome::Failure);
     }
@@ -114,7 +120,10 @@ mod tests {
     fn from_diagnostics_with_error_and_warnings_returns_failure() {
         let diagnostics = [test_diagnostic(Severity::Error)];
 
-        let outcome = CheckOutcome::from_diagnostics(&diagnostics, FailureThreshold::Warnings);
+        let outcome = CheckOutcome::from_diagnostics()
+            .diagnostics(&diagnostics)
+            .threshold(FailureThreshold::Warnings)
+            .call();
 
         assert_eq!(outcome, CheckOutcome::Failure);
     }
@@ -126,8 +135,14 @@ mod tests {
             test_diagnostic(Severity::Info),
         ];
 
-        let lenient = CheckOutcome::from_diagnostics(&diagnostics, FailureThreshold::Errors);
-        let strict = CheckOutcome::from_diagnostics(&diagnostics, FailureThreshold::Warnings);
+        let lenient = CheckOutcome::from_diagnostics()
+            .diagnostics(&diagnostics)
+            .threshold(FailureThreshold::Errors)
+            .call();
+        let strict = CheckOutcome::from_diagnostics()
+            .diagnostics(&diagnostics)
+            .threshold(FailureThreshold::Warnings)
+            .call();
 
         assert_eq!(lenient, CheckOutcome::Success);
         assert_eq!(strict, CheckOutcome::Success);
@@ -141,15 +156,24 @@ mod tests {
             test_diagnostic(Severity::Error),
         ];
 
-        let outcome = CheckOutcome::from_diagnostics(&diagnostics, FailureThreshold::Errors);
+        let outcome = CheckOutcome::from_diagnostics()
+            .diagnostics(&diagnostics)
+            .threshold(FailureThreshold::Errors)
+            .call();
 
         assert_eq!(outcome, CheckOutcome::Failure);
     }
 
     #[test]
     fn from_diagnostics_with_no_diagnostics_returns_success() {
-        let lenient = CheckOutcome::from_diagnostics(&[], FailureThreshold::Errors);
-        let strict = CheckOutcome::from_diagnostics(&[], FailureThreshold::Warnings);
+        let lenient = CheckOutcome::from_diagnostics()
+            .diagnostics(&[])
+            .threshold(FailureThreshold::Errors)
+            .call();
+        let strict = CheckOutcome::from_diagnostics()
+            .diagnostics(&[])
+            .threshold(FailureThreshold::Warnings)
+            .call();
 
         assert_eq!(lenient, CheckOutcome::Success);
         assert_eq!(strict, CheckOutcome::Success);
@@ -162,7 +186,10 @@ mod tests {
             .map(|diagnostic| FailureThreshold::Warnings.promote(diagnostic))
             .collect();
 
-        let outcome = CheckOutcome::from_diagnostics(&diagnostics, FailureThreshold::Warnings);
+        let outcome = CheckOutcome::from_diagnostics()
+            .diagnostics(&diagnostics)
+            .threshold(FailureThreshold::Warnings)
+            .call();
 
         assert_eq!(outcome, CheckOutcome::Failure);
     }
@@ -171,7 +198,10 @@ mod tests {
     fn from_diagnostics_with_warning_and_errors_returns_success() {
         let diagnostics = [test_diagnostic(Severity::Warn)];
 
-        let outcome = CheckOutcome::from_diagnostics(&diagnostics, FailureThreshold::Errors);
+        let outcome = CheckOutcome::from_diagnostics()
+            .diagnostics(&diagnostics)
+            .threshold(FailureThreshold::Errors)
+            .call();
 
         assert_eq!(outcome, CheckOutcome::Success);
     }
@@ -180,7 +210,10 @@ mod tests {
     fn from_diagnostics_with_warning_and_warnings_returns_failure() {
         let diagnostics = [test_diagnostic(Severity::Warn)];
 
-        let outcome = CheckOutcome::from_diagnostics(&diagnostics, FailureThreshold::Warnings);
+        let outcome = CheckOutcome::from_diagnostics()
+            .diagnostics(&diagnostics)
+            .threshold(FailureThreshold::Warnings)
+            .call();
 
         assert_eq!(outcome, CheckOutcome::Failure);
     }

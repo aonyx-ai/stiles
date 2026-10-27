@@ -1,3 +1,4 @@
+use bon::bon;
 use stabby::string;
 
 use crate::Span;
@@ -19,9 +20,11 @@ pub struct Location {
     message: string::String,
 }
 
+#[bon]
 impl Location {
     /// Creates a location with the given span and descriptive message
-    pub fn new(span: Span, message: String) -> Self {
+    #[builder(start_fn = builder)]
+    pub fn new(span: Span, #[builder(into)] message: String) -> Self {
         Self {
             span,
             message: string::String::from(message.as_str()),

@@ -1,5 +1,6 @@
 use std::fmt;
 
+use bon::bon;
 use gix::url::Scheme;
 
 use crate::config::GitUrl;
@@ -18,6 +19,7 @@ pub struct GitHubRepository {
     name: String,
 }
 
+#[bon]
 impl GitHubRepository {
     /// Returns the repository `url` names, if an API here serves it
     ///
@@ -29,6 +31,7 @@ impl GitHubRepository {
     /// A remote whisker cannot spell as an owner and a repository is not
     /// one of these. Neither is a local path, because `file://` serves no
     /// releases.
+    #[builder]
     pub fn from_url(url: &GitUrl, api_host: Option<&str>) -> Option<Self> {
         let url = url.to_gix_url();
 
@@ -84,7 +87,7 @@ mod tests {
     fn repository(url: &str) -> Option<GitHubRepository> {
         let url = GitUrl::new(url).expect("the remote should be accepted");
 
-        GitHubRepository::from_url(&url, None)
+        GitHubRepository::from_url().url(&url).call()
     }
 
     #[test]
@@ -166,7 +169,10 @@ mod tests {
         let url = GitUrl::new("https://github.acme.example/team/rules")
             .expect("the remote should be accepted");
 
-        let repository = GitHubRepository::from_url(&url, Some("github.acme.example"));
+        let repository = GitHubRepository::from_url()
+            .url(&url)
+            .api_host("github.acme.example")
+            .call();
 
         assert_eq!(
             repository.map(|it| it.to_string()),

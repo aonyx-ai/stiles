@@ -1,6 +1,7 @@
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
+use bon::bon;
 use stabby::{string, vec};
 
 /// A path through which another crate can name an item
@@ -39,6 +40,7 @@ pub struct PublicPath {
     segments: vec::Vec<string::String>,
 }
 
+#[bon]
 impl PublicPath {
     /// Creates a path from a crate name and the segments that follow it
     ///
@@ -53,6 +55,7 @@ impl PublicPath {
     ///
     /// assert_eq!(path.to_string(), "facade::Shape::Circle");
     /// ```
+    #[builder(start_fn = builder)]
     pub fn new<S>(krate: &str, segments: S) -> Self
     where
         S: IntoIterator,

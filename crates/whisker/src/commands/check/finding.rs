@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::slice;
 use std::sync::Arc;
 
+use bon::bon;
 use serde::Serialize;
 use whisker_types::{Diagnostic, Severity};
 
@@ -32,6 +33,7 @@ pub(crate) struct Finding {
     rendered: String,
 }
 
+#[bon]
 impl Finding {
     /// Describes `diagnostic`, reading its position from `sources`
     ///
@@ -42,6 +44,7 @@ impl Finding {
     /// # Errors
     ///
     /// Returns an error if the diagnostic cannot be rendered.
+    #[builder]
     pub(crate) fn new(
         diagnostic: &Diagnostic,
         sources: &HashMap<Arc<Path>, String>,
@@ -122,7 +125,11 @@ mod tests {
             Span::new(PathBuf::from("src/lib.rs"), start, end),
         );
 
-        Finding::new(&diagnostic, &sources).expect("should render")
+        Finding::builder()
+            .diagnostic(&diagnostic)
+            .sources(&sources)
+            .build()
+            .expect("should render")
     }
 
     #[test]
@@ -175,7 +182,11 @@ mod tests {
             Span::new(PathBuf::from("other.rs"), 5, 6),
         );
 
-        let finding = Finding::new(&diagnostic, &sources).expect("should render");
+        let finding = Finding::builder()
+            .diagnostic(&diagnostic)
+            .sources(&sources)
+            .build()
+            .expect("should render");
 
         assert_eq!((finding.line, finding.column), (1, 1));
     }

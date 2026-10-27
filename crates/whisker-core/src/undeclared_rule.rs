@@ -1,5 +1,6 @@
 use std::fmt;
 
+use bon::Builder;
 use whisker_types::{RuleId, Span};
 
 /// A lint pass reported a rule its plugin did not declare for it
@@ -17,18 +18,18 @@ use whisker_types::{RuleId, Span};
 /// use whisker_core::UndeclaredRule;
 /// use whisker_types::{RuleId, Span};
 ///
-/// let error = UndeclaredRule::new(
-///     RuleId::new("lint.bar"),
-///     vec![RuleId::new("lint.foo")],
-///     Span::new("src/lib.rs", 3, 9),
-/// );
+/// let error = UndeclaredRule::builder()
+///     .rule(RuleId::new("lint.bar"))
+///     .declared(vec![RuleId::new("lint.foo")])
+///     .span(Span::new("src/lib.rs", 3, 9))
+///     .build();
 ///
 /// assert_eq!(
 ///     error.to_string(),
 ///     "a lint pass reported `lint.bar` at byte 3 of src/lib.rs, but its plugin declares only `lint.foo` for it"
 /// );
 /// ```
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Builder)]
 pub struct UndeclaredRule {
     rule: RuleId,
     declared: Vec<RuleId>,
@@ -36,26 +37,6 @@ pub struct UndeclaredRule {
 }
 
 impl UndeclaredRule {
-    /// Records that a pass declaring `declared` reported `rule` at `span`
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use whisker_core::UndeclaredRule;
-    /// use whisker_types::{RuleId, Span};
-    ///
-    /// let error = UndeclaredRule::new(RuleId::new("lint.bar"), Vec::new(), Span::new("a.rs", 0, 1));
-    ///
-    /// assert_eq!(error.rule(), RuleId::new("lint.bar"));
-    /// ```
-    pub fn new(rule: RuleId, declared: Vec<RuleId>, span: Span) -> Self {
-        Self {
-            rule,
-            declared,
-            span,
-        }
-    }
-
     /// Returns the rule the pass reported
     ///
     /// # Examples
@@ -64,7 +45,11 @@ impl UndeclaredRule {
     /// use whisker_core::UndeclaredRule;
     /// use whisker_types::{RuleId, Span};
     ///
-    /// let error = UndeclaredRule::new(RuleId::new("lint.bar"), Vec::new(), Span::new("a.rs", 0, 1));
+    /// let error = UndeclaredRule::builder()
+    ///     .rule(RuleId::new("lint.bar"))
+    ///     .declared(Vec::new())
+    ///     .span(Span::new("a.rs", 0, 1))
+    ///     .build();
     ///
     /// assert_eq!(error.rule(), RuleId::new("lint.bar"));
     /// ```
@@ -80,7 +65,11 @@ impl UndeclaredRule {
     /// use whisker_core::UndeclaredRule;
     /// use whisker_types::{RuleId, Span};
     ///
-    /// let error = UndeclaredRule::new(RuleId::new("lint.bar"), Vec::new(), Span::new("a.rs", 0, 1));
+    /// let error = UndeclaredRule::builder()
+    ///     .rule(RuleId::new("lint.bar"))
+    ///     .declared(Vec::new())
+    ///     .span(Span::new("a.rs", 0, 1))
+    ///     .build();
     ///
     /// assert_eq!(error.span().start(), 0);
     /// ```
@@ -117,8 +106,11 @@ mod tests {
 
     #[test]
     fn display_with_no_declared_rules_says_so() {
-        let error =
-            UndeclaredRule::new(RuleId::new("lint.bar"), Vec::new(), Span::new("a.rs", 0, 1));
+        let error = UndeclaredRule::builder()
+            .rule(RuleId::new("lint.bar"))
+            .declared(Vec::new())
+            .span(Span::new("a.rs", 0, 1))
+            .build();
 
         let message = error.to_string();
 
@@ -127,11 +119,11 @@ mod tests {
 
     #[test]
     fn display_with_two_declared_rules_names_both() {
-        let error = UndeclaredRule::new(
-            RuleId::new("lint.bar"),
-            vec![RuleId::new("lint.foo"), RuleId::new("lint.baz")],
-            Span::new("a.rs", 0, 1),
-        );
+        let error = UndeclaredRule::builder()
+            .rule(RuleId::new("lint.bar"))
+            .declared(vec![RuleId::new("lint.foo"), RuleId::new("lint.baz")])
+            .span(Span::new("a.rs", 0, 1))
+            .build();
 
         let message = error.to_string();
 

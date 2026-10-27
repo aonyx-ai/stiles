@@ -1,5 +1,7 @@
 use std::fmt;
 
+use bon::bon;
+
 use crate::config::GitRev;
 use crate::custom_lints::AbiTag;
 
@@ -22,15 +24,20 @@ const SIDECAR: &str = ".sha256";
 /// # Examples
 ///
 /// ```ignore
-/// let name = AssetName::new(source.rev(), &AbiTag::host());
+/// let name = AssetName::builder()
+///     .rev(source.rev())
+///     .tag(&AbiTag::host())
+///     .build();
 ///
 /// println!("looking for {name} and {}", name.sidecar());
 /// ```
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct AssetName(String);
 
+#[bon]
 impl AssetName {
     /// Returns the name of the archive holding `rev` built for `tag`
+    #[builder]
     pub fn new(rev: &GitRev, tag: &AbiTag) -> Self {
         Self(format!("{rev}-{tag}{EXTENSION}"))
     }
@@ -62,21 +69,21 @@ mod tests {
     const REV: &str = "0123456789abcdef0123456789abcdef01234567";
 
     fn tag() -> AbiTag {
-        AbiTag::new(
-            &AbiIdentity {
+        AbiTag::builder()
+            .identity(&AbiIdentity {
                 abi_version: AbiVersion { major: 0, minor: 1 },
                 types_fingerprint: 0,
                 language_fingerprint: 0,
-            },
-            "aarch64-apple-darwin",
-        )
+            })
+            .target("aarch64-apple-darwin")
+            .build()
     }
 
     fn name() -> AssetName {
-        AssetName::new(
-            &GitRev::new(REV).expect("the revision should be accepted"),
-            &tag(),
-        )
+        AssetName::builder()
+            .rev(&GitRev::new(REV).expect("the revision should be accepted"))
+            .tag(&tag())
+            .build()
     }
 
     #[test]
