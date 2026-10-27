@@ -13,9 +13,12 @@ publish = false
 default = ["provider"]
 provider = [
   "dep:anyhow",
+  "dep:tsrs_ast",
   "dep:tsrs_astnav",
+  "dep:tsrs_checker",
   "dep:tsrs_compiler",
   "dep:tsrs_core",
+  "dep:tsrs_module",
   "dep:tsrs_tsoptions",
   "dep:tsrs_vfs",
 ]
@@ -25,9 +28,12 @@ anyhow = { workspace = true, optional = true }
 stabby.workspace = true
 tree-sitter.workspace = true
 tree-sitter-typescript.workspace = true
+tsrs_ast = { workspace = true, optional = true }
 tsrs_astnav = { workspace = true, optional = true }
+tsrs_checker = { workspace = true, optional = true }
 tsrs_compiler = { workspace = true, optional = true }
 tsrs_core = { workspace = true, optional = true }
+tsrs_module = { workspace = true, optional = true }
 tsrs_tsoptions = { workspace = true, optional = true }
 tsrs_vfs = { workspace = true, optional = true }
 whisker-macros.workspace = true

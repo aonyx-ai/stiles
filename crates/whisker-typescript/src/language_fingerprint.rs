@@ -1,7 +1,9 @@
 use stabby::IStable;
 use whisker_types::plugin::stable_fingerprint;
 
-use crate::decorations::TypeText;
+use crate::decorations::{
+    FnSignature, ImportSource, Parameter, Primitive, ResolvedType, StringUnion, TypeText,
+};
 
 include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 
@@ -33,8 +35,16 @@ include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 /// ```
 ///
 /// [`Decoration`]: whisker_types::Decoration
-pub const LANGUAGE_FINGERPRINT: u64 =
-    stable_fingerprint(&[VISITOR_FINGERPRINT, <TypeText as IStable>::ID]);
+pub const LANGUAGE_FINGERPRINT: u64 = stable_fingerprint(&[
+    VISITOR_FINGERPRINT,
+    <TypeText as IStable>::ID,
+    <ResolvedType as IStable>::ID,
+    <Primitive as IStable>::ID,
+    <FnSignature as IStable>::ID,
+    <Parameter as IStable>::ID,
+    <ImportSource as IStable>::ID,
+    <StringUnion as IStable>::ID,
+]);
 
 #[cfg(test)]
 mod tests {

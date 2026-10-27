@@ -20,6 +20,8 @@ pub mod decorations;
 mod language_fingerprint;
 #[cfg(feature = "provider")]
 mod provider;
+#[cfg(feature = "provider")]
+mod queries;
 
 pub use adapter::TypeScriptLintPassAdapter;
 pub use language_fingerprint::LANGUAGE_FINGERPRINT;
