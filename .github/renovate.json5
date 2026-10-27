@@ -11,8 +11,9 @@
       // The tsrs crates come from one repository at one commit, and they
       // build only together. Renovate otherwise opens one pull request per
       // crate, and each one moves a single crate to a commit the others are
-      // not at, so none of them builds.
-      matchPackageNames: ["/^tsrs_/"],
+      // not at, so none of them builds. A git dependency's package name is
+      // its repository URL, so the rule matches the crate names instead.
+      matchDepNames: ["/^tsrs_/"],
       groupName: "tsrs",
     },
   ],
