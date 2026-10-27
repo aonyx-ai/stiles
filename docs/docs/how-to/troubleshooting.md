@@ -15,23 +15,21 @@ resolve it.
 
 ## plugin (ABI x.y) incompatible with whisker (ABI x.y)
 
-Whisker rules are built against a specific version of the Whisker ABI.
-Sometimes, we make backwards-incompatible changes to the Whisker ABI. When the
-plugin's ABI version is below Whisker's ABI version, it's trying to use Whisker
-features from a newer Whisker version.
+Whisker rules are built against a specific version of the Whisker ABI, and the
+plugin was built against another one. A plugin with a lower ABI version needs a
+rebuild against your Whisker. A plugin with a higher one needs a newer Whisker.
 
 To resolve this, you have two options:
 
-1. Upgrade your Whisker installation to a version that supports the required ABI
-   version for your plugin; or
-2. Downgrade your plugin to a version that was built against an ABI version that
-   your installed Whisker supports.
+1. Move your rules pin to a commit built against your Whisker; or
+2. Upgrade or downgrade your Whisker installation to the version the plugin was
+   built for.
 
 :::note
 
-While Whisker is still in pre-1.0 development, the ABI version may change in
-backwards-incompatible ways without increment the major version. This means ABI
-version `0.2` may be incompatible with ABI version `0.1`.
+While Whisker is still in pre-1.0 development, every change to the ABI raises
+its minor version, and Whisker loads only plugins built for its exact version.
+This means ABI version `0.3` is incompatible with ABI version `0.2`.
 
 :::
 
@@ -63,6 +61,35 @@ A rule threw an error when checking a specific file.
 Report this issue to the rule author, where possible together with the code that
 caused the issue. You can try downgrading to a version of the rule that works,
 or temporarily disable the rule altogether.
+
+## two lints declare `RULE` for LANGUAGE: one in LIBRARY, one in LIBRARY
+
+Two loaded lints report the same rule on the same language. Whisker turns rules
+on and off, and hands them options, by their ID, so one ID must name one lint
+per language. The cause is usually a rule copied from another and renamed in one
+place only, or two rule repositories that chose the same ID.
+
+If both lints are yours, rename the rule in one of them. If they come from two
+rule repositories, remove one of them from your configuration and tell the
+authors.
+
+## the plugin exported a lint that declares no rules
+
+A lint must name the rules it reports. Whisker refuses every diagnostic under a
+rule the lint did not declare, so a lint that declares none could never report
+anything.
+
+Report this to the rule author. If the lint is yours, implement `DeclaresRules`
+for it and return the IDs it reports.
+
+## a lint pass reported `RULE` ..., but its plugin declares only RULES
+
+A rule reported a diagnostic under an ID it did not declare. Whisker could not
+turn that diagnostic off or hand it options, so it stops instead. The cause is
+usually an ID that changed in one place but not the other.
+
+Report this to the rule author. If the lint is yours, make its `DeclaresRules`
+implementation return every ID it reports.
 
 ## cannot update the lock file ... because --locked was passed
 

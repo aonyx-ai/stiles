@@ -69,6 +69,10 @@ and this project adheres to
 
 ### Changed
 
+- A TypeScript file with no `tsconfig.json` at or above it no longer stops the
+  whole check. It reports a coverage gap of its own, like any file whisker
+  cannot analyze, and the run goes on under `--keep-going`.
+
 - `whisker check` writes its diagnostics and `help:` lines to stdout. Errors
   stay on stderr. A script that read the report from stderr reads stdout
   now, and with `--json` stdout holds nothing but JSON.

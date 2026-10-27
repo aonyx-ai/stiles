@@ -34,12 +34,15 @@ disable = ["lint.no-inline-comments"]
 
 ## Find a rule's name
 
-To enable and disable rules, you need to know the rule's ID. Currently, we
-recommend rule authors to list the IDs in their documentation. There is no way
-to list rules through the Whisker CLI yet.
+To enable and disable rules, you need to know the rule's ID. Run this in your
+project to list the rules your configured lints declare:
 
-Alternatively, you can look through the rule's source code for a line like
-`RuleId::new("lint.doc-summary-break")`.
+```bash
+whisker rules
+```
+
+Each line names a rule and the languages it runs on, and ends in `off` when
+your `[rules]` turn it off.
 
 ## Fine-grained control
 
