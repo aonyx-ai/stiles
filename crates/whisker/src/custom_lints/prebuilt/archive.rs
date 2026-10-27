@@ -264,8 +264,9 @@ mod tests {
         path
     }
 
-    /// An archive must not write outside its destination. Such a name
-    /// holds more than one component, so the rule that skips a
+    /// An archive must not write outside its destination
+    ///
+    /// Such a name holds more than one component, so the rule that skips a
     /// subdirectory skips this too.
     #[test]
     fn extract_ignores_an_entry_that_climbs_out() {
@@ -281,7 +282,7 @@ mod tests {
         assert_eq!(names, vec!["kept".to_owned()]);
     }
 
-    /// An archive must not be able to plant a link pointing anywhere.
+    /// An archive must not be able to plant a link pointing anywhere
     #[test]
     fn extract_ignores_a_symbolic_link() {
         let directory = tempfile::tempdir().expect("temporary directory should be created");

@@ -385,7 +385,7 @@ mod tests {
     }
 
     /// An unpack that was interrupted leaves a directory behind, and the
-    /// next run has to be able to replace it rather than fail on it.
+    /// next run has to be able to replace it rather than fail on it
     #[test]
     fn holds_libraries_of_a_missing_directory_is_false() {
         let directory = directory_holding(&[]);

@@ -18,8 +18,9 @@ fn abi_prints_a_digest_and_the_target_triple() {
 }
 
 /// The build script bakes the target into the binary, and it bakes the
-/// same value into this test. The test therefore compares two values and
-/// describes neither.
+/// same value into this test
+///
+/// The test therefore compares two values and describes neither.
 #[test]
 fn abi_names_the_target_the_binary_was_built_for() {
     let mut command = Command::cargo_bin("whisker").expect("whisker binary should exist");

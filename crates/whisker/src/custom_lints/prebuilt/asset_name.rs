@@ -89,8 +89,9 @@ mod tests {
         assert!(name().as_str().starts_with(REV), "{}", name());
     }
 
-    /// The tag holds dashes, and so does the boundary before it. The
-    /// commit separates the two, because its width never varies.
+    /// The tag holds dashes, and so does the boundary before it
+    ///
+    /// The commit separates the two, because its width never varies.
     #[test]
     fn new_names_the_tag_after_the_commit() {
         let name = name();

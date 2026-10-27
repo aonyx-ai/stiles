@@ -292,7 +292,7 @@ mod tests {
     }
 
     /// Two remotes can end in the same segment, and a checkout of one must
-    /// never be served for the other.
+    /// never be served for the other
     #[test]
     fn checkout_directory_in_separates_remotes_that_share_a_last_segment() {
         let first = checkout_directory_in(Path::new(ROOT), &source("https://example.com/a/rules"));
@@ -327,7 +327,7 @@ mod tests {
     }
 
     /// A checkout of a source and the libraries built from it are two
-    /// different things, and one must never be served for the other.
+    /// different things, and one must never be served for the other
     #[test]
     fn prebuilt_directory_in_stays_apart_from_the_checkout() {
         let source = source("https://example.com/rules");
@@ -388,7 +388,7 @@ mod tests {
     }
 
     /// A shell that expands an unset variable leaves an empty string
-    /// behind, and joining onto that would put the cache at the root.
+    /// behind, and joining onto that would put the cache at the root
     #[test]
     fn present_treats_an_empty_value_as_unset() {
         let value = present(Some(OsString::new()));

@@ -1,4 +1,4 @@
-//! Exercises the derived `Decoration` implementations against a real tree.
+//! Exercises the derived `Decoration` implementations against a real tree
 //!
 //! The unit tests in the crate itself check the generated tokens; these check
 //! that the generated code compiles and that a node reads decorations back in

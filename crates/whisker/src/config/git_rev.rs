@@ -130,7 +130,7 @@ mod tests {
     }
 
     /// An uppercase hash is a hash, but accepting it would let one commit
-    /// be written two ways, and the cache is keyed by the text.
+    /// be written two ways, and the cache is keyed by the text
     #[test]
     fn new_with_uppercase_hash_returns_error() {
         let error = GitRev::new(VALID.to_uppercase()).expect_err("the revision should be rejected");

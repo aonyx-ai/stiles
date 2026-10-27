@@ -160,7 +160,7 @@ mod tests {
     }
 
     /// Before 1.0 an older minor is refused, which is the whole
-    /// difference between the two eras.
+    /// difference between the two eras
     #[test]
     fn accepts_an_older_minor_before_one_point_zero_returns_false() {
         let host = AbiVersion { major: 0, minor: 2 };
@@ -209,7 +209,7 @@ mod tests {
     }
 
     /// [`AbiVersion::accepts`] compares versions, so the derived order
-    /// has to weigh the major first.
+    /// has to weigh the major first
     #[test]
     fn ord_compares_the_major_before_the_minor() {
         assert!(AbiVersion { major: 1, minor: 0 } > AbiVersion { major: 0, minor: 9 });

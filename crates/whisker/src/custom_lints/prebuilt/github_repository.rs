@@ -138,7 +138,7 @@ mod tests {
     }
 
     /// A host is not case sensitive, and a person pasting one from a
-    /// browser can capitalize it.
+    /// browser can capitalize it
     #[test]
     fn from_url_accepts_a_host_in_capitals() {
         let repository = repository("https://GitHub.com/aonyx-ai/rules");
@@ -150,7 +150,7 @@ mod tests {
     }
 
     /// Credentials belong to whoever fetches, never to the name of the
-    /// repository they fetch.
+    /// repository they fetch
     #[test]
     fn from_url_ignores_credentials() {
         let repository = repository("https://someone:secret@github.com/aonyx-ai/rules");
