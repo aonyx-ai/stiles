@@ -9,6 +9,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "facade"
+version = "0.1.0"
+dependencies = [
+ "facade_core",
+]
+
+[[package]]
+name = "facade_core"
+version = "0.1.0"
+
+[[package]]
+name = "lookalike"
+version = "0.1.0"
+
+[[package]]
+name = "lookalike_json"
+version = "0.1.0"
+dependencies = [
+ "lookalike",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -31,6 +53,10 @@ name = "sample_project"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "facade",
+ "facade_core",
+ "lookalike",
+ "lookalike_json",
  "syn",
 ]
 

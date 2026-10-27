@@ -37,6 +37,15 @@ and this project adheres to
   language fingerprint, so the plugin ABI moves to 0.4. Rebuild every
   plugin.
 
+- The Rust provider records which other crates expose the item a `use`
+  path imports. Each imported path, including each name in a grouped
+  `use`, gets `Reexports`: one `PublicPath` for each direct dependency,
+  other than the defining crate, that publicly re-exports the item. A rule
+  can now prove that `use facade_core::Thing` has a `facade::Thing`, which
+  two imports side by side never proved. The new type is part of the Rust
+  language fingerprint, so the plugin ABI moves to 0.5. Rebuild every
+  plugin.
+
 - `DecoratedNode` is `Copy`. A rule reading a node out of the vector that
   `named_children` returns no longer clones borrowed data. The
   plugin ABI tag does not move, so every published archive still loads.

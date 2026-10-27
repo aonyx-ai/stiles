@@ -1,7 +1,7 @@
 use stabby::IStable;
 use whisker_types::plugin::stable_fingerprint;
 
-use crate::decorations::{AdtFlags, FnSignature, ImportSource, ResolvedType};
+use crate::decorations::{AdtFlags, FnSignature, ImportSource, Reexports, ResolvedType};
 
 include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 
@@ -42,6 +42,7 @@ pub const LANGUAGE_FINGERPRINT: u64 = stable_fingerprint(&[
     <AdtFlags as IStable>::ID,
     <FnSignature as IStable>::ID,
     <ImportSource as IStable>::ID,
+    <Reexports as IStable>::ID,
     <ResolvedType as IStable>::ID,
 ]);
 
