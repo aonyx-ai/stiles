@@ -230,7 +230,7 @@ impl DecorationProvider for RustDecorationProvider {
     /// nothing, because establishing the module reads whatever sibling
     /// modules the crate declares; a file whose text the load dropped would
     /// already have brought the process down by then, which is why
-    /// [`give_text_to_files_that_have_none`] repairs the database at load
+    /// `give_text_to_files_that_have_none` repairs the database at load
     /// time, so the read here needs no careful ordering.
     ///
     /// # Errors

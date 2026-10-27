@@ -13,7 +13,7 @@ include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 /// Two things on this side shape the boundary. The generated lint pass
 /// trait is one: its methods are named after the grammar's node kinds. A
 /// plugin generated from a different grammar still loads, and its checks
-/// never fire, so [`VISITOR_FINGERPRINT`] hashes the generated source. The decoration types are the other, because a plugin
+/// never fire, so `VISITOR_FINGERPRINT` hashes the generated source. The decoration types are the other, because a plugin
 /// reads them out of a node the host decorated, and reading them at a
 /// layout the host did not write is unsound rather than merely quiet.
 ///
