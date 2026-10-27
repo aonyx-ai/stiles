@@ -43,8 +43,8 @@ const MODULE_REFERENCE_KINDS: [&str; 2] = ["import_statement", "export_statement
 /// The provider loads one TypeScript project through tsrs, a Rust port of
 /// the TypeScript 7 checker, and answers for the files that project's
 /// program holds. It attaches a [`TypeText`] and a [`ResolvedType`] to
-/// each identifier the checker can type, and a [`StringUnion`] when that
-/// type is a union of string literals. A function or method declaration
+/// each identifier the checker can type. An identifier whose type is a union
+/// of string literals also gets a [`StringUnion`]. A function or method declaration
 /// gets an [`FnSignature`], and the module specifier of an import or
 /// export gets an [`ImportSource`].
 ///
@@ -82,8 +82,9 @@ pub struct TypeScriptDecorationProvider {
 impl TypeScriptDecorationProvider {
     /// Identifies this provider in diagnostics
     ///
-    /// A host that reports a gap for a TypeScript file on the provider's
-    /// behalf, such as a file no project holds, names the provider with it.
+    /// A host can report a gap for a TypeScript file on the provider's
+    /// behalf, such as a file no project holds. It names the provider with
+    /// this.
     ///
     /// # Examples
     ///
@@ -321,7 +322,7 @@ impl DecorationProvider for TypeScriptDecorationProvider {
 ///
 /// The range is the node's own for an identifier and a module specifier.
 /// For a function it is the range of the function's name, because tsrs
-/// finds the declaration as the parent of that name, and the decoration
+/// finds the declaration as the parent of that name. The decoration still
 /// goes on the declaration's node.
 struct Target {
     node_id: usize,

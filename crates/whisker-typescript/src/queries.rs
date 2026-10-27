@@ -4,6 +4,8 @@
 //! Each function takes tsrs handles and returns a type from
 //! [`crate::decorations`], so no tsrs type leaves this module.
 
+use std::path::Path;
+
 use tsrs_ast::{Kind, Node, SourceFile, SymbolFlags, get_type_annotation_node};
 use tsrs_checker::{Checker, LiteralValue, Type, TypeFlags};
 use tsrs_compiler::Program;
@@ -36,8 +38,8 @@ const FUNCTION_DECLARATIONS: [Kind; 3] = [
 ///
 /// The alias comes from the type when the checker kept one, as it does for
 /// a union or an object type. An alias of a primitive leaves no trace on
-/// the type, so the alias then comes from the annotation that
-/// `declaration` writes, such as `Name` in `name: Name`.
+/// the type. The alias then comes from the annotation that `declaration`
+/// writes, such as `Name` in `name: Name`.
 pub(crate) fn resolved_type(
     checker: &mut Checker,
     ty: P<Type>,
@@ -173,22 +175,25 @@ pub(crate) fn import_source(
         return ImportSource::Unresolved;
     }
 
-    classify(specifier.text(), resolved.resolved_file_name)
+    classify(specifier.text(), Path::new(resolved.resolved_file_name))
 }
 
 /// Sorts a resolved import by its specifier and the file it resolved to
 ///
 /// A relative specifier is relative whatever it reached. Otherwise a file
 /// under `node_modules` is a dependency. A package specifier that resolved
-/// anywhere else came through a workspace link, which the resolver follows
-/// to the package's real directory, or through a `paths` mapping. Both
-/// mean a package of this repository.
-fn classify(specifier: &str, resolved_file_name: &str) -> ImportSource {
+/// anywhere else came through a workspace link or a `paths` mapping. The
+/// resolver follows a workspace link to the package's real directory.
+/// Either way the package belongs to this repository.
+fn classify(specifier: &str, resolved: &Path) -> ImportSource {
     if is_external_module_name_relative(specifier) {
         return ImportSource::Relative;
     }
 
-    match resolved_file_name.contains("/node_modules/") {
+    let in_node_modules = resolved
+        .components()
+        .any(|component| component.as_os_str() == "node_modules");
+    match in_node_modules {
         true => ImportSource::Dependency,
         false => ImportSource::Workspace,
     }
@@ -200,21 +205,21 @@ mod tests {
 
     #[test]
     fn classify_with_a_package_in_node_modules_returns_dependency() {
-        let source = classify("lodash", "/repo/node_modules/lodash/index.d.ts");
+        let source = classify("lodash", Path::new("/repo/node_modules/lodash/index.d.ts"));
 
         assert_eq!(source, ImportSource::Dependency);
     }
 
     #[test]
     fn classify_with_a_package_outside_node_modules_returns_workspace() {
-        let source = classify("@aonyx/sdk", "/repo/packages/sdk/src/index.ts");
+        let source = classify("@aonyx/sdk", Path::new("/repo/packages/sdk/src/index.ts"));
 
         assert_eq!(source, ImportSource::Workspace);
     }
 
     #[test]
     fn classify_with_a_relative_specifier_returns_relative() {
-        let source = classify("../a", "/repo/node_modules/x/a.ts");
+        let source = classify("../a", Path::new("/repo/node_modules/x/a.ts"));
 
         assert_eq!(source, ImportSource::Relative);
     }

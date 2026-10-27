@@ -75,7 +75,7 @@ impl Parameter {
 ///
 /// The TypeScript provider attaches one to every function declaration,
 /// method, and method or function signature it can resolve. Each type
-/// carries its written alias and its primitive, so a rule can tell two
+/// carries its written alias and its primitive. A rule thus tells two
 /// parameters a caller can swap from two the checker keeps apart.
 ///
 /// # Examples

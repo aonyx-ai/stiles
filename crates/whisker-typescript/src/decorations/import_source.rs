@@ -4,9 +4,9 @@ use whisker_macros::Decoration;
 ///
 /// The TypeScript provider attaches one to the specifier string of every
 /// `import` and `export ... from` statement, as the program resolved it.
-/// A rule that orders imports by origin reads this rather than guessing
-/// from the specifier's spelling, because `@scope/pkg` may be a package of
-/// this repository or one from the registry.
+/// A rule that orders imports by origin reads this rather than the
+/// specifier's spelling. `@scope/pkg` may be a package of this repository
+/// or one from the registry.
 ///
 /// # Examples
 ///
