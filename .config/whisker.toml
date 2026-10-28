@@ -27,4 +27,4 @@ whisker-source = "."
 # check here runs exactly the rules it ran yesterday.
 [[lints]]
 git = "https://github.com/aonyx-ai/whisker-aonyx-rules"
-rev = "8ed2f5301fa6bcfc03fed6d2dc783e11330c4ee9"
+rev = "60e926a497b6b872cd598caec916656d2d6fd287"
