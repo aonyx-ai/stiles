@@ -23,16 +23,29 @@ Releases][gh-releases]. You'll have to move the file someplace on your `$PATH`
 yourself.
 
 ```bash
-shasum -a 256 -c stiles-0.1.0-rc.5-aarch64-apple-darwin.tar.gz.sha256
-tar -xzf stiles-0.1.0-rc.5-aarch64-apple-darwin.tar.gz
+shasum -a 256 -c stiles-0.1.0-aarch64-apple-darwin.tar.gz.sha256
+tar -xzf stiles-0.1.0-aarch64-apple-darwin.tar.gz
+```
+
+## With Cargo
+
+Stiles is on crates.io. [cargo-binstall][binstall] downloads the archive of a
+release and installs it without a build:
+
+```bash
+cargo binstall stiles
+```
+
+`cargo install` builds the same release from source:
+
+```bash
+cargo install --locked stiles
 ```
 
 ## From source
 
-If your platform has no archive, you want to install an unreleased version, or
-you don't want to install binary files from the internet, you can easily build
-Stiles from source. The easiest method is to use `cargo install` pointed at the
-Git repository:
+To install an unreleased version, point `cargo install` at the Git
+repository:
 
 ```bash
 cargo install --git https://github.com/aonyx-ai/stiles --locked stiles
@@ -46,5 +59,6 @@ cd stiles
 cargo install --locked --path crates/stiles
 ```
 
+[binstall]: https://github.com/cargo-bins/cargo-binstall
 [install-sh]: https://github.com/aonyx-ai/stiles/blob/main/docs/static/install.sh
 [gh-releases]: https://github.com/aonyx-ai/stiles/releases

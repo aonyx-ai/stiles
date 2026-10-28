@@ -9,19 +9,20 @@ The API documentation for each Stiles crate is on docs.rs.
 
 ## the table
 
-| Crate                              | Holds                                                                                               |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
-| [whisker-plugin][whisker-plugin]   | `DeclaresRules` and `export_lints!`, which hand the lints of a crate to Stiles                      |
-| [whisker-rust][whisker-rust]       | `RustLintPass`, one method per node kind                                                            |
-| [whisker-types][whisker-types]     | `Diagnostic`, `Span`, `Suggestion`, `Severity`, `RuleId`, `DecoratedNode`, and the decoration types |
-| [whisker-testing][whisker-testing] | `parse`, `decorate`, `execute`, `fixtures`, and `assert_diagnostic`                                 |
+| Crate                                  | Holds                                                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [stiles-plugin][stiles-plugin]         | `DeclaresRules` and `export_lints!`, which hand the lints of a crate to Stiles                      |
+| [stiles-types][stiles-types]           | `Diagnostic`, `Span`, `Suggestion`, `Severity`, `RuleId`, `DecoratedNode`, and the decoration types |
+| [stiles-testing][stiles-testing]       | `parse`, `decorate`, `execute`, `fixtures`, and `assert_diagnostic`                                 |
+| [stiles-rust][stiles-rust]             | `RustLintPass` and the Rust decorations                                                             |
+| [stiles-typescript][stiles-typescript] | `TypeScriptLintPass` and the TypeScript decorations                                                 |
 
-<!--
-every link points at docs.rs and every crate sets publish = false, so nothing
-resolves today. decide whether a page that cannot work yet ships or waits.
--->
+A lint depends on the crate of each language it checks. The
+[supported languages][supported-languages] page lists them.
 
-[whisker-plugin]: https://docs.rs/whisker-plugin
-[whisker-rust]: https://docs.rs/whisker-rust
-[whisker-testing]: https://docs.rs/whisker-testing
-[whisker-types]: https://docs.rs/whisker-types
+[stiles-plugin]: https://docs.rs/stiles-plugin
+[stiles-rust]: https://docs.rs/stiles-rust
+[stiles-testing]: https://docs.rs/stiles-testing
+[stiles-types]: https://docs.rs/stiles-types
+[stiles-typescript]: https://docs.rs/stiles-typescript
+[supported-languages]: /docs/reference/supported-languages

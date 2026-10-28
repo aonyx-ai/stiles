@@ -1,5 +1,5 @@
-use whisker_rust::RustLintPass;
-use whisker_types::{DecoratedNode, Diagnostic, RuleId, Severity};
+use stiles_rust::RustLintPass;
+use stiles_types::{DecoratedNode, Diagnostic, RuleId, Severity};
 
 // 1: Rule struct and documentation
 /// Flags a summary line that runs straight into the rest of the comment
@@ -34,14 +34,14 @@ impl RustLintPass for DocSummaryBreak {
 // 3: Rule ID
 const RULE_ID: RuleId = RuleId::new("lint.doc-summary-break");
 
-impl whisker_plugin::DeclaresRules for DocSummaryBreak {
+impl stiles_plugin::DeclaresRules for DocSummaryBreak {
     fn rules(&self) -> Vec<RuleId> {
         vec![RULE_ID]
     }
 }
 
 // 4: Lint registration
-whisker_plugin::export_lints![rust: [DocSummaryBreak]];
+stiles_plugin::export_lints![rust: [DocSummaryBreak]];
 
 // ... and some helper functions for the lint
 
@@ -75,9 +75,9 @@ fn is_blank(node: &DecoratedNode<'_>) -> bool {
 // <
 #[cfg(test)]
 mod tests {
-    use whisker_rust::RustLintPassAdapter;
-    use whisker_testing::{assert_diagnostic, assert_no_diagnostics, execute, parse};
-    use whisker_types::{Language, LintPass};
+    use stiles_rust::RustLintPassAdapter;
+    use stiles_testing::{assert_diagnostic, assert_no_diagnostics, execute, parse};
+    use stiles_types::{Language, LintPass};
 
     use super::*;
 

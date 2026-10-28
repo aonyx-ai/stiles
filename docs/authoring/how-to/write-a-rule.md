@@ -35,15 +35,20 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-whisker-plugin = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.5" }
-whisker-rust = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.5", default-features = false }
-whisker-types = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.5" }
+stiles-plugin = "=0.1.0"
+stiles-rust = { version = "=0.1.0", default-features = false }
+stiles-types = "=0.1.0"
 
 [lib]
 crate-type = ["cdylib"]
 ```
 
 ## hook a node kind
+
+A lint implements the lint pass trait of the language it checks. This example
+checks Rust, so it implements `RustLintPass`. The
+[supported languages][supported-languages] page names the trait of each
+language.
 
 ```rust
 impl RustLintPass for DocSummaryBreak {
@@ -69,21 +74,21 @@ impl RustLintPass for DocSummaryBreak {
 ```rust
 const RULE_ID: RuleId = RuleId::new("lint.doc-summary-break");
 
-impl whisker_plugin::DeclaresRules for DocSummaryBreak {
+impl stiles_plugin::DeclaresRules for DocSummaryBreak {
     fn rules(&self) -> Vec<RuleId> {
         vec![RULE_ID]
     }
 }
 
-whisker_plugin::export_lints![rust: [DocSummaryBreak]];
+stiles_plugin::export_lints![rust: [DocSummaryBreak]];
 ```
 
 ## test it
 
 ```rust
-use whisker_rust::RustLintPassAdapter;
-use whisker_testing::{assert_diagnostic, assert_no_diagnostics, execute, parse};
-use whisker_types::{Language, LintPass};
+use stiles_rust::RustLintPassAdapter;
+use stiles_testing::{assert_diagnostic, assert_no_diagnostics, execute, parse};
+use stiles_types::{Language, LintPass};
 
 fn passes() -> Vec<Box<dyn LintPass>> {
     vec![Box::new(RustLintPassAdapter::new(DocSummaryBreak))]
@@ -141,3 +146,5 @@ where now. api, configuration, shared-rules, prebuilt archives.
   project.
 - [Prebuilt archives](/authoring/reference/prebuilt-archives) so the people who
   use your rules download them compiled.
+
+[supported-languages]: /docs/reference/supported-languages
