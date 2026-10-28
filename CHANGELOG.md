@@ -1,4 +1,4 @@
-<!-- markdownlint-disable-file MD024 -->
+<!-- markdownlint-disable-file MD013 MD024 -->
 
 # Changelog
 
