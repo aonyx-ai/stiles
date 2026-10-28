@@ -171,19 +171,6 @@ mod tests {
         assert!(artifact.to_string_lossy().contains("libplugin"));
     }
 
-    #[test]
-    fn cdylib_artifacts_ignores_unknown_message_reasons() {
-        let stdout = [
-            r#"{"reason":"a-future-cargo-message","novel_field":42}"#.to_string(),
-            artifact_line(MANIFEST, r#""cdylib""#, &dylib_name("libplugin")),
-        ]
-        .join("\n");
-
-        let artifacts = cdylib_artifacts(&stdout, Path::new(DIRECTORY));
-
-        assert!(artifacts.is_ok());
-    }
-
     /// A directory sharing a name prefix with the configured one is not
     /// inside it, and `starts_with` compares whole components
     #[test]
@@ -207,20 +194,16 @@ mod tests {
     }
 
     #[test]
-    fn cdylib_artifacts_picks_the_platform_library_among_filenames() {
-        let filenames = format!(
-            "\"/plugin/target/release/libplugin.rlib\", {}",
-            dylib_name("libplugin")
-        );
-        let stdout = artifact_line(MANIFEST, r#""cdylib", "rlib""#, &filenames);
+    fn cdylib_artifacts_ignores_unknown_message_reasons() {
+        let stdout = [
+            r#"{"reason":"a-future-cargo-message","novel_field":42}"#.to_string(),
+            artifact_line(MANIFEST, r#""cdylib""#, &dylib_name("libplugin")),
+        ]
+        .join("\n");
 
-        let artifacts = cdylib_artifacts(&stdout, Path::new(DIRECTORY)).expect("should find");
+        let artifacts = cdylib_artifacts(&stdout, Path::new(DIRECTORY));
 
-        assert!(
-            artifacts[0]
-                .extension()
-                .is_some_and(|extension| extension == std::env::consts::DLL_EXTENSION)
-        );
+        assert!(artifacts.is_ok());
     }
 
     #[test]
@@ -248,6 +231,23 @@ mod tests {
                 PathBuf::from(dylib_name("libsecond").trim_matches('"')),
             ],
             "members must load in a stable order, not in build-completion order"
+        );
+    }
+
+    #[test]
+    fn cdylib_artifacts_picks_the_platform_library_among_filenames() {
+        let filenames = format!(
+            "\"/plugin/target/release/libplugin.rlib\", {}",
+            dylib_name("libplugin")
+        );
+        let stdout = artifact_line(MANIFEST, r#""cdylib", "rlib""#, &filenames);
+
+        let artifacts = cdylib_artifacts(&stdout, Path::new(DIRECTORY)).expect("should find");
+
+        assert!(
+            artifacts[0]
+                .extension()
+                .is_some_and(|extension| extension == std::env::consts::DLL_EXTENSION)
         );
     }
 

@@ -109,6 +109,29 @@ mod tests {
     }
 
     #[test]
+    fn an_insertion_after_a_lookup_is_visible() {
+        let mut map = DecorationMap::new();
+        map.insert(1, Count(1));
+        let _ = map.lookup();
+
+        map.insert(1, Count(2));
+
+        assert_eq!(map.lookup().get::<Count>(1, 1), Some(&Count(2)));
+    }
+
+    #[test]
+    fn get_all_returns_every_entry_of_a_type() {
+        let mut map = DecorationMap::new();
+        map.insert(1, Count(1));
+        map.insert(1, Other(9));
+        map.insert(1, Count(2));
+
+        let found = map.lookup().get_all::<Count>(1);
+
+        assert_eq!(found, vec![&Count(1), &Count(2)]);
+    }
+
+    #[test]
     fn get_groups_entries_by_node() {
         let mut map = DecorationMap::new();
         map.insert(1, Count(10));
@@ -155,29 +178,6 @@ mod tests {
         let found = map.lookup().get::<Other>(1, 0);
 
         assert!(found.is_none());
-    }
-
-    #[test]
-    fn get_all_returns_every_entry_of_a_type() {
-        let mut map = DecorationMap::new();
-        map.insert(1, Count(1));
-        map.insert(1, Other(9));
-        map.insert(1, Count(2));
-
-        let found = map.lookup().get_all::<Count>(1);
-
-        assert_eq!(found, vec![&Count(1), &Count(2)]);
-    }
-
-    #[test]
-    fn an_insertion_after_a_lookup_is_visible() {
-        let mut map = DecorationMap::new();
-        map.insert(1, Count(1));
-        let _ = map.lookup();
-
-        map.insert(1, Count(2));
-
-        assert_eq!(map.lookup().get::<Count>(1, 1), Some(&Count(2)));
     }
 
     #[test]

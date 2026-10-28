@@ -24,6 +24,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn ordering_puts_error_above_warn() {
+        assert!(Severity::Error > Severity::Warn);
+    }
+
+    #[test]
+    fn ordering_puts_info_above_help() {
+        assert!(Severity::Info > Severity::Help);
+    }
+
+    #[test]
+    fn ordering_puts_warn_above_info() {
+        assert!(Severity::Warn > Severity::Info);
+    }
+
+    #[test]
     fn trait_send() {
         fn assert_send<T: Send>() {}
         assert_send::<Severity>();
@@ -39,21 +54,6 @@ mod tests {
     fn trait_unpin() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Severity>();
-    }
-
-    #[test]
-    fn ordering_puts_error_above_warn() {
-        assert!(Severity::Error > Severity::Warn);
-    }
-
-    #[test]
-    fn ordering_puts_info_above_help() {
-        assert!(Severity::Info > Severity::Help);
-    }
-
-    #[test]
-    fn ordering_puts_warn_above_info() {
-        assert!(Severity::Warn > Severity::Info);
     }
 
     mod prop {

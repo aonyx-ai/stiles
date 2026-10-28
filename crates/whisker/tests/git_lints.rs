@@ -159,38 +159,21 @@ fn fixture_in_an_ambient_git_environment() -> AmbientRun {
     }
 }
 
-/// Pins that the fixture helper commits in a repository of its own
+/// Names the remote and the commit when the remote cannot serve the pin
 #[test]
-fn fixture_repository_in_an_ambient_git_environment_holds_its_own_commit() {
-    let run = fixture_in_an_ambient_git_environment();
+fn check_with_git_lint_source_at_an_unknown_rev_fails() {
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let rules = repository_with_one_lint("fixture.no-todo");
+    let target = package(TODO_SOURCE);
+    configure_git_lint(target.path(), &rules.url(), ABSENT_REV);
 
-    assert_eq!(
-        run.rules.rev().len(),
-        40,
-        "the fixture should hold a commit of its own"
-    );
-}
-
-/// Pins that the fixture helper leaves the config of the ambient repository
-#[test]
-fn fixture_repository_ignores_an_ambient_git_config() {
-    let run = fixture_in_an_ambient_git_environment();
-
-    assert_eq!(
-        run.config_after, run.config_before,
-        "the fixture wrote the victim's config"
-    );
-}
-
-/// Pins that the fixture helper leaves the index of the ambient repository
-#[test]
-fn fixture_repository_ignores_an_ambient_git_environment() {
-    let run = fixture_in_an_ambient_git_environment();
-
-    assert_eq!(
-        run.index_after, run.index_before,
-        "the fixture wrote the victim's index"
-    );
+    whisker(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(ABSENT_REV))
+        .stderr(predicate::str::contains(rules.url()));
 }
 
 /// Pins that a git environment around whisker cannot reach its checkout
@@ -234,6 +217,35 @@ fn check_with_git_lint_source_reports_its_diagnostic() {
         .stdout(predicate::str::contains("finish this before it ships"));
 }
 
+/// A checkout in the cache is used without asking the remote again
+///
+/// The remote is deleted between the two runs, so a second run that still
+/// succeeds cannot have reached it. This is what makes a pinned source
+/// cheap enough to sit in front of every check, and what keeps a check
+/// working with no network at all.
+#[test]
+fn check_with_git_lint_source_reuses_the_checkout_without_the_remote() {
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let rules = repository_with_one_lint("fixture.no-todo");
+    let target = package(TODO_SOURCE);
+    configure_git_lint(target.path(), &rules.url(), rules.rev());
+
+    whisker(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[fixture.no-todo]"));
+    rules.remove();
+
+    whisker(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[fixture.no-todo]"));
+}
+
 /// A repository of rules is a workspace, and every member is a rule
 ///
 /// This is the shape the extraction of whisker's own rules produces, so
@@ -274,48 +286,36 @@ fn check_with_git_lint_workspace_loads_every_member() {
         .stdout(predicate::str::contains("warning[fixture.second]"));
 }
 
-/// Names the remote and the commit when the remote cannot serve the pin
+/// Pins that the fixture helper leaves the config of the ambient repository
 #[test]
-fn check_with_git_lint_source_at_an_unknown_rev_fails() {
-    let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let rules = repository_with_one_lint("fixture.no-todo");
-    let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), ABSENT_REV);
+fn fixture_repository_ignores_an_ambient_git_config() {
+    let run = fixture_in_an_ambient_git_environment();
 
-    whisker(&cache)
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .code(1)
-        .stderr(predicate::str::contains(ABSENT_REV))
-        .stderr(predicate::str::contains(rules.url()));
+    assert_eq!(
+        run.config_after, run.config_before,
+        "the fixture wrote the victim's config"
+    );
 }
 
-/// A checkout in the cache is used without asking the remote again
-///
-/// The remote is deleted between the two runs, so a second run that still
-/// succeeds cannot have reached it. This is what makes a pinned source
-/// cheap enough to sit in front of every check, and what keeps a check
-/// working with no network at all.
+/// Pins that the fixture helper leaves the index of the ambient repository
 #[test]
-fn check_with_git_lint_source_reuses_the_checkout_without_the_remote() {
-    let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let rules = repository_with_one_lint("fixture.no-todo");
-    let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
+fn fixture_repository_ignores_an_ambient_git_environment() {
+    let run = fixture_in_an_ambient_git_environment();
 
-    whisker(&cache)
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("warning[fixture.no-todo]"));
-    rules.remove();
+    assert_eq!(
+        run.index_after, run.index_before,
+        "the fixture wrote the victim's index"
+    );
+}
 
-    whisker(&cache)
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("warning[fixture.no-todo]"));
+/// Pins that the fixture helper commits in a repository of its own
+#[test]
+fn fixture_repository_in_an_ambient_git_environment_holds_its_own_commit() {
+    let run = fixture_in_an_ambient_git_environment();
+
+    assert_eq!(
+        run.rules.rev().len(),
+        40,
+        "the fixture should hold a commit of its own"
+    );
 }

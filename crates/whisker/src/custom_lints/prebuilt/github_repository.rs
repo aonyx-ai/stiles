@@ -90,9 +90,11 @@ mod tests {
         GitHubRepository::from_url().url(&url).call()
     }
 
+    /// A host is not case sensitive, and a person pasting one from a
+    /// browser can capitalize it
     #[test]
-    fn from_url_accepts_an_https_remote() {
-        let repository = repository("https://github.com/aonyx-ai/rules");
+    fn from_url_accepts_a_host_in_capitals() {
+        let repository = repository("https://GitHub.com/aonyx-ai/rules");
 
         assert_eq!(
             repository.map(|it| it.to_string()),
@@ -101,8 +103,18 @@ mod tests {
     }
 
     #[test]
-    fn from_url_accepts_the_scp_spelling_of_an_ssh_remote() {
-        let repository = repository("git@github.com:aonyx-ai/rules.git");
+    fn from_url_accepts_a_trailing_slash() {
+        let repository = repository("https://github.com/aonyx-ai/rules/");
+
+        assert_eq!(
+            repository.map(|it| it.to_string()),
+            Some("aonyx-ai/rules".to_owned())
+        );
+    }
+
+    #[test]
+    fn from_url_accepts_an_https_remote() {
+        let repository = repository("https://github.com/aonyx-ai/rules");
 
         assert_eq!(
             repository.map(|it| it.to_string()),
@@ -121,30 +133,18 @@ mod tests {
     }
 
     #[test]
+    fn from_url_accepts_the_scp_spelling_of_an_ssh_remote() {
+        let repository = repository("git@github.com:aonyx-ai/rules.git");
+
+        assert_eq!(
+            repository.map(|it| it.to_string()),
+            Some("aonyx-ai/rules".to_owned())
+        );
+    }
+
+    #[test]
     fn from_url_drops_the_git_suffix() {
         let repository = repository("https://github.com/aonyx-ai/rules.git");
-
-        assert_eq!(
-            repository.map(|it| it.to_string()),
-            Some("aonyx-ai/rules".to_owned())
-        );
-    }
-
-    #[test]
-    fn from_url_accepts_a_trailing_slash() {
-        let repository = repository("https://github.com/aonyx-ai/rules/");
-
-        assert_eq!(
-            repository.map(|it| it.to_string()),
-            Some("aonyx-ai/rules".to_owned())
-        );
-    }
-
-    /// A host is not case sensitive, and a person pasting one from a
-    /// browser can capitalize it
-    #[test]
-    fn from_url_accepts_a_host_in_capitals() {
-        let repository = repository("https://GitHub.com/aonyx-ai/rules");
 
         assert_eq!(
             repository.map(|it| it.to_string()),
@@ -181,16 +181,6 @@ mod tests {
     }
 
     #[test]
-    fn from_url_of_another_host_is_none() {
-        assert_eq!(repository("https://gitlab.com/aonyx-ai/rules"), None);
-    }
-
-    #[test]
-    fn from_url_of_a_local_path_is_none() {
-        assert_eq!(repository("file:///srv/rules"), None);
-    }
-
-    #[test]
     fn from_url_of_a_deeper_path_is_none() {
         assert_eq!(
             repository("https://github.com/aonyx-ai/rules/tree/main"),
@@ -199,13 +189,23 @@ mod tests {
     }
 
     #[test]
-    fn from_url_of_an_owner_alone_is_none() {
-        assert_eq!(repository("https://github.com/aonyx-ai"), None);
+    fn from_url_of_a_local_path_is_none() {
+        assert_eq!(repository("file:///srv/rules"), None);
     }
 
     #[test]
     fn from_url_of_an_empty_name_is_none() {
         assert_eq!(repository("https://github.com/aonyx-ai/.git"), None);
+    }
+
+    #[test]
+    fn from_url_of_an_owner_alone_is_none() {
+        assert_eq!(repository("https://github.com/aonyx-ai"), None);
+    }
+
+    #[test]
+    fn from_url_of_another_host_is_none() {
+        assert_eq!(repository("https://gitlab.com/aonyx-ai/rules"), None);
     }
 
     #[test]

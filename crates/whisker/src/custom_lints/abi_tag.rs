@@ -102,19 +102,11 @@ mod tests {
         }
     }
 
-    /// Pins the tag that publishers write into an archive name
-    ///
-    /// Whisker stops finding every archive that carries the old tag if
-    /// this derivation changes. The test fails first, so whoever changes
-    /// it knows to republish.
     #[test]
-    fn new_is_stable_across_releases() {
-        let tag = AbiTag::builder()
-            .identity(&identity())
-            .target("aarch64-apple-darwin")
-            .build();
+    fn host_names_the_platform_the_binary_was_built_for() {
+        let tag = AbiTag::host().to_string();
 
-        assert_eq!(tag.to_string(), "b7d58f06e26e0a22-aarch64-apple-darwin");
+        assert!(tag.ends_with(&format!("-{TARGET}")), "{tag}");
     }
 
     /// From 1.0 a minor is not part of the tag
@@ -141,37 +133,25 @@ mod tests {
         );
     }
 
-    /// Before 1.0 a minor is part of the tag
+    /// Pins the tag that publishers write into an archive name
     ///
-    /// Nothing is promised there, so a plugin loads only on the whisker
-    /// it was built for.
+    /// Whisker stops finding every archive that carries the old tag if
+    /// this derivation changes. The test fails first, so whoever changes
+    /// it knows to republish.
     #[test]
-    fn new_separates_minors_before_one_point_zero() {
-        let first = AbiIdentity {
-            abi_version: AbiVersion { major: 0, minor: 1 },
-            ..identity()
-        };
-        let second = AbiIdentity {
-            abi_version: AbiVersion { major: 0, minor: 2 },
-            ..identity()
-        };
+    fn new_is_stable_across_releases() {
+        let tag = AbiTag::builder()
+            .identity(&identity())
+            .target("aarch64-apple-darwin")
+            .build();
 
-        assert_ne!(
-            AbiTag::builder()
-                .identity(&first)
-                .target("x86_64-unknown-linux-gnu")
-                .build(),
-            AbiTag::builder()
-                .identity(&second)
-                .target("x86_64-unknown-linux-gnu")
-                .build()
-        );
+        assert_eq!(tag.to_string(), "b7d58f06e26e0a22-aarch64-apple-darwin");
     }
 
     #[test]
-    fn new_separates_identities_that_differ_in_the_major() {
+    fn new_separates_identities_that_differ_in_the_language_fingerprint() {
         let other = AbiIdentity {
-            abi_version: AbiVersion { major: 2, minor: 4 },
+            language_fingerprint: 1,
             ..identity()
         };
 
@@ -188,9 +168,9 @@ mod tests {
     }
 
     #[test]
-    fn new_separates_identities_that_differ_in_the_language_fingerprint() {
+    fn new_separates_identities_that_differ_in_the_major() {
         let other = AbiIdentity {
-            language_fingerprint: 1,
+            abi_version: AbiVersion { major: 2, minor: 4 },
             ..identity()
         };
 
@@ -225,20 +205,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn new_separates_platforms() {
-        assert_ne!(
-            AbiTag::builder()
-                .identity(&identity())
-                .target("aarch64-apple-darwin")
-                .build(),
-            AbiTag::builder()
-                .identity(&identity())
-                .target("x86_64-unknown-linux-gnu")
-                .build()
-        );
-    }
-
     /// Pins that one fingerprint cannot borrow a digit from the other
     ///
     /// At a variable width the two would run together. Two different
@@ -268,11 +234,45 @@ mod tests {
         );
     }
 
+    /// Before 1.0 a minor is part of the tag
+    ///
+    /// Nothing is promised there, so a plugin loads only on the whisker
+    /// it was built for.
     #[test]
-    fn host_names_the_platform_the_binary_was_built_for() {
-        let tag = AbiTag::host().to_string();
+    fn new_separates_minors_before_one_point_zero() {
+        let first = AbiIdentity {
+            abi_version: AbiVersion { major: 0, minor: 1 },
+            ..identity()
+        };
+        let second = AbiIdentity {
+            abi_version: AbiVersion { major: 0, minor: 2 },
+            ..identity()
+        };
 
-        assert!(tag.ends_with(&format!("-{TARGET}")), "{tag}");
+        assert_ne!(
+            AbiTag::builder()
+                .identity(&first)
+                .target("x86_64-unknown-linux-gnu")
+                .build(),
+            AbiTag::builder()
+                .identity(&second)
+                .target("x86_64-unknown-linux-gnu")
+                .build()
+        );
+    }
+
+    #[test]
+    fn new_separates_platforms() {
+        assert_ne!(
+            AbiTag::builder()
+                .identity(&identity())
+                .target("aarch64-apple-darwin")
+                .build(),
+            AbiTag::builder()
+                .identity(&identity())
+                .target("x86_64-unknown-linux-gnu")
+                .build()
+        );
     }
 
     #[test]

@@ -219,19 +219,6 @@ mod tests {
     }
 
     #[test]
-    fn for_rules_with_no_rules_keeps_nothing() {
-        let options = RuleOptions::new(vec![RuleOption::new(
-            "lint.a".into(),
-            "names".into(),
-            Vec::new(),
-        )]);
-
-        let kept = options.for_rules(&[]);
-
-        assert!(kept.options().is_empty());
-    }
-
-    #[test]
     fn for_rules_keeps_the_options_of_the_named_rules_in_order() {
         let options = RuleOptions::new(vec![
             RuleOption::new("lint.a".into(), "first".into(), Vec::new()),
@@ -246,6 +233,19 @@ mod tests {
     }
 
     #[test]
+    fn for_rules_with_no_rules_keeps_nothing() {
+        let options = RuleOptions::new(vec![RuleOption::new(
+            "lint.a".into(),
+            "names".into(),
+            Vec::new(),
+        )]);
+
+        let kept = options.for_rules(&[]);
+
+        assert!(kept.options().is_empty());
+    }
+
+    #[test]
     fn hash_agrees_with_eq() {
         let mut tables = HashSet::new();
         tables.insert(options());
@@ -253,16 +253,6 @@ mod tests {
         let found = tables.contains(&options());
 
         assert!(found);
-    }
-
-    #[test]
-    fn names_with_an_empty_list_differs_from_an_absent_option() {
-        let options = options();
-
-        let empty = options.names(RuleId::new("lint.bool-param"), "boundary-attributes");
-        let absent = options.names(RuleId::new("lint.bool-param"), "absent");
-
-        assert_eq!([empty, absent], [Some(Vec::new()), None]);
     }
 
     #[test]
@@ -278,6 +268,16 @@ mod tests {
             names,
             Some(vec!["shard".to_owned(), "procedure".to_owned()])
         );
+    }
+
+    #[test]
+    fn names_with_an_empty_list_differs_from_an_absent_option() {
+        let options = options();
+
+        let empty = options.names(RuleId::new("lint.bool-param"), "boundary-attributes");
+        let absent = options.names(RuleId::new("lint.bool-param"), "absent");
+
+        assert_eq!([empty, absent], [Some(Vec::new()), None]);
     }
 
     #[test]

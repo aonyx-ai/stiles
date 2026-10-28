@@ -59,24 +59,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<Suggestion>();
-    }
-
-    #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<Suggestion>();
-    }
-
-    #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<Suggestion>();
-    }
-
-    #[test]
     fn message_returns_the_message() {
         let span = Span::new(PathBuf::from("test.rs"), 0, 5);
         let suggestion = Suggestion::new(span, "new_text".into(), "try this".into());
@@ -98,6 +80,24 @@ mod tests {
         let suggestion = Suggestion::new(span.clone(), "new_text".into(), "try this".into());
 
         assert_eq!(suggestion.span(), &span);
+    }
+
+    #[test]
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Suggestion>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Suggestion>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Suggestion>();
     }
 
     mod prop {

@@ -149,32 +149,6 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<Diagnostic>();
-    }
-
-    #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<Diagnostic>();
-    }
-
-    #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<Diagnostic>();
-    }
-
-    /// Returns a location that a test attaches as an origin
-    fn origin() -> Location {
-        Location::new(
-            Span::new(PathBuf::from("other.rs"), 5, 15),
-            "defined here".into(),
-        )
-    }
-
-    #[test]
     fn clone_copies_the_message() {
         let diag = test_diagnostic().with_origin(origin());
 
@@ -199,6 +173,14 @@ mod tests {
         let copy = diag.clone();
 
         assert_eq!(copy.rule_id(), diag.rule_id());
+    }
+
+    /// Returns a location that a test attaches as an origin
+    fn origin() -> Location {
+        Location::new(
+            Span::new(PathBuf::from("other.rs"), 5, 15),
+            "defined here".into(),
+        )
     }
 
     #[test]
@@ -257,6 +239,24 @@ mod tests {
         let diag = test_diagnostic();
 
         assert_eq!(diag.span(), &Span::new(PathBuf::from("test.rs"), 0, 10));
+    }
+
+    #[test]
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Diagnostic>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Diagnostic>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Diagnostic>();
     }
 
     #[test]

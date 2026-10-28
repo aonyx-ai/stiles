@@ -211,11 +211,6 @@ mod tests {
         assert_eq!(offset_of!(AbiVersion, minor), 4);
     }
 
-    #[test]
-    fn the_pair_is_eight_bytes() {
-        assert_eq!(size_of::<AbiVersion>(), 8);
-    }
-
     /// [`AbiVersion::accepts`] compares versions, so the derived order
     /// has to weigh the major first
     #[test]
@@ -226,6 +221,11 @@ mod tests {
     #[test]
     fn ord_with_one_major_compares_the_minor() {
         assert!(AbiVersion { major: 1, minor: 1 } > AbiVersion { major: 1, minor: 0 });
+    }
+
+    #[test]
+    fn the_pair_is_eight_bytes() {
+        assert_eq!(size_of::<AbiVersion>(), 8);
     }
 
     #[test]

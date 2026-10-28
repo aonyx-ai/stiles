@@ -121,21 +121,17 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<DecoratedTree>();
-    }
+    fn file_returns_path() {
+        let source = "";
+        let tree = parse_tree(source);
+        let decorated = DecoratedTree::new(
+            tree,
+            Language::Rust,
+            source.into(),
+            PathBuf::from("test.rs"),
+        );
 
-    #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<DecoratedTree>();
-    }
-
-    #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<DecoratedTree>();
+        assert_eq!(decorated.file(), Path::new("test.rs"));
     }
 
     #[test]
@@ -155,6 +151,24 @@ mod tests {
         decorated.merge_decorations(decorations);
 
         assert_eq!(decorated.root_node().decoration::<Tag>(), Some(&Tag(7)));
+    }
+
+    #[test]
+    fn merge_decorations_twice_keeps_every_instance_in_order() {
+        let decorated = merged_twice();
+
+        let tags = decorated.root_node().decorations_of_type::<Tag>();
+
+        assert_eq!(tags, vec![&Tag(1), &Tag(2)]);
+    }
+
+    #[test]
+    fn merge_decorations_twice_keeps_first_of_a_type() {
+        let decorated = merged_twice();
+
+        let tag = decorated.root_node().decoration::<Tag>();
+
+        assert_eq!(tag, Some(&Tag(1)));
     }
 
     /// Returns a tree whose root got `Tag(1)` from one merge and `Tag(2)`
@@ -178,24 +192,6 @@ mod tests {
         decorated.merge_decorations(second);
 
         decorated
-    }
-
-    #[test]
-    fn merge_decorations_twice_keeps_every_instance_in_order() {
-        let decorated = merged_twice();
-
-        let tags = decorated.root_node().decorations_of_type::<Tag>();
-
-        assert_eq!(tags, vec![&Tag(1), &Tag(2)]);
-    }
-
-    #[test]
-    fn merge_decorations_twice_keeps_first_of_a_type() {
-        let decorated = merged_twice();
-
-        let tag = decorated.root_node().decoration::<Tag>();
-
-        assert_eq!(tag, Some(&Tag(1)));
     }
 
     #[test]
@@ -227,17 +223,21 @@ mod tests {
     }
 
     #[test]
-    fn file_returns_path() {
-        let source = "";
-        let tree = parse_tree(source);
-        let decorated = DecoratedTree::new(
-            tree,
-            Language::Rust,
-            source.into(),
-            PathBuf::from("test.rs"),
-        );
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<DecoratedTree>();
+    }
 
-        assert_eq!(decorated.file(), Path::new("test.rs"));
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<DecoratedTree>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<DecoratedTree>();
     }
 
     mod prop {

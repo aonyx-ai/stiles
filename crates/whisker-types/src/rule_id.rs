@@ -92,6 +92,13 @@ mod tests {
     }
 
     #[test]
+    fn cmp_with_the_same_name_is_equal() {
+        let first = RuleId::new("lint.a");
+
+        assert_eq!(first.cmp(&first), Ordering::Equal);
+    }
+
+    #[test]
     fn debug_shows_the_name() {
         let id = RuleId::new("lint.test");
 
@@ -112,13 +119,6 @@ mod tests {
         const RULE_ID: RuleId = RuleId::new("lint.const");
 
         assert_eq!(RULE_ID.as_str(), "lint.const");
-    }
-
-    #[test]
-    fn cmp_with_the_same_name_is_equal() {
-        let first = RuleId::new("lint.a");
-
-        assert_eq!(first.cmp(&first), Ordering::Equal);
     }
 
     #[test]

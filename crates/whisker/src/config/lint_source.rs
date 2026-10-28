@@ -123,13 +123,6 @@ mod tests {
     }
 
     #[test]
-    fn url_returns_the_configured_remote() {
-        let source = git_source();
-
-        assert_eq!(source.url().to_string(), "https://example.com/rules");
-    }
-
-    #[test]
     fn trait_send_git_lint_source() {
         fn assert_send<T: Send>() {}
         assert_send::<GitLintSource>();
@@ -163,5 +156,12 @@ mod tests {
     fn trait_unpin_lint_source() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<LintSource>();
+    }
+
+    #[test]
+    fn url_returns_the_configured_remote() {
+        let source = git_source();
+
+        assert_eq!(source.url().to_string(), "https://example.com/rules");
     }
 }

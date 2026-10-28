@@ -264,15 +264,12 @@ mod tests {
         path
     }
 
-    /// An archive must not write outside its destination
-    ///
-    /// Such a name holds more than one component, so the rule that skips a
-    /// subdirectory skips this too.
+    /// An archive must not be able to plant a link pointing anywhere
     #[test]
-    fn extract_ignores_an_entry_that_climbs_out() {
-        let names = extracted(&[("../escaped", b"no" as &[u8]), ("kept", b"yes")]);
+    fn extract_ignores_a_symbolic_link() {
+        let (_directory, into) = extracted_beside_a_link();
 
-        assert_eq!(names, vec!["kept".to_owned()]);
+        assert!(!into.join("link").exists());
     }
 
     #[test]
@@ -301,12 +298,22 @@ mod tests {
         (directory, into)
     }
 
-    /// An archive must not be able to plant a link pointing anywhere
     #[test]
-    fn extract_ignores_a_symbolic_link() {
-        let (_directory, into) = extracted_beside_a_link();
+    fn extract_ignores_an_entry_in_a_subdirectory() {
+        let names = extracted(&[("nested/deep", b"no" as &[u8]), ("kept", b"yes")]);
 
-        assert!(!into.join("link").exists());
+        assert_eq!(names, vec!["kept".to_owned()]);
+    }
+
+    /// An archive must not write outside its destination
+    ///
+    /// Such a name holds more than one component, so the rule that skips a
+    /// subdirectory skips this too.
+    #[test]
+    fn extract_ignores_an_entry_that_climbs_out() {
+        let names = extracted(&[("../escaped", b"no" as &[u8]), ("kept", b"yes")]);
+
+        assert_eq!(names, vec!["kept".to_owned()]);
     }
 
     #[test]
@@ -314,13 +321,6 @@ mod tests {
         let (_directory, into) = extracted_beside_a_link();
 
         assert!(into.join("kept").is_file());
-    }
-
-    #[test]
-    fn extract_ignores_an_entry_in_a_subdirectory() {
-        let names = extracted(&[("nested/deep", b"no" as &[u8]), ("kept", b"yes")]);
-
-        assert_eq!(names, vec!["kept".to_owned()]);
     }
 
     #[test]
@@ -358,14 +358,6 @@ mod tests {
     }
 
     #[test]
-    fn from_sidecar_accepts_what_shasum_writes() {
-        let digest =
-            Sha256Digest::from_sidecar(&format!("{EMPTY}  rules.tar.gz\n")).expect("should parse");
-
-        assert_eq!(digest.to_string(), EMPTY);
-    }
-
-    #[test]
     fn from_sidecar_accepts_uppercase() {
         let digest = Sha256Digest::from_sidecar(&EMPTY.to_ascii_uppercase()).expect("should parse");
 
@@ -373,10 +365,11 @@ mod tests {
     }
 
     #[test]
-    fn from_sidecar_of_an_empty_file_returns_error() {
-        let error = Sha256Digest::from_sidecar("   \n").expect_err("should fail");
+    fn from_sidecar_accepts_what_shasum_writes() {
+        let digest =
+            Sha256Digest::from_sidecar(&format!("{EMPTY}  rules.tar.gz\n")).expect("should parse");
 
-        assert!(format!("{error:#}").contains("empty"), "{error:#}");
+        assert_eq!(digest.to_string(), EMPTY);
     }
 
     #[test]
@@ -387,10 +380,27 @@ mod tests {
     }
 
     #[test]
+    fn from_sidecar_of_an_empty_file_returns_error() {
+        let error = Sha256Digest::from_sidecar("   \n").expect_err("should fail");
+
+        assert!(format!("{error:#}").contains("empty"), "{error:#}");
+    }
+
+    #[test]
     fn from_sidecar_of_something_that_is_not_hexadecimal_returns_error() {
         let error = Sha256Digest::from_sidecar(&"z".repeat(64)).expect_err("should fail");
 
         assert!(format!("{error:#}").contains("SHA-256"), "{error:#}");
+    }
+
+    #[test]
+    fn of_a_missing_file_returns_error() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+
+        let error =
+            Sha256Digest::of_file(&directory.path().join("absent")).expect_err("should fail");
+
+        assert!(format!("{error:#}").contains("absent"), "{error:#}");
     }
 
     #[test]
@@ -427,16 +437,6 @@ mod tests {
             Sha256Digest::of_file(&first).expect("the file should be read"),
             Sha256Digest::of_file(&second).expect("the file should be read")
         );
-    }
-
-    #[test]
-    fn of_a_missing_file_returns_error() {
-        let directory = tempfile::tempdir().expect("temporary directory should be created");
-
-        let error =
-            Sha256Digest::of_file(&directory.path().join("absent")).expect_err("should fail");
-
-        assert!(format!("{error:#}").contains("absent"), "{error:#}");
     }
 
     #[test]

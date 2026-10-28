@@ -1079,35 +1079,6 @@ mod tests {
         DecoratedTree::new(tree, Language::Rust, source.to_string(), file_path)
     }
 
-    /// Exercises the exclusion guard, which no fixture workspace can reach
-    ///
-    /// The VFS keeps an excluded file's identity but no contents, so any
-    /// database query about it panics. The test seeds the state directly,
-    /// because the load whisker performs never marks a file excluded.
-    #[test]
-    fn decorate_with_excluded_file_reports_excluded_by_toolchain() {
-        let file_path =
-            std::path::absolute("excluded_by_toolchain.rs").expect("should be made absolute");
-        let mut vfs = Vfs::default();
-        vfs.insert_excluded_file(VfsPath::new_real_path(
-            file_path.to_string_lossy().to_string(),
-        ));
-        let provider = RustDecorationProvider {
-            db: Mutex::new(RootDatabase::default()),
-            vfs,
-            root: Arc::from(Path::new("/")),
-        };
-        let tree = parse_rust("fn main() {}\n", file_path);
-
-        let coverage = provider.decorate(&tree).expect("decorate should succeed");
-
-        match coverage {
-            Coverage::Covered(_) => panic!("an excluded file must not be covered"),
-            Coverage::NotCovered(CoverageGap::ExcludedByToolchain { .. }) => {}
-            Coverage::NotCovered(gap) => panic!("unexpected gap: {gap}"),
-        }
-    }
-
     /// A zero-width span must not take the type of the token around it
     ///
     /// Rowan resolves an empty range to the token that contains it. Without
@@ -1147,6 +1118,35 @@ mod tests {
         let covering = covering_node(&syntax, range_at(past_the_end, 1));
 
         assert!(covering.is_none());
+    }
+
+    /// Exercises the exclusion guard, which no fixture workspace can reach
+    ///
+    /// The VFS keeps an excluded file's identity but no contents, so any
+    /// database query about it panics. The test seeds the state directly,
+    /// because the load whisker performs never marks a file excluded.
+    #[test]
+    fn decorate_with_excluded_file_reports_excluded_by_toolchain() {
+        let file_path =
+            std::path::absolute("excluded_by_toolchain.rs").expect("should be made absolute");
+        let mut vfs = Vfs::default();
+        vfs.insert_excluded_file(VfsPath::new_real_path(
+            file_path.to_string_lossy().to_string(),
+        ));
+        let provider = RustDecorationProvider {
+            db: Mutex::new(RootDatabase::default()),
+            vfs,
+            root: Arc::from(Path::new("/")),
+        };
+        let tree = parse_rust("fn main() {}\n", file_path);
+
+        let coverage = provider.decorate(&tree).expect("decorate should succeed");
+
+        match coverage {
+            Coverage::Covered(_) => panic!("an excluded file must not be covered"),
+            Coverage::NotCovered(CoverageGap::ExcludedByToolchain { .. }) => {}
+            Coverage::NotCovered(gap) => panic!("unexpected gap: {gap}"),
+        }
     }
 
     /// Returns the text of the qualifier in `source`'s first `use` item

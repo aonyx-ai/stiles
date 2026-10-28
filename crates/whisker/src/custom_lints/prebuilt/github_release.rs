@@ -430,6 +430,14 @@ mod tests {
     }
 
     #[test]
+    fn base_from_a_value_drops_a_trailing_slash() {
+        assert_eq!(
+            base_from(Some("https://github.acme.example/api/v3/".to_owned())),
+            "https://github.acme.example/api/v3"
+        );
+    }
+
+    #[test]
     fn base_from_an_empty_value_is_the_public_api() {
         assert_eq!(base_from(Some(String::new())), DEFAULT_BASE);
     }
@@ -440,10 +448,10 @@ mod tests {
     }
 
     #[test]
-    fn base_from_a_value_drops_a_trailing_slash() {
+    fn host_of_another_api_names_its_host() {
         assert_eq!(
-            base_from(Some("https://github.acme.example/api/v3/".to_owned())),
-            "https://github.acme.example/api/v3"
+            host_of("https://github.acme.example/api/v3"),
+            Some("github.acme.example".to_owned())
         );
     }
 
@@ -458,56 +466,13 @@ mod tests {
     }
 
     #[test]
-    fn host_of_another_api_names_its_host() {
-        assert_eq!(
-            host_of("https://github.acme.example/api/v3"),
-            Some("github.acme.example".to_owned())
-        );
+    fn present_keeps_a_value_that_holds_something() {
+        assert_eq!(present(Some("token".to_owned())), Some("token".to_owned()));
     }
 
     #[test]
-    fn repository_host_of_the_public_api_names_nothing() {
-        assert_eq!(repository_host(DEFAULT_BASE), None);
-    }
-
-    #[test]
-    fn repository_host_of_another_api_names_its_host() {
-        assert_eq!(
-            repository_host("https://github.acme.example/api/v3"),
-            Some("github.acme.example".to_owned())
-        );
-    }
-
-    /// A download redirects to a storage host
-    ///
-    /// That host signs the request itself and refuses one that carries an
-    /// `Authorization` header, so the token must not follow it there.
-    #[test]
-    fn serves_is_false_for_the_host_a_download_redirects_to() {
-        let api = api_for(DEFAULT_BASE);
-
-        assert!(!api.serves("https://objects.githubusercontent.com/whatever"));
-    }
-
-    #[test]
-    fn serves_is_true_for_the_public_api() {
-        let api = api_for(DEFAULT_BASE);
-
-        assert!(api.serves("https://api.github.com/repos/aonyx-ai/rules/releases"));
-    }
-
-    #[test]
-    fn serves_is_true_for_a_configured_api() {
-        let api = api_for("https://github.acme.example/api/v3");
-
-        assert!(api.serves("https://github.acme.example/api/v3/repos/team/rules/releases"));
-    }
-
-    #[test]
-    fn read_text_of_a_body_within_the_limit_returns_it() {
-        let body = read_text(b"digest".as_slice(), 64, "the sidecar").expect("should read");
-
-        assert_eq!(body, "digest");
+    fn present_treats_an_empty_value_as_unset() {
+        assert_eq!(present(Some(String::new())), None);
     }
 
     #[test]
@@ -519,13 +484,44 @@ mod tests {
     }
 
     #[test]
-    fn present_treats_an_empty_value_as_unset() {
-        assert_eq!(present(Some(String::new())), None);
+    fn read_text_of_a_body_within_the_limit_returns_it() {
+        let body = read_text(b"digest".as_slice(), 64, "the sidecar").expect("should read");
+
+        assert_eq!(body, "digest");
+    }
+
+    /// A listing carries far more than whisker reads, and GitHub adds
+    /// fields over time
+    ///
+    /// Neither fact may fail a check.
+    #[test]
+    fn releases_ignore_fields_whisker_does_not_read() {
+        let json = r#"[{"id":1,"tag_name":"v1","draft":false,"prerelease":true,
+            "assets":[{"name":"a","url":"https://api/a","label":null,"state":"uploaded"}]}]"#;
+
+        let releases = releases(json);
+
+        assert_eq!(releases.len(), 1);
     }
 
     #[test]
-    fn present_keeps_a_value_that_holds_something() {
-        assert_eq!(present(Some("token".to_owned())), Some("token".to_owned()));
+    fn releases_without_assets_parse() {
+        let releases = releases(r#"[{"draft":false}]"#);
+
+        assert!(releases[0].assets.is_empty());
+    }
+
+    #[test]
+    fn repository_host_of_another_api_names_its_host() {
+        assert_eq!(
+            repository_host("https://github.acme.example/api/v3"),
+            Some("github.acme.example".to_owned())
+        );
+    }
+
+    #[test]
+    fn repository_host_of_the_public_api_names_nothing() {
+        assert_eq!(repository_host(DEFAULT_BASE), None);
     }
 
     #[test]
@@ -548,6 +544,28 @@ mod tests {
         assert_eq!(asset.sidecar.name, name.sidecar());
     }
 
+    #[test]
+    fn select_asset_reads_a_later_release_when_the_first_lacks_it() {
+        let name = name();
+        let json = format!(
+            "[{},{}]",
+            listing(false, &["other.tar.gz"]).trim_matches(['[', ']']),
+            listing(false, &[name.as_str(), &name.sidecar()]).trim_matches(['[', ']'])
+        );
+        let releases = releases(&json);
+
+        assert!(select_asset(&releases, &name).is_some());
+    }
+
+    /// Nobody published a draft, and its assets can still change
+    #[test]
+    fn select_asset_skips_a_draft() {
+        let name = name();
+        let releases = releases(&listing(true, &[name.as_str(), &name.sidecar()]));
+
+        assert_eq!(select_asset(&releases, &name), None);
+    }
+
     /// Whisker unpacks no archive it cannot check
     #[test]
     fn select_asset_without_a_sidecar_is_none() {
@@ -568,47 +586,29 @@ mod tests {
         assert_eq!(select_asset(&releases, &name), None);
     }
 
-    /// Nobody published a draft, and its assets can still change
-    #[test]
-    fn select_asset_skips_a_draft() {
-        let name = name();
-        let releases = releases(&listing(true, &[name.as_str(), &name.sidecar()]));
-
-        assert_eq!(select_asset(&releases, &name), None);
-    }
-
-    #[test]
-    fn select_asset_reads_a_later_release_when_the_first_lacks_it() {
-        let name = name();
-        let json = format!(
-            "[{},{}]",
-            listing(false, &["other.tar.gz"]).trim_matches(['[', ']']),
-            listing(false, &[name.as_str(), &name.sidecar()]).trim_matches(['[', ']'])
-        );
-        let releases = releases(&json);
-
-        assert!(select_asset(&releases, &name).is_some());
-    }
-
-    /// A listing carries far more than whisker reads, and GitHub adds
-    /// fields over time
+    /// A download redirects to a storage host
     ///
-    /// Neither fact may fail a check.
+    /// That host signs the request itself and refuses one that carries an
+    /// `Authorization` header, so the token must not follow it there.
     #[test]
-    fn releases_ignore_fields_whisker_does_not_read() {
-        let json = r#"[{"id":1,"tag_name":"v1","draft":false,"prerelease":true,
-            "assets":[{"name":"a","url":"https://api/a","label":null,"state":"uploaded"}]}]"#;
+    fn serves_is_false_for_the_host_a_download_redirects_to() {
+        let api = api_for(DEFAULT_BASE);
 
-        let releases = releases(json);
-
-        assert_eq!(releases.len(), 1);
+        assert!(!api.serves("https://objects.githubusercontent.com/whatever"));
     }
 
     #[test]
-    fn releases_without_assets_parse() {
-        let releases = releases(r#"[{"draft":false}]"#);
+    fn serves_is_true_for_a_configured_api() {
+        let api = api_for("https://github.acme.example/api/v3");
 
-        assert!(releases[0].assets.is_empty());
+        assert!(api.serves("https://github.acme.example/api/v3/repos/team/rules/releases"));
+    }
+
+    #[test]
+    fn serves_is_true_for_the_public_api() {
+        let api = api_for(DEFAULT_BASE);
+
+        assert!(api.serves("https://api.github.com/repos/aonyx-ai/rules/releases"));
     }
 
     #[test]

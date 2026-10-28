@@ -314,6 +314,16 @@ mod tests {
     }
 
     #[test]
+    fn prebuilt_directory_in_does_not_hold_the_checkout() {
+        let source = source("https://example.com/rules");
+
+        let prebuilt = prebuilt_directory_in(Path::new(ROOT), &source, &tag(0, TARGET));
+        let checkout = checkout_directory_in(Path::new(ROOT), &source);
+
+        assert!(!checkout.starts_with(&prebuilt), "{checkout:?}");
+    }
+
+    #[test]
     fn prebuilt_directory_in_ends_with_the_tag() {
         let directory = prebuilt_directory_in(
             Path::new(ROOT),
@@ -325,6 +335,24 @@ mod tests {
             directory.file_name().expect("should have a name"),
             std::ffi::OsStr::new(&tag(0, TARGET).to_string())
         );
+    }
+
+    #[test]
+    fn prebuilt_directory_in_names_the_remote_the_way_a_checkout_does() {
+        let source = source("https://example.com/rules");
+
+        let prebuilt = prebuilt_directory_in(Path::new(ROOT), &source, &tag(0, TARGET));
+        let checkout = checkout_directory_in(Path::new(ROOT), &source);
+
+        let remote_of = |path: &Path, depth: usize| {
+            path.ancestors()
+                .nth(depth)
+                .and_then(Path::file_name)
+                .expect("should have a remote directory")
+                .to_owned()
+        };
+
+        assert_eq!(remote_of(&prebuilt, 2), remote_of(&checkout, 1));
     }
 
     /// Two whiskers must never read each other's libraries
@@ -351,31 +379,19 @@ mod tests {
     }
 
     #[test]
-    fn prebuilt_directory_in_does_not_hold_the_checkout() {
-        let source = source("https://example.com/rules");
+    fn present_keeps_a_value_that_holds_something() {
+        let value = present(Some(OsString::from("/cache")));
 
-        let prebuilt = prebuilt_directory_in(Path::new(ROOT), &source, &tag(0, TARGET));
-        let checkout = checkout_directory_in(Path::new(ROOT), &source);
-
-        assert!(!checkout.starts_with(&prebuilt), "{checkout:?}");
+        assert_eq!(value, Some(OsString::from("/cache")));
     }
 
+    /// A shell that expands an unset variable leaves an empty string
+    /// behind, and joining onto that would put the cache at the root
     #[test]
-    fn prebuilt_directory_in_names_the_remote_the_way_a_checkout_does() {
-        let source = source("https://example.com/rules");
+    fn present_treats_an_empty_value_as_unset() {
+        let value = present(Some(OsString::new()));
 
-        let prebuilt = prebuilt_directory_in(Path::new(ROOT), &source, &tag(0, TARGET));
-        let checkout = checkout_directory_in(Path::new(ROOT), &source);
-
-        let remote_of = |path: &Path, depth: usize| {
-            path.ancestors()
-                .nth(depth)
-                .and_then(Path::file_name)
-                .expect("should have a remote directory")
-                .to_owned()
-        };
-
-        assert_eq!(remote_of(&prebuilt, 2), remote_of(&checkout, 1));
+        assert_eq!(value, None);
     }
 
     #[test]
@@ -406,22 +422,6 @@ mod tests {
             format!("{error:#}").contains(CACHE_VARIABLE),
             "the error should name the way out: {error:#}"
         );
-    }
-
-    /// A shell that expands an unset variable leaves an empty string
-    /// behind, and joining onto that would put the cache at the root
-    #[test]
-    fn present_treats_an_empty_value_as_unset() {
-        let value = present(Some(OsString::new()));
-
-        assert_eq!(value, None);
-    }
-
-    #[test]
-    fn present_keeps_a_value_that_holds_something() {
-        let value = present(Some(OsString::from("/cache")));
-
-        assert_eq!(value, Some(OsString::from("/cache")));
     }
 
     #[test]

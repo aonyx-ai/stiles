@@ -345,6 +345,16 @@ mod tests {
         )
     }
 
+    /// An unpack that was interrupted leaves a directory behind, and the
+    /// next run has to be able to replace it rather than fail on it
+    #[test]
+    fn holds_libraries_of_a_missing_directory_is_false() {
+        let directory = directory_holding(&[]);
+        let missing = directory.path().join("absent");
+
+        assert!(!holds_libraries(&missing));
+    }
+
     #[test]
     fn holds_libraries_with_a_library_is_true() {
         let directory = directory_holding(&[&library("one")]);
@@ -357,16 +367,6 @@ mod tests {
         let directory = directory_holding(&["README.md"]);
 
         assert!(!holds_libraries(directory.path()));
-    }
-
-    /// An unpack that was interrupted leaves a directory behind, and the
-    /// next run has to be able to replace it rather than fail on it
-    #[test]
-    fn holds_libraries_of_a_missing_directory_is_false() {
-        let directory = directory_holding(&[]);
-        let missing = directory.path().join("absent");
-
-        assert!(!holds_libraries(&missing));
     }
 
     #[test]
@@ -406,15 +406,6 @@ mod tests {
     }
 
     #[test]
-    fn libraries_of_an_empty_directory_is_empty() {
-        let directory = directory_holding(&[]);
-
-        let libraries = libraries(directory.path()).expect("the directory should be read");
-
-        assert!(libraries.is_empty(), "{libraries:?}");
-    }
-
-    #[test]
     fn libraries_of_a_missing_directory_returns_error() {
         let directory = directory_holding(&[]);
         let missing = directory.path().join("absent");
@@ -422,5 +413,14 @@ mod tests {
         let error = libraries(&missing).expect_err("should fail");
 
         assert!(format!("{error:#}").contains("absent"), "{error:#}");
+    }
+
+    #[test]
+    fn libraries_of_an_empty_directory_is_empty() {
+        let directory = directory_holding(&[]);
+
+        let libraries = libraries(directory.path()).expect("the directory should be read");
+
+        assert!(libraries.is_empty(), "{libraries:?}");
     }
 }

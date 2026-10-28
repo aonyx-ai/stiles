@@ -205,52 +205,11 @@ mod tests {
     }
 
     #[test]
-    fn render_to_string_with_empty_diagnostics_returns_empty() {
-        let result = render_to_string(&[], &HashMap::new()).unwrap();
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn render_to_string_includes_rule_id() {
-        let output = render_to_string(&[test_diagnostic()], &test_source()).unwrap();
-        assert!(
-            output.contains("lint.test"),
-            "output should contain rule id: {output}"
-        );
-    }
-
-    #[test]
     fn render_to_string_includes_message() {
         let output = render_to_string(&[test_diagnostic()], &test_source()).unwrap();
         assert!(
             output.contains("test warning"),
             "output should contain message: {output}"
-        );
-    }
-
-    #[test]
-    fn render_to_string_shows_warning_severity() {
-        let output = render_to_string(&[test_diagnostic()], &test_source()).unwrap();
-        assert!(
-            output.contains("warning"),
-            "output should contain 'warning': {output}"
-        );
-    }
-
-    #[test]
-    fn render_to_string_shows_error_severity() {
-        let diag = Diagnostic::new(
-            RuleId::new("lint.err"),
-            Severity::Error,
-            "test error".into(),
-            Span::new(PathBuf::from("test.rs"), 0, 12),
-        );
-
-        let output = render_to_string(&[diag], &test_source()).unwrap();
-
-        assert!(
-            output.contains("error"),
-            "output should contain 'error': {output}"
         );
     }
 
@@ -281,6 +240,15 @@ mod tests {
         assert!(
             output.contains("also here"),
             "output should contain related message: {output}"
+        );
+    }
+
+    #[test]
+    fn render_to_string_includes_rule_id() {
+        let output = render_to_string(&[test_diagnostic()], &test_source()).unwrap();
+        assert!(
+            output.contains("lint.test"),
+            "output should contain rule id: {output}"
         );
     }
 
@@ -341,12 +309,44 @@ mod tests {
     }
 
     #[test]
+    fn render_to_string_shows_error_severity() {
+        let diag = Diagnostic::new(
+            RuleId::new("lint.err"),
+            Severity::Error,
+            "test error".into(),
+            Span::new(PathBuf::from("test.rs"), 0, 12),
+        );
+
+        let output = render_to_string(&[diag], &test_source()).unwrap();
+
+        assert!(
+            output.contains("error"),
+            "output should contain 'error': {output}"
+        );
+    }
+
+    #[test]
     fn render_to_string_shows_source_file_name() {
         let output = render_to_string(&[test_diagnostic()], &test_source()).unwrap();
         assert!(
             output.contains("test.rs"),
             "output should contain filename: {output}"
         );
+    }
+
+    #[test]
+    fn render_to_string_shows_warning_severity() {
+        let output = render_to_string(&[test_diagnostic()], &test_source()).unwrap();
+        assert!(
+            output.contains("warning"),
+            "output should contain 'warning': {output}"
+        );
+    }
+
+    #[test]
+    fn render_to_string_with_empty_diagnostics_returns_empty() {
+        let result = render_to_string(&[], &HashMap::new()).unwrap();
+        assert!(result.is_empty());
     }
 
     mod prop {

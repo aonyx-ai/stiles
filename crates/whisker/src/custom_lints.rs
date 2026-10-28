@@ -678,6 +678,22 @@ mod tests {
     }
 
     #[test]
+    fn configured_sources_leaves_a_path_source_unlocked() {
+        let root = tempfile::tempdir().expect("temporary directory should be created");
+        package(root.path(), "no_todo");
+        let config = config_with(root.path(), vec![LintPath::new("no_todo")]);
+
+        let sources =
+            configured_sources(&config, &AbiTag::host(), &mut Vec::new()).expect("should resolve");
+
+        assert_eq!(
+            sources.first().map(|source| source.contents),
+            Some(Contents::Sources(Locking::Unlocked)),
+            "a lockfile on disk belongs to the person running whisker"
+        );
+    }
+
+    #[test]
     fn configured_sources_rejects_a_duplicate_entry() {
         let root = tempfile::tempdir().expect("temporary directory should be created");
         package(root.path(), "no_todo");
@@ -753,22 +769,6 @@ mod tests {
                 std::fs::canonicalize(first).expect("should resolve"),
                 std::fs::canonicalize(second).expect("should resolve"),
             ]
-        );
-    }
-
-    #[test]
-    fn configured_sources_leaves_a_path_source_unlocked() {
-        let root = tempfile::tempdir().expect("temporary directory should be created");
-        package(root.path(), "no_todo");
-        let config = config_with(root.path(), vec![LintPath::new("no_todo")]);
-
-        let sources =
-            configured_sources(&config, &AbiTag::host(), &mut Vec::new()).expect("should resolve");
-
-        assert_eq!(
-            sources.first().map(|source| source.contents),
-            Some(Contents::Sources(Locking::Unlocked)),
-            "a lockfile on disk belongs to the person running whisker"
         );
     }
 

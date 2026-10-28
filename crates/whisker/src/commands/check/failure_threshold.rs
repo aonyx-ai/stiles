@@ -71,24 +71,6 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<FailureThreshold>();
-    }
-
-    #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<FailureThreshold>();
-    }
-
-    #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<FailureThreshold>();
-    }
-
-    #[test]
     fn is_met_by_with_errors_accepts_only_error() {
         let threshold = FailureThreshold::Errors;
 
@@ -152,6 +134,27 @@ mod tests {
         assert_eq!(severities, [Severity::Help, Severity::Info]);
     }
 
+    #[test]
+    fn promote_with_warnings_preserves_the_message() {
+        let promoted = promoted_detailed_warning();
+
+        assert_eq!(promoted.message(), "test message");
+    }
+
+    #[test]
+    fn promote_with_warnings_preserves_the_origins() {
+        let promoted = promoted_detailed_warning();
+
+        assert_eq!(promoted.origins(), [origin()]);
+    }
+
+    #[test]
+    fn promote_with_warnings_preserves_the_related_locations() {
+        let promoted = promoted_detailed_warning();
+
+        assert_eq!(promoted.related(), [related()]);
+    }
+
     fn origin() -> Location {
         Location::new(
             Span::new(PathBuf::from("other.rs"), 1, 2),
@@ -186,27 +189,6 @@ mod tests {
     }
 
     #[test]
-    fn promote_with_warnings_preserves_the_message() {
-        let promoted = promoted_detailed_warning();
-
-        assert_eq!(promoted.message(), "test message");
-    }
-
-    #[test]
-    fn promote_with_warnings_preserves_the_origins() {
-        let promoted = promoted_detailed_warning();
-
-        assert_eq!(promoted.origins(), [origin()]);
-    }
-
-    #[test]
-    fn promote_with_warnings_preserves_the_related_locations() {
-        let promoted = promoted_detailed_warning();
-
-        assert_eq!(promoted.related(), [related()]);
-    }
-
-    #[test]
     fn promote_with_warnings_preserves_the_rule_id() {
         let promoted = promoted_detailed_warning();
 
@@ -232,5 +214,23 @@ mod tests {
         let promoted = FailureThreshold::Warnings.promote(test_diagnostic(Severity::Warn));
 
         assert_eq!(promoted.severity(), Severity::Error);
+    }
+
+    #[test]
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<FailureThreshold>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<FailureThreshold>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<FailureThreshold>();
     }
 }

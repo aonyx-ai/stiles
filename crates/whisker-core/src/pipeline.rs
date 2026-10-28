@@ -268,21 +268,9 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<Pipeline>();
-    }
-
-    #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<Pipeline>();
-    }
-
-    #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<Pipeline>();
+    fn detect_language_with_no_extension_returns_error() {
+        let result = detect_language(Path::new("Makefile"));
+        assert!(result.is_err());
     }
 
     #[test]
@@ -297,10 +285,63 @@ mod tests {
         assert!(result.is_err());
     }
 
+    /// A pass that panics ends the file with an error that says where
+    ///
+    /// The panic comes back across the boundary as a value. The run can
+    /// therefore name the node it was checking.
     #[test]
-    fn detect_language_with_no_extension_returns_error() {
-        let result = detect_language(Path::new("Makefile"));
-        assert!(result.is_err());
+    fn run_on_source_with_a_panicking_pass_returns_an_error_naming_the_node() {
+        struct Panicking;
+        impl whisker_types::LintPass for Panicking {
+            extern "C" fn language(&self) -> whisker_types::Language {
+                whisker_types::Language::Rust
+            }
+
+            extern "C" fn configure(
+                &mut self,
+                _options: &whisker_types::RuleOptions,
+            ) -> Configured {
+                Configured::Ok(())
+            }
+
+            extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+                let kind = node.kind();
+                Panic::catch(move || -> Vec<Diagnostic> {
+                    match kind == "function_item" {
+                        true => panic!("no functions allowed"),
+                        false => Vec::new(),
+                    }
+                })
+                .map(|found| found.into_iter().collect())
+                .into()
+            }
+        }
+
+        let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
+        let mut pipeline = Pipeline::builder()
+            .language(Language::Rust)
+            .grammar(&ts_lang)
+            .build()
+            .unwrap();
+        let mut passes = vec![lint(Panicking, &[])];
+
+        let error = pipeline
+            .run_on_source(
+                "fn main() {}",
+                Path::new("test.rs"),
+                &[&Covering as &dyn DecorationProvider],
+                &mut passes,
+            )
+            .expect_err("a panicking pass should fail the file");
+
+        let RunPipelineError::LintsFailed { source } = error else {
+            panic!("should be a failed walk, got {error:?}");
+        };
+        assert_eq!(
+            source.to_string(),
+            "a lint pass panicked while checking a function_item at byte 0 of test.rs: no functions \
+             allowed"
+        );
     }
 
     #[test]
@@ -329,6 +370,23 @@ mod tests {
         assert_eq!(messages, ["covered"]);
     }
 
+    #[test]
+    fn run_on_source_with_declining_provider_names_the_file() {
+        let uncovered = uncovered(&[&Declining]);
+
+        assert_eq!(uncovered.file(), Path::new("test.rs"));
+    }
+
+    #[test]
+    fn run_on_source_with_declining_provider_returns_its_gap() {
+        let uncovered = uncovered(&[&Declining]);
+
+        assert_eq!(
+            uncovered.gaps(),
+            [(ProviderName("declining"), CoverageGap::StaleSource)]
+        );
+    }
+
     /// Runs a pipeline over `fn main() {}` with the given providers and
     /// returns the file they left uncovered
     fn uncovered(providers: &[&dyn DecorationProvider]) -> UncoveredFile {
@@ -352,23 +410,6 @@ mod tests {
             panic!("should be an UncoveredFile, got {error:?}");
         };
         uncovered
-    }
-
-    #[test]
-    fn run_on_source_with_declining_provider_names_the_file() {
-        let uncovered = uncovered(&[&Declining]);
-
-        assert_eq!(uncovered.file(), Path::new("test.rs"));
-    }
-
-    #[test]
-    fn run_on_source_with_declining_provider_returns_its_gap() {
-        let uncovered = uncovered(&[&Declining]);
-
-        assert_eq!(
-            uncovered.gaps(),
-            [(ProviderName("declining"), CoverageGap::StaleSource)]
-        );
     }
 
     #[test]
@@ -459,65 +500,6 @@ mod tests {
         assert!(uncovered.gaps().is_empty());
     }
 
-    /// A pass that panics ends the file with an error that says where
-    ///
-    /// The panic comes back across the boundary as a value. The run can
-    /// therefore name the node it was checking.
-    #[test]
-    fn run_on_source_with_a_panicking_pass_returns_an_error_naming_the_node() {
-        struct Panicking;
-        impl whisker_types::LintPass for Panicking {
-            extern "C" fn language(&self) -> whisker_types::Language {
-                whisker_types::Language::Rust
-            }
-
-            extern "C" fn configure(
-                &mut self,
-                _options: &whisker_types::RuleOptions,
-            ) -> Configured {
-                Configured::Ok(())
-            }
-
-            extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-                let kind = node.kind();
-                Panic::catch(move || -> Vec<Diagnostic> {
-                    match kind == "function_item" {
-                        true => panic!("no functions allowed"),
-                        false => Vec::new(),
-                    }
-                })
-                .map(|found| found.into_iter().collect())
-                .into()
-            }
-        }
-
-        let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-        let mut pipeline = Pipeline::builder()
-            .language(Language::Rust)
-            .grammar(&ts_lang)
-            .build()
-            .unwrap();
-        let mut passes = vec![lint(Panicking, &[])];
-
-        let error = pipeline
-            .run_on_source(
-                "fn main() {}",
-                Path::new("test.rs"),
-                &[&Covering as &dyn DecorationProvider],
-                &mut passes,
-            )
-            .expect_err("a panicking pass should fail the file");
-
-        let RunPipelineError::LintsFailed { source } = error else {
-            panic!("should be a failed walk, got {error:?}");
-        };
-        assert_eq!(
-            source.to_string(),
-            "a lint pass panicked while checking a function_item at byte 0 of test.rs: no functions \
-             allowed"
-        );
-    }
-
     #[test]
     fn run_on_source_with_two_decorating_providers_keeps_first_decoration() {
         let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
@@ -588,6 +570,24 @@ mod tests {
         let RunPipelineError::Uncovered { .. } = error else {
             panic!("should be an UncoveredFile, got {error:?}");
         };
+    }
+
+    #[test]
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Pipeline>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Pipeline>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Pipeline>();
     }
 
     mod prop {

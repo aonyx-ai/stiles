@@ -55,21 +55,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<Language>();
+    fn display_with_rust_shows_rust() {
+        assert_eq!(Language::Rust.to_string(), "Rust");
     }
 
     #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<Language>();
-    }
-
-    #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<Language>();
+    fn display_with_typescript_shows_typescript() {
+        assert_eq!(Language::TypeScript.to_string(), "TypeScript");
     }
 
     #[test]
@@ -96,13 +88,21 @@ mod tests {
     }
 
     #[test]
-    fn display_with_rust_shows_rust() {
-        assert_eq!(Language::Rust.to_string(), "Rust");
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Language>();
     }
 
     #[test]
-    fn display_with_typescript_shows_typescript() {
-        assert_eq!(Language::TypeScript.to_string(), "TypeScript");
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Language>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Language>();
     }
 
     mod prop {

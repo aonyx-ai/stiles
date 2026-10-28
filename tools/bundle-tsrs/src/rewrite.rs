@@ -398,30 +398,12 @@ mod tests {
     }
 
     #[test]
-    fn rewrite_leaves_crate_visibility_alone() {
-        let rewriter = rewriter(&[]);
-
-        let text = rewrite(&rewriter, "pub(crate) fn f() {}");
-
-        assert_eq!(text, "pub(crate) fn f() {}");
-    }
-
-    #[test]
     fn rewrite_leaves_a_later_path_segment_alone() {
         let rewriter = rewriter(&[]);
 
         let text = rewrite(&rewriter, "use other::tsrs_core::x; let y = a.tsrs_core;");
 
         assert_eq!(text, "use other::tsrs_core::x; let y = a.tsrs_core;");
-    }
-
-    #[test]
-    fn rewrite_moves_a_path_to_an_exported_macro_to_the_root() {
-        let rewriter = rewriter(&[MACROS]);
-
-        let text = rewrite(&rewriter, "tsrs_core::free!(x); crate::free!(y);");
-
-        assert_eq!(text, "crate::free!(x); crate::free!(y);");
     }
 
     #[test]
@@ -434,12 +416,45 @@ mod tests {
     }
 
     #[test]
-    fn rewrite_prefixes_a_module_that_shares_a_name_with_a_macro() {
+    fn rewrite_leaves_crate_visibility_alone() {
+        let rewriter = rewriter(&[]);
+
+        let text = rewrite(&rewriter, "pub(crate) fn f() {}");
+
+        assert_eq!(text, "pub(crate) fn f() {}");
+    }
+
+    #[test]
+    fn rewrite_moves_a_path_to_an_exported_macro_to_the_root() {
         let rewriter = rewriter(&[MACROS]);
 
-        let text = rewrite(&rewriter, "crate::free::release(x);");
+        let text = rewrite(&rewriter, "tsrs_core::free!(x); crate::free!(y);");
 
-        assert_eq!(text, "crate::tsrs_ast::free::release(x);");
+        assert_eq!(text, "crate::free!(x); crate::free!(y);");
+    }
+
+    #[test]
+    fn rewrite_points_the_manifest_dir_at_the_crate() {
+        let rewriter = rewriter(&[]);
+
+        let text = rewrite(
+            &rewriter,
+            "concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/libs\")",
+        );
+
+        assert_eq!(
+            text,
+            "concat!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/tsrs_ast\"), \"/libs\")"
+        );
+    }
+
+    #[test]
+    fn rewrite_prefixes_a_crate_in_a_type_annotation() {
+        let rewriter = rewriter(&[]);
+
+        let text = rewrite(&rewriter, "fn f(node: tsrs_core::Node) {}");
+
+        assert_eq!(text, "fn f(node: crate::tsrs_core::Node) {}");
     }
 
     #[test]
@@ -473,6 +488,15 @@ mod tests {
     }
 
     #[test]
+    fn rewrite_prefixes_a_module_that_shares_a_name_with_a_macro() {
+        let rewriter = rewriter(&[MACROS]);
+
+        let text = rewrite(&rewriter, "crate::free::release(x);");
+
+        assert_eq!(text, "crate::tsrs_ast::free::release(x);");
+    }
+
+    #[test]
     fn rewrite_prefixes_a_name_of_a_crate_with_crate() {
         let rewriter = rewriter(&[]);
 
@@ -482,15 +506,6 @@ mod tests {
             text,
             "use crate::tsrs_core as core;\nuse crate::tsrs_core::{a, b};"
         );
-    }
-
-    #[test]
-    fn rewrite_prefixes_a_crate_in_a_type_annotation() {
-        let rewriter = rewriter(&[]);
-
-        let text = rewrite(&rewriter, "fn f(node: tsrs_core::Node) {}");
-
-        assert_eq!(text, "fn f(node: crate::tsrs_core::Node) {}");
     }
 
     #[test]
@@ -517,6 +532,17 @@ mod tests {
     }
 
     #[test]
+    fn rewrite_with_an_escaped_include_fails() {
+        let rewriter = rewriter(&[]);
+
+        let error = rewriter
+            .rewrite("include_str!(\"a\\\\b\")", &CrateName::new("tsrs_ast"))
+            .expect_err("should fail");
+
+        assert!(format!("{error:#}").contains("holds an escape"));
+    }
+
+    #[test]
     fn trait_auto_crate_name() {
         fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<CrateName>();
@@ -538,31 +564,5 @@ mod tests {
     fn trait_auto_rewritten() {
         fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<Rewritten>();
-    }
-
-    #[test]
-    fn rewrite_with_an_escaped_include_fails() {
-        let rewriter = rewriter(&[]);
-
-        let error = rewriter
-            .rewrite("include_str!(\"a\\\\b\")", &CrateName::new("tsrs_ast"))
-            .expect_err("should fail");
-
-        assert!(format!("{error:#}").contains("holds an escape"));
-    }
-
-    #[test]
-    fn rewrite_points_the_manifest_dir_at_the_crate() {
-        let rewriter = rewriter(&[]);
-
-        let text = rewrite(
-            &rewriter,
-            "concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/libs\")",
-        );
-
-        assert_eq!(
-            text,
-            "concat!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/tsrs_ast\"), \"/libs\")"
-        );
     }
 }

@@ -25,89 +25,6 @@ impl RustLintPass for MatchArmWildcardFinder {
 }
 
 #[test]
-fn wildcard_finder_detects_wildcard_arm() {
-    let tree = parse("fn f() { match x { 1 => {} _ => {} } }", Language::Rust);
-    let mut passes = vec![adapt(MatchArmWildcardFinder)];
-    let diagnostics = execute(&tree, &mut passes);
-    let [diagnostic] = diagnostics.as_slice() else {
-        panic!("expected one diagnostic, got {diagnostics:?}");
-    };
-
-    assert_diagnostic(diagnostic)
-        .has_rule_id("lint.wildcard-match-arm")
-        .has_severity(Severity::Warn)
-        .message_contains("wildcard");
-}
-
-#[test]
-fn wildcard_finder_ignores_named_arms() {
-    let tree = parse("fn f() { match x { Foo => {} Bar => {} } }", Language::Rust);
-    let mut passes = vec![adapt(MatchArmWildcardFinder)];
-    let diagnostics = execute(&tree, &mut passes);
-
-    assert_no_diagnostics(&diagnostics);
-}
-
-struct MacroInvocationFinder;
-
-impl RustLintPass for MacroInvocationFinder {
-    fn check_macro_invocation(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-        let text = node.text();
-        if text.starts_with("matches!") {
-            vec![Diagnostic::new(
-                RuleId::new("lint.no-matches-macro"),
-                Severity::Warn,
-                "use of matches! macro".into(),
-                node.span(),
-            )]
-        } else {
-            Vec::new()
-        }
-    }
-}
-
-#[test]
-fn macro_finder_detects_matches_macro() {
-    let tree = parse("fn f() { let _ = matches!(x, 1); }", Language::Rust);
-    let mut passes = vec![adapt(MacroInvocationFinder)];
-    let diagnostics = execute(&tree, &mut passes);
-    let [diagnostic] = diagnostics.as_slice() else {
-        panic!("expected one diagnostic, got {diagnostics:?}");
-    };
-
-    assert_diagnostic(diagnostic)
-        .has_rule_id("lint.no-matches-macro")
-        .message_contains("matches!");
-}
-
-#[test]
-fn macro_finder_ignores_println() {
-    let tree = parse("fn f() { println!(\"hello\"); }", Language::Rust);
-    let mut passes = vec![adapt(MacroInvocationFinder)];
-    let diagnostics = execute(&tree, &mut passes);
-
-    assert_no_diagnostics(&diagnostics);
-}
-
-struct BoolParamFinder;
-
-impl RustLintPass for BoolParamFinder {
-    fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-        let text = node.text();
-        if text.contains(": bool") {
-            vec![Diagnostic::new(
-                RuleId::new("lint.bool-param"),
-                Severity::Warn,
-                "bool parameter".into(),
-                node.span(),
-            )]
-        } else {
-            Vec::new()
-        }
-    }
-}
-
-#[test]
 fn bool_finder_detects_bool_param() {
     let tree = parse("fn f(x: bool) {}", Language::Rust);
     let mut passes = vec![adapt(BoolParamFinder)];
@@ -130,50 +47,22 @@ fn bool_finder_ignores_non_bool_params() {
     assert_no_diagnostics(&diagnostics);
 }
 
-#[test]
-fn multiple_lint_passes_run_together() {
-    let tree = parse(
-        "fn f(x: bool) { let _ = matches!(x, true); }",
-        Language::Rust,
-    );
-    let mut passes = vec![adapt(BoolParamFinder), adapt(MacroInvocationFinder)];
-    let diagnostics = execute(&tree, &mut passes);
+struct MacroInvocationFinder;
 
-    let mut rule_ids: Vec<&str> = diagnostics.iter().map(|d| d.rule_id().as_str()).collect();
-    rule_ids.sort_unstable();
-    assert_eq!(rule_ids, ["lint.bool-param", "lint.no-matches-macro"]);
-}
-
-#[test]
-fn diagnostic_spans_point_to_correct_byte_ranges() {
-    let source = "fn main() { let _ = matches!(x, 1); }";
-    let tree = parse(source, Language::Rust);
-    let mut passes = vec![adapt(MacroInvocationFinder)];
-    let diagnostics = execute(&tree, &mut passes);
-    let [diagnostic] = diagnostics.as_slice() else {
-        panic!("expected one diagnostic, got {diagnostics:?}");
-    };
-
-    let span = diagnostic.span();
-    let spanned_text = &source[span.start()..span.end()];
-    assert!(
-        spanned_text.contains("matches!"),
-        "span should cover the matches! invocation, got: {spanned_text}"
-    );
-}
-
-#[test]
-fn empty_source_produces_no_diagnostics() {
-    let tree = parse("", Language::Rust);
-    let mut passes = vec![
-        adapt(MatchArmWildcardFinder),
-        adapt(MacroInvocationFinder),
-        adapt(BoolParamFinder),
-    ];
-
-    let diagnostics = execute(&tree, &mut passes);
-
-    assert_no_diagnostics(&diagnostics);
+impl RustLintPass for MacroInvocationFinder {
+    fn check_macro_invocation(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
+        let text = node.text();
+        if text.starts_with("matches!") {
+            vec![Diagnostic::new(
+                RuleId::new("lint.no-matches-macro"),
+                Severity::Warn,
+                "use of matches! macro".into(),
+                node.span(),
+            )]
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 #[test]
@@ -216,5 +105,116 @@ fn complex_source_does_not_panic() {
         adapt(BoolParamFinder),
     ];
     let diagnostics = execute(&tree, &mut passes);
+    assert_no_diagnostics(&diagnostics);
+}
+
+#[test]
+fn diagnostic_spans_point_to_correct_byte_ranges() {
+    let source = "fn main() { let _ = matches!(x, 1); }";
+    let tree = parse(source, Language::Rust);
+    let mut passes = vec![adapt(MacroInvocationFinder)];
+    let diagnostics = execute(&tree, &mut passes);
+    let [diagnostic] = diagnostics.as_slice() else {
+        panic!("expected one diagnostic, got {diagnostics:?}");
+    };
+
+    let span = diagnostic.span();
+    let spanned_text = &source[span.start()..span.end()];
+    assert!(
+        spanned_text.contains("matches!"),
+        "span should cover the matches! invocation, got: {spanned_text}"
+    );
+}
+
+struct BoolParamFinder;
+
+impl RustLintPass for BoolParamFinder {
+    fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
+        let text = node.text();
+        if text.contains(": bool") {
+            vec![Diagnostic::new(
+                RuleId::new("lint.bool-param"),
+                Severity::Warn,
+                "bool parameter".into(),
+                node.span(),
+            )]
+        } else {
+            Vec::new()
+        }
+    }
+}
+
+#[test]
+fn empty_source_produces_no_diagnostics() {
+    let tree = parse("", Language::Rust);
+    let mut passes = vec![
+        adapt(MatchArmWildcardFinder),
+        adapt(MacroInvocationFinder),
+        adapt(BoolParamFinder),
+    ];
+
+    let diagnostics = execute(&tree, &mut passes);
+
+    assert_no_diagnostics(&diagnostics);
+}
+
+#[test]
+fn macro_finder_detects_matches_macro() {
+    let tree = parse("fn f() { let _ = matches!(x, 1); }", Language::Rust);
+    let mut passes = vec![adapt(MacroInvocationFinder)];
+    let diagnostics = execute(&tree, &mut passes);
+    let [diagnostic] = diagnostics.as_slice() else {
+        panic!("expected one diagnostic, got {diagnostics:?}");
+    };
+
+    assert_diagnostic(diagnostic)
+        .has_rule_id("lint.no-matches-macro")
+        .message_contains("matches!");
+}
+
+#[test]
+fn macro_finder_ignores_println() {
+    let tree = parse("fn f() { println!(\"hello\"); }", Language::Rust);
+    let mut passes = vec![adapt(MacroInvocationFinder)];
+    let diagnostics = execute(&tree, &mut passes);
+
+    assert_no_diagnostics(&diagnostics);
+}
+
+#[test]
+fn multiple_lint_passes_run_together() {
+    let tree = parse(
+        "fn f(x: bool) { let _ = matches!(x, true); }",
+        Language::Rust,
+    );
+    let mut passes = vec![adapt(BoolParamFinder), adapt(MacroInvocationFinder)];
+    let diagnostics = execute(&tree, &mut passes);
+
+    let mut rule_ids: Vec<&str> = diagnostics.iter().map(|d| d.rule_id().as_str()).collect();
+    rule_ids.sort_unstable();
+    assert_eq!(rule_ids, ["lint.bool-param", "lint.no-matches-macro"]);
+}
+
+#[test]
+fn wildcard_finder_detects_wildcard_arm() {
+    let tree = parse("fn f() { match x { 1 => {} _ => {} } }", Language::Rust);
+    let mut passes = vec![adapt(MatchArmWildcardFinder)];
+    let diagnostics = execute(&tree, &mut passes);
+    let [diagnostic] = diagnostics.as_slice() else {
+        panic!("expected one diagnostic, got {diagnostics:?}");
+    };
+
+    assert_diagnostic(diagnostic)
+        .has_rule_id("lint.wildcard-match-arm")
+        .has_severity(Severity::Warn)
+        .message_contains("wildcard");
+}
+
+#[test]
+fn wildcard_finder_ignores_named_arms() {
+    let tree = parse("fn f() { match x { Foo => {} Bar => {} } }", Language::Rust);
+    let mut passes = vec![adapt(MatchArmWildcardFinder)];
+    let diagnostics = execute(&tree, &mut passes);
+
     assert_no_diagnostics(&diagnostics);
 }

@@ -180,123 +180,65 @@ fn strand(cache: &TempDir, rules: FixtureRepository) {
     rules.remove();
 }
 
-/// Pins that whisker loads prebuilt lints and needs nothing else
+/// Pins that whisker compiles a checkout it already holds, and asks nobody
 ///
-/// A source build produces the libraries a publisher would ship, so the
-/// first run makes them. The second run has nothing left to fetch or
-/// compile. The diagnostic can therefore come only from the seeded
-/// libraries.
+/// Whisker once asked a release API before it looked at what it held. A
+/// project whose lints publish nothing then spent a request on every
+/// check, and stopped working away from a network.
 #[test]
-fn check_with_prebuilt_lints_loads_them_without_a_source() {
+fn check_with_a_checkout_already_present_asks_nothing() {
+    let server = FakeGitHub::start();
     let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let rules = repository_with_one_lint("loaded_lint", RULE);
+    let rules = repository_with_one_lint("warm_lint", RULE);
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
+    configure_git_lint(target.path(), REMOTE, rules.rev());
 
-    whisker(&cache)
+    // The first run cannot reach the remote, and fails. It leaves behind
+    // the directory whisker keeps that remote's checkouts in, and the
+    // run that matters needs a checkout there.
+    whisker_asking(&cache, server.url())
         .arg("check")
         .arg(target.path())
         .assert()
-        .success();
-
+        .code(1);
     let remote = fetched_remote(&cache);
-    let built = shared_build_directory()
-        .join("release")
-        .join(library_name("loaded_lint"));
-    seed_prebuilt(&cache, &remote, rules.rev(), &[built]);
-    strand(&cache, rules);
+    clone_into(
+        &rules,
+        &cache.path().join("git").join(&remote).join(rules.rev()),
+    );
+    let asked = server.seen().len();
 
-    whisker(&cache)
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(format!("warning[{RULE}]")))
-        .stdout(predicate::str::contains("finish this before it ships"));
-}
-
-/// Pins that every library in a prebuilt directory is loaded
-///
-/// A repository of rules is a workspace, and every member builds its own
-/// library. One configured entry therefore ships as many libraries as
-/// the repository has rules. Whisker must load all of them.
-#[test]
-fn check_with_several_prebuilt_libraries_loads_every_one() {
-    let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let rules = FixtureRepository::new(|directory| {
-        std::fs::write(
-            directory.join("Cargo.toml"),
-            "[workspace]\nmembers = [\"lints/*\"]\nresolver = \"3\"\n",
-        )
-        .expect("the workspace manifest should be written");
-        write_lint_package(
-            &directory.join("lints").join("first"),
-            "workspace_first",
-            "fixture.first",
-            Standalone::No,
-        );
-        write_lint_package(
-            &directory.join("lints").join("second"),
-            "workspace_second",
-            "fixture.second",
-            Standalone::No,
-        );
-        write_lockfile(directory);
-    });
-    let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
-
-    whisker(&cache)
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success();
-
-    let remote = fetched_remote(&cache);
-    let release = shared_build_directory().join("release");
-    let built = vec![
-        release.join(library_name("workspace_first")),
-        release.join(library_name("workspace_second")),
-    ];
-    seed_prebuilt(&cache, &remote, rules.rev(), &built);
-    strand(&cache, rules);
-
-    whisker(&cache)
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("warning[fixture.first]"))
-        .stdout(predicate::str::contains("warning[fixture.second]"));
-}
-
-/// Pins that a prebuilt directory holding nothing loadable is not an answer
-///
-/// An unpack that was interrupted leaves an empty directory behind.
-/// Whisker has to treat that as an absent one and fall back, rather than
-/// fail a run over a cache entry it can replace.
-#[test]
-fn check_with_an_empty_prebuilt_directory_builds_from_source() {
-    let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let rules = repository_with_one_lint("empty_lint", RULE);
-    let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
-
-    whisker(&cache)
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success();
-
-    let remote = fetched_remote(&cache);
-    seed_prebuilt(&cache, &remote, rules.rev(), &[]);
-
-    whisker(&cache)
+    whisker_asking(&cache, server.url())
         .arg("check")
         .arg(target.path())
         .assert()
         .success()
         .stdout(predicate::str::contains(format!("warning[{RULE}]")));
+
+    assert_eq!(
+        server.seen().len(),
+        asked,
+        "the run should have asked nothing: {:?}",
+        server.seen()
+    );
+}
+
+/// An API that answers with a fault is worth saying, unlike a missing one
+#[test]
+fn check_with_a_failing_release_api_warns() {
+    let server = FakeGitHub::start();
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let target = package(TODO_SOURCE);
+    configure_git_lint(target.path(), REMOTE, REV);
+    server.route(RELEASES, Answer::failure(500));
+
+    whisker_asking(&cache, server.url())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("warning: whisker cannot use"))
+        .stderr(predicate::str::contains("500"));
 }
 
 /// Pins that the handshake still runs on a library whisker did not build
@@ -332,6 +274,32 @@ fn check_with_a_prebuilt_that_fails_the_handshake_fails() {
         .stderr(predicate::str::contains(
             destination.to_string_lossy().into_owned(),
         ));
+}
+
+/// Pins the whole path from the question to the diagnostic
+///
+/// Whisker asks, downloads, checks the digest, unpacks, loads, and
+/// reports.
+#[test]
+fn check_with_a_published_archive_loads_it_without_a_source() {
+    let server = FakeGitHub::start();
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let target = package(TODO_SOURCE);
+    configure_git_lint(target.path(), REMOTE, REV);
+    publish(&server, &[fixture_library("published_lint")]);
+
+    whisker_asking(&cache, server.url())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(format!("warning[{RULE}]")))
+        .stdout(predicate::str::contains("finish this before it ships"));
+
+    assert!(
+        cache.path().join("prebuilt").is_dir(),
+        "the archive should have been kept"
+    );
 }
 
 /// Builds the package at `directory` and returns the library it produced
@@ -460,30 +428,128 @@ fn publish(server: &FakeGitHub, libraries: &[PathBuf]) -> String {
     name
 }
 
-/// Pins the whole path from the question to the diagnostic
+/// A remote the API does not answer for is never asked about
 ///
-/// Whisker asks, downloads, checks the digest, unpacks, loads, and
-/// reports.
+/// A project that keeps its lints in a repository somewhere else must not
+/// have that repository's name sent anywhere.
 #[test]
-fn check_with_a_published_archive_loads_it_without_a_source() {
+fn check_with_a_remote_the_api_does_not_serve_asks_nothing() {
     let server = FakeGitHub::start();
     let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let rules = repository_with_one_lint("unserved_lint", RULE);
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
-    publish(&server, &[fixture_library("published_lint")]);
+    configure_git_lint(target.path(), &rules.url(), rules.rev());
 
     whisker_asking(&cache, server.url())
         .arg("check")
         .arg(target.path())
         .assert()
         .success()
-        .stdout(predicate::str::contains(format!("warning[{RULE}]")))
-        .stdout(predicate::str::contains("finish this before it ships"));
+        .stdout(predicate::str::contains(format!("warning[{RULE}]")));
+
+    assert!(server.seen().is_empty(), "{:?}", server.seen());
+}
+
+/// Pins that a repository whisker cannot see stays quiet
+///
+/// This is what a private repository looks like without a token, and the
+/// reader can do nothing about it. Naming it on every check would be
+/// noise, so the note is kept for the case a publisher can fix.
+#[test]
+fn check_with_a_repository_the_api_does_not_know_says_nothing() {
+    let server = FakeGitHub::start();
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let target = package(TODO_SOURCE);
+    configure_git_lint(target.path(), REMOTE, REV);
+
+    whisker_asking(&cache, server.url())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("note: no prebuilt lints").not())
+        .stderr(predicate::str::contains("warning: whisker cannot use").not());
+}
+
+/// A private repository answers only a request that carries a token
+#[test]
+fn check_with_a_token_sends_it_to_the_api() {
+    let server = FakeGitHub::start();
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let target = package(TODO_SOURCE);
+    configure_git_lint(target.path(), REMOTE, REV);
+    publish(&server, &[fixture_library("token_lint")]);
+
+    whisker_asking(&cache, server.url())
+        .env("GH_TOKEN", "a-secret")
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success();
+
+    let carried = server
+        .seen()
+        .iter()
+        .filter(|seen| seen.header("authorization") == Some("Bearer a-secret"))
+        .count();
+
+    assert_eq!(carried, server.seen().len(), "{:?}", server.seen());
+}
+
+/// An archive that does not match its digest is not unpacked, and is said
+#[test]
+fn check_with_a_wrong_digest_warns() {
+    let server = FakeGitHub::start();
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let target = package(TODO_SOURCE);
+    configure_git_lint(target.path(), REMOTE, REV);
+    let name = publish(&server, &[fixture_library("digest_lint")]);
+    server.route(
+        &format!("/assets/{name}.sha256"),
+        Answer::text(format!("{}  {name}\n", "0".repeat(64))),
+    );
+
+    whisker_asking(&cache, server.url())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("warning: whisker cannot use"))
+        .stderr(predicate::str::contains("digest"));
 
     assert!(
-        cache.path().join("prebuilt").is_dir(),
-        "the archive should have been kept"
+        !cache.path().join("prebuilt").join("rules").exists(),
+        "nothing should have been kept"
     );
+}
+
+/// Pins that a prebuilt directory holding nothing loadable is not an answer
+///
+/// An unpack that was interrupted leaves an empty directory behind.
+/// Whisker has to treat that as an absent one and fall back, rather than
+/// fail a run over a cache entry it can replace.
+#[test]
+fn check_with_an_empty_prebuilt_directory_builds_from_source() {
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let rules = repository_with_one_lint("empty_lint", RULE);
+    let target = package(TODO_SOURCE);
+    configure_git_lint(target.path(), &rules.url(), rules.rev());
+
+    whisker(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success();
+
+    let remote = fetched_remote(&cache);
+    seed_prebuilt(&cache, &remote, rules.rev(), &[]);
+
+    whisker(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(format!("warning[{RULE}]")));
 }
 
 /// Pins that what whisker kept is read without asking anyone
@@ -513,6 +579,118 @@ fn check_with_prebuilt_lints_in_the_cache_asks_nothing() {
         server.seen().len(),
         asked,
         "the second run should have asked nothing"
+    );
+}
+
+/// Pins that whisker loads prebuilt lints and needs nothing else
+///
+/// A source build produces the libraries a publisher would ship, so the
+/// first run makes them. The second run has nothing left to fetch or
+/// compile. The diagnostic can therefore come only from the seeded
+/// libraries.
+#[test]
+fn check_with_prebuilt_lints_loads_them_without_a_source() {
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let rules = repository_with_one_lint("loaded_lint", RULE);
+    let target = package(TODO_SOURCE);
+    configure_git_lint(target.path(), &rules.url(), rules.rev());
+
+    whisker(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success();
+
+    let remote = fetched_remote(&cache);
+    let built = shared_build_directory()
+        .join("release")
+        .join(library_name("loaded_lint"));
+    seed_prebuilt(&cache, &remote, rules.rev(), &[built]);
+    strand(&cache, rules);
+
+    whisker(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(format!("warning[{RULE}]")))
+        .stdout(predicate::str::contains("finish this before it ships"));
+}
+
+/// Pins that every library in a prebuilt directory is loaded
+///
+/// A repository of rules is a workspace, and every member builds its own
+/// library. One configured entry therefore ships as many libraries as
+/// the repository has rules. Whisker must load all of them.
+#[test]
+fn check_with_several_prebuilt_libraries_loads_every_one() {
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let rules = FixtureRepository::new(|directory| {
+        std::fs::write(
+            directory.join("Cargo.toml"),
+            "[workspace]\nmembers = [\"lints/*\"]\nresolver = \"3\"\n",
+        )
+        .expect("the workspace manifest should be written");
+        write_lint_package(
+            &directory.join("lints").join("first"),
+            "workspace_first",
+            "fixture.first",
+            Standalone::No,
+        );
+        write_lint_package(
+            &directory.join("lints").join("second"),
+            "workspace_second",
+            "fixture.second",
+            Standalone::No,
+        );
+        write_lockfile(directory);
+    });
+    let target = package(TODO_SOURCE);
+    configure_git_lint(target.path(), &rules.url(), rules.rev());
+
+    whisker(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success();
+
+    let remote = fetched_remote(&cache);
+    let release = shared_build_directory().join("release");
+    let built = vec![
+        release.join(library_name("workspace_first")),
+        release.join(library_name("workspace_second")),
+    ];
+    seed_prebuilt(&cache, &remote, rules.rev(), &built);
+    strand(&cache, rules);
+
+    whisker(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[fixture.first]"))
+        .stdout(predicate::str::contains("warning[fixture.second]"));
+}
+
+/// Clones the fixture at `rules` into `destination`, detached at its commit
+///
+/// # Panics
+///
+/// Panics if git is unavailable or any step fails.
+fn clone_into(rules: &FixtureRepository, destination: &Path) {
+    let parent = destination.parent().expect("the path should have a parent");
+    std::fs::create_dir_all(parent).expect("the parent should be created");
+
+    let name = destination
+        .file_name()
+        .expect("the path should have a name")
+        .to_string_lossy()
+        .into_owned();
+
+    git(parent, &["clone", "--quiet", &rules.url(), &name]);
+    git(
+        destination,
+        &["checkout", "--quiet", "--detach", rules.rev()],
     );
 }
 
@@ -547,182 +725,4 @@ fn check_without_a_matching_asset_names_the_archive_nobody_published() {
         ))
         .stderr(predicate::str::contains(REV))
         .stderr(predicate::str::contains("warning: whisker cannot use").not());
-}
-
-/// Pins that a repository whisker cannot see stays quiet
-///
-/// This is what a private repository looks like without a token, and the
-/// reader can do nothing about it. Naming it on every check would be
-/// noise, so the note is kept for the case a publisher can fix.
-#[test]
-fn check_with_a_repository_the_api_does_not_know_says_nothing() {
-    let server = FakeGitHub::start();
-    let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
-
-    whisker_asking(&cache, server.url())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .code(1)
-        .stderr(predicate::str::contains("note: no prebuilt lints").not())
-        .stderr(predicate::str::contains("warning: whisker cannot use").not());
-}
-
-/// An archive that does not match its digest is not unpacked, and is said
-#[test]
-fn check_with_a_wrong_digest_warns() {
-    let server = FakeGitHub::start();
-    let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
-    let name = publish(&server, &[fixture_library("digest_lint")]);
-    server.route(
-        &format!("/assets/{name}.sha256"),
-        Answer::text(format!("{}  {name}\n", "0".repeat(64))),
-    );
-
-    whisker_asking(&cache, server.url())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .code(1)
-        .stderr(predicate::str::contains("warning: whisker cannot use"))
-        .stderr(predicate::str::contains("digest"));
-
-    assert!(
-        !cache.path().join("prebuilt").join("rules").exists(),
-        "nothing should have been kept"
-    );
-}
-
-/// An API that answers with a fault is worth saying, unlike a missing one
-#[test]
-fn check_with_a_failing_release_api_warns() {
-    let server = FakeGitHub::start();
-    let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
-    server.route(RELEASES, Answer::failure(500));
-
-    whisker_asking(&cache, server.url())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .code(1)
-        .stderr(predicate::str::contains("warning: whisker cannot use"))
-        .stderr(predicate::str::contains("500"));
-}
-
-/// A private repository answers only a request that carries a token
-#[test]
-fn check_with_a_token_sends_it_to_the_api() {
-    let server = FakeGitHub::start();
-    let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
-    publish(&server, &[fixture_library("token_lint")]);
-
-    whisker_asking(&cache, server.url())
-        .env("GH_TOKEN", "a-secret")
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success();
-
-    let carried = server
-        .seen()
-        .iter()
-        .filter(|seen| seen.header("authorization") == Some("Bearer a-secret"))
-        .count();
-
-    assert_eq!(carried, server.seen().len(), "{:?}", server.seen());
-}
-
-/// A remote the API does not answer for is never asked about
-///
-/// A project that keeps its lints in a repository somewhere else must not
-/// have that repository's name sent anywhere.
-#[test]
-fn check_with_a_remote_the_api_does_not_serve_asks_nothing() {
-    let server = FakeGitHub::start();
-    let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let rules = repository_with_one_lint("unserved_lint", RULE);
-    let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
-
-    whisker_asking(&cache, server.url())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(format!("warning[{RULE}]")));
-
-    assert!(server.seen().is_empty(), "{:?}", server.seen());
-}
-
-/// Clones the fixture at `rules` into `destination`, detached at its commit
-///
-/// # Panics
-///
-/// Panics if git is unavailable or any step fails.
-fn clone_into(rules: &FixtureRepository, destination: &Path) {
-    let parent = destination.parent().expect("the path should have a parent");
-    std::fs::create_dir_all(parent).expect("the parent should be created");
-
-    let name = destination
-        .file_name()
-        .expect("the path should have a name")
-        .to_string_lossy()
-        .into_owned();
-
-    git(parent, &["clone", "--quiet", &rules.url(), &name]);
-    git(
-        destination,
-        &["checkout", "--quiet", "--detach", rules.rev()],
-    );
-}
-
-/// Pins that whisker compiles a checkout it already holds, and asks nobody
-///
-/// Whisker once asked a release API before it looked at what it held. A
-/// project whose lints publish nothing then spent a request on every
-/// check, and stopped working away from a network.
-#[test]
-fn check_with_a_checkout_already_present_asks_nothing() {
-    let server = FakeGitHub::start();
-    let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let rules = repository_with_one_lint("warm_lint", RULE);
-    let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, rules.rev());
-
-    // The first run cannot reach the remote, and fails. It leaves behind
-    // the directory whisker keeps that remote's checkouts in, and the
-    // run that matters needs a checkout there.
-    whisker_asking(&cache, server.url())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .code(1);
-    let remote = fetched_remote(&cache);
-    clone_into(
-        &rules,
-        &cache.path().join("git").join(&remote).join(rules.rev()),
-    );
-    let asked = server.seen().len();
-
-    whisker_asking(&cache, server.url())
-        .arg("check")
-        .arg(target.path())
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(format!("warning[{RULE}]")));
-
-    assert_eq!(
-        server.seen().len(),
-        asked,
-        "the run should have asked nothing: {:?}",
-        server.seen()
-    );
 }

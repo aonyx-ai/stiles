@@ -36,61 +36,6 @@ fn parse(source: &str) -> DecoratedTree {
 }
 
 #[test]
-fn many_cardinality_reads_back_every_instance_in_order() {
-    let mut tree = parse("fn main() {}");
-    let id = tree.root_node().id();
-    tree.decorations_mut()
-        .insert(id, TraitImpl(Str::new("Debug")));
-    tree.decorations_mut()
-        .insert(id, TraitImpl(Str::new("Clone")));
-
-    let found = tree.root_node().get::<TraitImpl>();
-
-    let names: Vec<&str> = found.iter().map(|found| found.0.as_str()).collect();
-    assert_eq!(names, ["Debug", "Clone"]);
-}
-
-#[test]
-fn many_cardinality_when_absent_reads_back_empty() {
-    let tree = parse("fn main() {}");
-
-    let found = tree.root_node().get::<TraitImpl>();
-
-    assert!(found.is_empty());
-}
-
-#[test]
-fn one_cardinality_reads_back_a_single_value() {
-    let mut tree = parse("fn main() {}");
-    let id = tree.root_node().id();
-    tree.decorations_mut()
-        .insert(id, ResolvedType(Str::new("u32")));
-
-    let found = tree.root_node().get::<ResolvedType>();
-
-    assert_eq!(found.expect("should be present").0.as_str(), "u32");
-}
-
-#[test]
-fn one_cardinality_when_absent_reads_back_none() {
-    let tree = parse("fn main() {}");
-
-    let found = tree.root_node().get::<ResolvedType>();
-
-    assert!(found.is_none());
-}
-
-/// Returns a tree whose root, and none of its children, holds a
-/// `ResolvedType`
-fn decorated_root() -> DecoratedTree {
-    let mut tree = parse("fn main() {}");
-    let root_id = tree.root_node().id();
-    tree.decorations_mut()
-        .insert(root_id, ResolvedType(Str::new("root")));
-    tree
-}
-
-#[test]
 fn decorations_are_keyed_per_node() {
     let tree = decorated_root();
 
@@ -124,6 +69,61 @@ fn lookup_can_be_called_through_the_trait() {
     let found = ResolvedType::lookup(&tree.root_node());
 
     assert_eq!(found.expect("should be present").0.as_str(), "u32");
+}
+
+#[test]
+fn many_cardinality_reads_back_every_instance_in_order() {
+    let mut tree = parse("fn main() {}");
+    let id = tree.root_node().id();
+    tree.decorations_mut()
+        .insert(id, TraitImpl(Str::new("Debug")));
+    tree.decorations_mut()
+        .insert(id, TraitImpl(Str::new("Clone")));
+
+    let found = tree.root_node().get::<TraitImpl>();
+
+    let names: Vec<&str> = found.iter().map(|found| found.0.as_str()).collect();
+    assert_eq!(names, ["Debug", "Clone"]);
+}
+
+/// Returns a tree whose root, and none of its children, holds a
+/// `ResolvedType`
+fn decorated_root() -> DecoratedTree {
+    let mut tree = parse("fn main() {}");
+    let root_id = tree.root_node().id();
+    tree.decorations_mut()
+        .insert(root_id, ResolvedType(Str::new("root")));
+    tree
+}
+
+#[test]
+fn many_cardinality_when_absent_reads_back_empty() {
+    let tree = parse("fn main() {}");
+
+    let found = tree.root_node().get::<TraitImpl>();
+
+    assert!(found.is_empty());
+}
+
+#[test]
+fn one_cardinality_reads_back_a_single_value() {
+    let mut tree = parse("fn main() {}");
+    let id = tree.root_node().id();
+    tree.decorations_mut()
+        .insert(id, ResolvedType(Str::new("u32")));
+
+    let found = tree.root_node().get::<ResolvedType>();
+
+    assert_eq!(found.expect("should be present").0.as_str(), "u32");
+}
+
+#[test]
+fn one_cardinality_when_absent_reads_back_none() {
+    let tree = parse("fn main() {}");
+
+    let found = tree.root_node().get::<ResolvedType>();
+
+    assert!(found.is_none());
 }
 
 /// Decorates the root with a type named `Local` that only this function

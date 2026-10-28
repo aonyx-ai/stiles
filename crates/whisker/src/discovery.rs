@@ -517,13 +517,6 @@ mod tests {
     }
 
     #[test]
-    fn unsorted_tree_reads_back_out_of_order() {
-        let directory = unsorted_tree();
-
-        assert_stored_out_of_order(directory.path());
-    }
-
-    #[test]
     fn run_with_anchored_pattern_prunes_only_at_the_project_root() {
         let directory = tree(&[
             "examples/demo.rs",
@@ -661,6 +654,13 @@ mod tests {
         );
     }
 
+    #[test]
+    fn run_with_explicit_file_target_and_invalid_pattern_matches_the_directory_error() {
+        let (over_file, over_directory) = invalid_pattern_errors();
+
+        assert_eq!(over_file, over_directory);
+    }
+
     /// Returns the errors of discovery over a file and over its directory,
     /// with a configuration that holds an invalid pattern
     fn invalid_pattern_errors() -> (String, String) {
@@ -697,13 +697,6 @@ mod tests {
             over_file.contains("failed to read the ignore pattern `{a,b`"),
             "error should name the offending pattern: {over_file}"
         );
-    }
-
-    #[test]
-    fn run_with_explicit_file_target_and_invalid_pattern_matches_the_directory_error() {
-        let (over_file, over_directory) = invalid_pattern_errors();
-
-        assert_eq!(over_file, over_directory);
     }
 
     #[test]
@@ -1008,6 +1001,16 @@ mod tests {
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
     }
 
+    #[test]
+    fn run_with_unparsable_ignore_file_above_the_root_does_not_blame_the_walk() {
+        let error = unparsable_ignore_file_above_the_root_error();
+
+        assert!(
+            !error.contains("failed to read a directory entry"),
+            "error should not blame the directory walk: {error}"
+        );
+    }
+
     /// Returns the error of discovery below a directory whose ignore file
     /// does not parse
     fn unparsable_ignore_file_above_the_root_error() -> String {
@@ -1027,16 +1030,6 @@ mod tests {
         format!("{error:#}")
     }
 
-    #[test]
-    fn run_with_unparsable_ignore_file_above_the_root_does_not_blame_the_walk() {
-        let error = unparsable_ignore_file_above_the_root_error();
-
-        assert!(
-            !error.contains("failed to read a directory entry"),
-            "error should not blame the directory walk: {error}"
-        );
-    }
-
     /// Pins that an ignore file is named as one wherever the walker found it
     ///
     /// An ignore file above the root fails before the walk has an entry, so
@@ -1049,6 +1042,16 @@ mod tests {
         assert!(
             error.contains("failed to read an ignore file"),
             "error should describe the unparsable ignore file: {error}"
+        );
+    }
+
+    #[test]
+    fn run_with_unparsable_ignore_file_and_fail_policy_names_the_file() {
+        let error = unparsable_ignore_file_error();
+
+        assert!(
+            error.contains(".gitignore"),
+            "error should name the file the walker could not parse: {error}"
         );
     }
 
@@ -1081,16 +1084,6 @@ mod tests {
     }
 
     #[test]
-    fn run_with_unparsable_ignore_file_and_fail_policy_names_the_file() {
-        let error = unparsable_ignore_file_error();
-
-        assert!(
-            error.contains(".gitignore"),
-            "error should name the file the walker could not parse: {error}"
-        );
-    }
-
-    #[test]
     fn run_with_unparsable_ignore_file_and_fail_policy_quotes_the_glob() {
         let error = unparsable_ignore_file_error();
 
@@ -1110,6 +1103,13 @@ mod tests {
         );
     }
 
+    #[test]
+    fn run_with_unparsable_ignore_file_and_keep_going_keeps_every_file() {
+        let (_, files) = unparsable_ignore_file_kept_going();
+
+        assert_eq!(files, ["generated/schema.rs", "src/main.rs"]);
+    }
+
     /// Returns the result of discovery with the policy that keeps going over
     /// [`tree_with_unparsable_ignore_file`], and the files it found
     fn unparsable_ignore_file_kept_going() -> (Discovery, Vec<String>) {
@@ -1125,13 +1125,6 @@ mod tests {
 
         let files = discovered(&discovery, directory.path());
         (discovery, files)
-    }
-
-    #[test]
-    fn run_with_unparsable_ignore_file_and_keep_going_keeps_every_file() {
-        let (_, files) = unparsable_ignore_file_kept_going();
-
-        assert_eq!(files, ["generated/schema.rs", "src/main.rs"]);
     }
 
     #[test]
@@ -1161,6 +1154,17 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn run_with_unreadable_directory_and_fail_policy_gives_the_reason() {
+        let error = unreadable_directory_error();
+
+        assert!(
+            error.contains("Permission denied"),
+            "error should give the reason the walker reported: {error}"
+        );
+    }
+
     /// Returns the error of discovery with the fail policy over a tree whose
     /// `locked` directory cannot be read
     #[cfg(unix)]
@@ -1178,17 +1182,6 @@ mod tests {
             .expect_err("discovery should fail");
 
         format!("{error:#}")
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn run_with_unreadable_directory_and_fail_policy_gives_the_reason() {
-        let error = unreadable_directory_error();
-
-        assert!(
-            error.contains("Permission denied"),
-            "error should give the reason the walker reported: {error}"
-        );
     }
 
     #[cfg(unix)]
@@ -1213,6 +1206,14 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn run_with_unreadable_directory_and_keep_going_keeps_the_readable_files() {
+        let (_, files) = unreadable_directory_kept_going();
+
+        assert_eq!(files, ["src/main.rs"]);
+    }
+
     /// Returns the result of discovery with the policy that keeps going over
     /// a tree whose `locked` directory cannot be read, and the files it found
     #[cfg(unix)]
@@ -1231,14 +1232,6 @@ mod tests {
 
         let files = discovered(&discovery, directory.path());
         (discovery, files)
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn run_with_unreadable_directory_and_keep_going_keeps_the_readable_files() {
-        let (_, files) = unreadable_directory_kept_going();
-
-        assert_eq!(files, ["src/main.rs"]);
     }
 
     #[cfg(unix)]
@@ -1265,5 +1258,12 @@ mod tests {
     fn trait_unpin() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Discovery>();
+    }
+
+    #[test]
+    fn unsorted_tree_reads_back_out_of_order() {
+        let directory = unsorted_tree();
+
+        assert_stored_out_of_order(directory.path());
     }
 }

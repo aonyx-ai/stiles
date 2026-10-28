@@ -98,22 +98,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resolved_type_builder_defaults_to_false() {
-        let ty = ResolvedType::new("i32".into());
-
-        let flags = [ty.is_enum(), ty.is_never(), ty.is_result(), ty.is_option()];
-
-        assert_eq!(flags, [false; 4]);
-    }
-
-    #[test]
-    fn resolved_type_display_returns_the_text() {
-        let ty = ResolvedType::new("i32".into());
-
-        assert_eq!(ty.display(), "i32");
-    }
-
-    #[test]
     fn resolved_type_builder_clears_a_flag() {
         let ty = ResolvedType::new("MyEnum".into())
             .with_enum(true)
@@ -123,12 +107,28 @@ mod tests {
     }
 
     #[test]
+    fn resolved_type_builder_defaults_to_false() {
+        let ty = ResolvedType::new("i32".into());
+
+        let flags = [ty.is_enum(), ty.is_never(), ty.is_result(), ty.is_option()];
+
+        assert_eq!(flags, [false; 4]);
+    }
+
+    #[test]
     fn resolved_type_builder_sets_flags() {
         let ty = ResolvedType::new("MyEnum".into())
             .with_enum(true)
             .with_never(false);
 
         assert!(ty.is_enum());
+    }
+
+    #[test]
+    fn resolved_type_display_returns_the_text() {
+        let ty = ResolvedType::new("i32".into());
+
+        assert_eq!(ty.display(), "i32");
     }
 
     #[test]
