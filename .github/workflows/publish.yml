@@ -58,6 +58,16 @@ jobs:
       - name: Install Otto
         run: cargo install otto --version 0.1.0 --locked
 
+      # `cargo publish` packages each crate and builds it from the package
+      # before the upload, and the token for trusted publishing expires
+      # after about 30 minutes. A cold build of the workspace can take
+      # longer, so this dry run builds every crate the same way first, and
+      # the publish then rebuilds only the crates themselves. A crate that
+      # does not build also stops the job here, before anything reaches
+      # crates.io.
+      - name: Build the crates as the publish does
+        run: cargo publish --locked --dry-run --workspace
+
       # A token for trusted publishing cannot create a crate, and it covers
       # only the crates whose trusted publisher exists when the token is
       # requested. The placeholders therefore come first. For each crate that
