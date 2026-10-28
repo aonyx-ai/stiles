@@ -738,9 +738,9 @@ not edit the changelog by hand.
 
 `otto release` runs a release from the terminal, and `otto status` shows where
 one stands. Install Otto with `cargo install otto`. A release tag is
-`stiles@<version>`, and publishing its GitHub release builds the binaries. A
-pre-release such as `0.1.0-rc.6` is always an override of the next version
-that Otto proposes.
+`stiles@<version>`, and publishing its GitHub release builds the binaries and
+publishes the crates to crates.io. A pre-release such as `0.1.0-rc.6` is
+always an override of the next version that Otto proposes.
 
 ---
 
