@@ -1,7 +1,6 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use anyhow::Context as _;
 use bon::bon;
 use clawless::exit::Exit;
 use clawless::prelude::*;

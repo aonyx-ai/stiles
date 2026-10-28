@@ -11,7 +11,6 @@ use std::collections::hash_map::Entry;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::Context as _;
 use clawless::exit::Exit;
 use clawless::prelude::*;
 use whisker_core::{Lint, Pipeline, RunPipelineError};

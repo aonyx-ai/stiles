@@ -8,13 +8,13 @@ use ra_ap_hir::{
     Adt, AsAssocItem as _, Crate, CrateDependency, Enum, Function, HasAttrs, HirDisplay, ItemInNs,
     Module, ModuleDef, PathResolution, ScopeDef, Semantics, Type, attach_db,
 };
-use ra_ap_ide_db::base_db::SourceDatabase as _;
+use ra_ap_ide_db::base_db::{SourceDatabase as _, VfsPath};
 use ra_ap_ide_db::famous_defs::FamousDefs;
-use ra_ap_ide_db::{ChangeWithProcMacros, RootDatabase};
+use ra_ap_ide_db::{ChangeWithProcMacros, FileId, RootDatabase};
 use ra_ap_load_cargo::{LoadCargoConfig, ProcMacroServerChoice};
 use ra_ap_project_model::{CargoConfig, ProjectManifest, ProjectWorkspace};
 use ra_ap_syntax::{AstNode, Edition, NodeOrToken, SyntaxNode, TextRange, TextSize, ast};
-use ra_ap_vfs::{AbsPathBuf, FileExcluded, FileId, Vfs, VfsPath};
+use ra_ap_vfs::{AbsPathBuf, FileExcluded, Vfs};
 use whisker_types::{
     Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, DecorationMap,
     DecorationProvider, ProviderName,
