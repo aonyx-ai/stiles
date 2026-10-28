@@ -1,6 +1,7 @@
 # Stiles
 
-Stiles is a linting platform built on tree-sitter. It lints Rust today.
+Stiles is a linting platform built on tree-sitter. It lints the
+[supported languages][languages].
 
 Stiles ships no rules of its own. A project brings its own, either a crate in
 the repository or a repository of shared rules pinned to a commit. Rules can be
@@ -32,3 +33,4 @@ build from source.
 [how-it-works]: /docs/explanation/how-stiles-works
 [installation]: /docs/how-to/install
 [quick-start]: /docs/tutorials/quick-start
+[languages]: /docs/reference/supported-languages

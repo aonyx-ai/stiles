@@ -12,18 +12,13 @@ out how Stiles discovers files.
 ## Included files
 
 Stiles walks through the files or directories you list in its `check`
-arguments. Every file with an extension supported by Stiles is checked.
-Anything else is always ignored.
-
-| Extension                     | Language   | Project file    |
-| ----------------------------- | ---------- | --------------- |
-| `.rs`                         | Rust       | `Cargo.toml`    |
-| `.ts`, `.mts`, `.cts`, `.tsx` | TypeScript | `tsconfig.json` |
+arguments. Every file with an extension of a
+[supported language][supported-languages] is checked. Anything else is always
+ignored.
 
 Stiles loads a language's project only when it finds a file in that language,
-so a repository with no TypeScript needs no `tsconfig.json`. A TypeScript file
-belongs to the project of the `tsconfig.json` nearest it, so one repository can
-hold several TypeScript projects.
+so a repository needs a project file only for the languages it holds. The
+supported languages page says which project each file belongs to.
 
 If it turns out that an included file cannot be parsed by one of Stiles's
 language adapters, Stiles will throw an error.
@@ -45,3 +40,5 @@ There are several reasons Stiles might ignore a file:
 
 You can override the ignore rules above by passing a specific file to
 `stiles check`.
+
+[supported-languages]: /docs/reference/supported-languages

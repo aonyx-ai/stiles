@@ -1,16 +1,15 @@
 # Stiles
 
-Stiles is a linting platform built on [tree-sitter][ts]. It lints Rust and
-TypeScript. Stiles ships no rules of its own: a project configures the ones it
-wants, and those are exactly the ones it runs. Aonyx's own live in
-[stiles-aonyx-rules][rules] and cover what Clippy does not, like derive
-ordering, wildcard match arms, `matches!` macro usage, and the other style
-rules defined in our `CLAUDE.md` files.
+Stiles is a linting platform built on [tree-sitter][ts]. It lints the
+[supported languages][languages]. Stiles ships no rules of its own: a project
+configures the ones it wants, and those are exactly the ones it runs. Aonyx's
+own live in [stiles-aonyx-rules][rules] and cover the style rules of our
+`CLAUDE.md` files that each language's own linter does not.
 
-A rule implements the `RustLintPass` or `TypeScriptLintPass` trait, which
-stiles generates from tree-sitter's grammar for that language. A rule that
-needs type information reads decorations that stiles computes before any rule
-runs, with [rust-analyzer][ra] for Rust and [tsrs][tsrs] for TypeScript.
+A rule implements the lint pass trait that stiles generates from a language's
+tree-sitter grammar. A rule that needs type information reads decorations that
+stiles computes before any rule runs, with each language's own tooling. The
+[supported languages][languages] page lists the languages and their tooling.
 
 ## Status
 
@@ -45,13 +44,14 @@ Then check the project:
 stiles check .
 ```
 
-The first run builds the rules, which takes as long as any Rust compilation.
-Later runs reuse cargo's cache.
+The first run compiles the rules. Later runs reuse the compiled rules.
 
 ## Documentation
 
 The [documentation][docs] covers the rest:
 
+- [Supported languages][languages] — the languages and the tooling behind
+  each.
 - [Install Stiles][install] — release archives, the GitHub Actions action,
   and building from source.
 - [Command line][checking] — what ends a run, and what fails it.
@@ -85,9 +85,8 @@ dual licensed as above, without any additional terms or conditions.
 [custom-lints]: https://aonyx-ai.github.io/stiles/authoring/how-to/write-a-rule
 [docs]: https://aonyx-ai.github.io/stiles/
 [install]: https://aonyx-ai.github.io/stiles/docs/how-to/install
+[languages]: https://aonyx-ai.github.io/stiles/docs/reference/supported-languages
 [prebuilt-lints]: https://aonyx-ai.github.io/stiles/docs/reference/prebuilt-archives
-[ra]: https://rust-analyzer.github.io/
 [releases]: https://github.com/aonyx-ai/stiles/releases
 [rules]: https://github.com/aonyx-ai/stiles-aonyx-rules
 [ts]: https://tree-sitter.github.io/tree-sitter/
-[tsrs]: https://github.com/oxc-project/tsrs
