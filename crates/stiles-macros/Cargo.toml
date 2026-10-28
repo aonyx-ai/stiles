@@ -3,7 +3,8 @@ name = "stiles-macros"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish = false
+description = "The derive macro for Stiles decoration types"
+repository.workspace = true
 
 [lib]
 proc-macro = true

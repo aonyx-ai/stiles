@@ -3,8 +3,11 @@ name = "stiles"
 version.workspace = true
 edition = "2024"
 license = "Apache-2.0 OR MIT"
+description = "Lint any supported language with rules you write, built on tree-sitter"
 repository = "https://github.com/aonyx-ai/stiles.git"
-publish = false
+readme = "../../README.md"
+keywords = ["lint", "linter", "tree-sitter", "static-analysis"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "stiles"
@@ -29,12 +32,12 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 tar.workspace = true
-stiles-core = { path = "../stiles-core" }
-stiles-reporting = { path = "../stiles-reporting" }
-stiles-plugin = { path = "../stiles-plugin" }
-stiles-rust = { path = "../stiles-rust" }
-stiles-typescript = { path = "../stiles-typescript" }
-stiles-types = { path = "../stiles-types" }
+stiles-core = { path = "../stiles-core", version = "=0.1.0" }
+stiles-reporting = { path = "../stiles-reporting", version = "=0.1.0" }
+stiles-plugin = { path = "../stiles-plugin", version = "=0.1.0" }
+stiles-rust = { path = "../stiles-rust", version = "=0.1.0" }
+stiles-typescript = { path = "../stiles-typescript", version = "=0.1.0" }
+stiles-types = { path = "../stiles-types", version = "=0.1.0" }
 
 [dev-dependencies]
 assert_cmd = "2"
@@ -43,3 +46,11 @@ tempfile.workspace = true
 tiny_http.workspace = true
 toml.workspace = true
 trycmd = "1.0"
+
+# cargo-binstall downloads the archive a release attaches instead of
+# building from source. The release tag and the archive name both carry
+# the version, and the archive holds the binary in a directory of that name.
+[package.metadata.binstall]
+pkg-url = "https://github.com/aonyx-ai/stiles/releases/download/stiles@{ version }/stiles-{ version }-{ target }.tar.gz"
+pkg-fmt = "tgz"
+bin-dir = "stiles-{ version }-{ target }/{ bin }{ binary-ext }"

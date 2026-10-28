@@ -3,7 +3,8 @@ name = "stiles-reporting"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish = false
+description = "Renders Stiles diagnostics for the terminal"
+repository.workspace = true
 
 [dependencies]
 codespan-reporting.workspace = true

@@ -3,7 +3,8 @@ name = "stiles-testing"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish = false
+description = "Test helpers for Stiles lint rules"
+repository.workspace = true
 
 [dependencies]
 tree-sitter.workspace = true

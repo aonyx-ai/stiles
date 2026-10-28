@@ -3,7 +3,8 @@ name = "stiles-codegen"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish = false
+description = "Generates the lint pass trait of a Stiles language crate from its grammar"
+repository.workspace = true
 
 [dependencies]
 serde.workspace = true
