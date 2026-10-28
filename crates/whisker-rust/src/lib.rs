@@ -30,12 +30,12 @@ mod tests {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&language()).unwrap();
         let tree = parser.parse(source, None).unwrap();
-        DecoratedTree::new(
-            tree,
-            Language::Rust,
-            source.to_string(),
-            PathBuf::from("test.rs"),
-        )
+        DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::Rust)
+            .source(source.to_string())
+            .file(PathBuf::from("test.rs"))
+            .build()
     }
 
     #[test]
@@ -272,12 +272,14 @@ mod tests {
         struct AlwaysWarn;
         impl RustLintPass for AlwaysWarn {
             fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-                vec![Diagnostic::new(
-                    RuleId::new("test.warn"),
-                    Severity::Warn,
-                    "found function".into(),
-                    node.span(),
-                )]
+                vec![
+                    Diagnostic::builder()
+                        .rule_id(RuleId::new("test.warn"))
+                        .severity(Severity::Warn)
+                        .message("found function")
+                        .span(node.span())
+                        .build(),
+                ]
             }
         }
 

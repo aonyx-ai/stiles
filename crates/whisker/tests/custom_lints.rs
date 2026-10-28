@@ -163,12 +163,14 @@ fn workspace_of_lints() -> TempDir {
                  }}\n\n\
                  impl RustLintPass for Flag {{\n\
                  \x20   fn {method}(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {{\n\
-                 \x20       vec![Diagnostic::new(\n\
-                 \x20           RuleId::new(\"{rule}\"),\n\
-                 \x20           Severity::Warn,\n\
-                 \x20           \"the member fired\".into(),\n\
-                 \x20           node.span(),\n\
-                 \x20       )]\n\
+                 \x20       vec![\n\
+                 \x20           Diagnostic::builder()\n\
+                 \x20               .rule_id(RuleId::new(\"{rule}\"))\n\
+                 \x20               .severity(Severity::Warn)\n\
+                 \x20               .message(\"the member fired\")\n\
+                 \x20               .span(node.span())\n\
+                 \x20               .build(),\n\
+                 \x20       ]\n\
                  \x20   }}\n\
                  }}\n\n\
                  whisker_plugin::export_lints![rust: [Flag]];\n"

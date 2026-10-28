@@ -310,9 +310,13 @@ fn read_options(options: BTreeMap<String, BTreeMap<String, Vec<String>>>) -> Rul
     let options = options
         .into_iter()
         .flat_map(|(rule, options)| {
-            options
-                .into_iter()
-                .map(move |(name, values)| RuleOption::new(rule.clone(), name, values))
+            options.into_iter().map(move |(name, values)| {
+                RuleOption::builder()
+                    .rule(rule.clone())
+                    .name(name)
+                    .values(values)
+                    .build()
+            })
         })
         .collect();
 

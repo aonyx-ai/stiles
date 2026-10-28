@@ -12,12 +12,14 @@ impl RustLintPass for MatchArmWildcardFinder {
     fn check_match_arm(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
         let text = node.text();
         if text.starts_with('_') && !text.starts_with("__") {
-            vec![Diagnostic::new(
-                RuleId::new("lint.wildcard-match-arm"),
-                Severity::Warn,
-                "wildcard match arm".into(),
-                node.span(),
-            )]
+            vec![
+                Diagnostic::builder()
+                    .rule_id(RuleId::new("lint.wildcard-match-arm"))
+                    .severity(Severity::Warn)
+                    .message("wildcard match arm")
+                    .span(node.span())
+                    .build(),
+            ]
         } else {
             Vec::new()
         }
@@ -53,12 +55,14 @@ impl RustLintPass for MacroInvocationFinder {
     fn check_macro_invocation(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
         let text = node.text();
         if text.starts_with("matches!") {
-            vec![Diagnostic::new(
-                RuleId::new("lint.no-matches-macro"),
-                Severity::Warn,
-                "use of matches! macro".into(),
-                node.span(),
-            )]
+            vec![
+                Diagnostic::builder()
+                    .rule_id(RuleId::new("lint.no-matches-macro"))
+                    .severity(Severity::Warn)
+                    .message("use of matches! macro")
+                    .span(node.span())
+                    .build(),
+            ]
         } else {
             Vec::new()
         }
@@ -132,12 +136,14 @@ impl RustLintPass for BoolParamFinder {
     fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
         let text = node.text();
         if text.contains(": bool") {
-            vec![Diagnostic::new(
-                RuleId::new("lint.bool-param"),
-                Severity::Warn,
-                "bool parameter".into(),
-                node.span(),
-            )]
+            vec![
+                Diagnostic::builder()
+                    .rule_id(RuleId::new("lint.bool-param"))
+                    .severity(Severity::Warn)
+                    .message("bool parameter")
+                    .span(node.span())
+                    .build(),
+            ]
         } else {
             Vec::new()
         }

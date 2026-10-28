@@ -11,7 +11,11 @@ const RULE_ID: RuleId = RuleId::new("fixture.anyhow-bare-try");
 /// is empty. The comparison uses the definition path, which is the point
 /// of the probe: four crates in the fixture render their error type as
 /// `Error`, and only one of them is this one.
-const ANYHOW_ERROR: TypePathRef<'static> = TypePathRef::new("anyhow", &[], "Error");
+const ANYHOW_ERROR: TypePathRef<'static> = TypePathRef::builder()
+    .krate("anyhow")
+    .modules(&[])
+    .name("Error")
+    .build();
 
 /// Flags `?` on a `Result` inside a function whose error type is anyhow's
 ///
@@ -73,12 +77,14 @@ impl RustLintPass for AnyhowBareTry {
             return Vec::new();
         }
 
-        vec![Diagnostic::new(
-            RULE_ID,
-            Severity::Warn,
-            "use of `?` on Result without error context".into(),
-            node.span(),
-        )]
+        vec![
+            Diagnostic::builder()
+                .rule_id(RULE_ID)
+                .severity(Severity::Warn)
+                .message("use of `?` on Result without error context")
+                .span(node.span())
+                .build(),
+        ]
     }
 }
 
@@ -198,7 +204,10 @@ mod tests {
         );
         map.insert(
             function,
-            FnSignature::new(None, Some(error), ReturnMode::Direct),
+            FnSignature::builder()
+                .error_type(error)
+                .return_mode(ReturnMode::Direct)
+                .build(),
         );
         decorate(&mut tree, map);
 
@@ -206,11 +215,23 @@ mod tests {
     }
 
     fn anyhow_error() -> ErrorType {
-        ErrorType::Named(TypePath::new("anyhow", Vec::<String>::new(), "Error"))
+        ErrorType::Named(
+            TypePath::builder()
+                .krate("anyhow")
+                .modules(Vec::<String>::new())
+                .name("Error")
+                .build(),
+        )
     }
 
     fn io_error() -> ErrorType {
-        ErrorType::Named(TypePath::new("std", vec!["io".to_owned()], "Error"))
+        ErrorType::Named(
+            TypePath::builder()
+                .krate("std")
+                .modules(vec!["io".to_owned()])
+                .name("Error")
+                .build(),
+        )
     }
 
     #[test]

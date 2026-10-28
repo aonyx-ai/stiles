@@ -29,7 +29,7 @@ pub struct FnSignature {
 #[bon]
 impl FnSignature {
     /// Creates a function signature
-    #[builder(start_fn = builder)]
+    #[builder]
     pub fn new(
         return_type: Option<ResolvedType>,
         error_type: Option<ErrorType>,
@@ -71,9 +71,19 @@ mod tests {
     /// `Result<(), anyhow::Error>` directly
     fn returning_a_result() -> FnSignature {
         let ret = ResolvedType::new("Result<(), anyhow::Error>".into()).with_result(true);
-        let error = ErrorType::Named(TypePath::new("anyhow", [] as [&str; 0], "Error"));
+        let error = ErrorType::Named(
+            TypePath::builder()
+                .krate("anyhow")
+                .modules([] as [&str; 0])
+                .name("Error")
+                .build(),
+        );
 
-        FnSignature::new(Some(ret), Some(error), ReturnMode::Direct)
+        FnSignature::builder()
+            .return_type(ret)
+            .error_type(error)
+            .return_mode(ReturnMode::Direct)
+            .build()
     }
 
     #[test]
@@ -82,7 +92,13 @@ mod tests {
 
         let error = sig.error_type().expect("the error type should be kept");
 
-        assert!(error.is(TypePathRef::new("anyhow", &[], "Error")));
+        assert!(
+            error.is(TypePathRef::builder()
+                .krate("anyhow")
+                .modules(&[])
+                .name("Error")
+                .build())
+        );
     }
 
     #[test]
@@ -103,21 +119,27 @@ mod tests {
 
     #[test]
     fn fn_signature_without_return_type_has_no_error_type() {
-        let sig = FnSignature::new(None, None, ReturnMode::Opaque);
+        let sig = FnSignature::builder()
+            .return_mode(ReturnMode::Opaque)
+            .build();
 
         assert!(sig.error_type().is_none());
     }
 
     #[test]
     fn fn_signature_without_return_type_has_no_return_type() {
-        let sig = FnSignature::new(None, None, ReturnMode::Opaque);
+        let sig = FnSignature::builder()
+            .return_mode(ReturnMode::Opaque)
+            .build();
 
         assert!(sig.return_type().is_none());
     }
 
     #[test]
     fn fn_signature_without_return_type_keeps_the_return_mode() {
-        let sig = FnSignature::new(None, None, ReturnMode::Opaque);
+        let sig = FnSignature::builder()
+            .return_mode(ReturnMode::Opaque)
+            .build();
 
         assert_eq!(sig.return_mode(), ReturnMode::Opaque);
     }

@@ -21,7 +21,7 @@ use whisker_types::{RuleId, Span};
 /// let error = UndeclaredRule::builder()
 ///     .rule(RuleId::new("lint.bar"))
 ///     .declared(vec![RuleId::new("lint.foo")])
-///     .span(Span::new("src/lib.rs", 3, 9))
+///     .span(Span::builder().file("src/lib.rs").start(3).end(9).build())
 ///     .build();
 ///
 /// assert_eq!(
@@ -48,7 +48,7 @@ impl UndeclaredRule {
     /// let error = UndeclaredRule::builder()
     ///     .rule(RuleId::new("lint.bar"))
     ///     .declared(Vec::new())
-    ///     .span(Span::new("a.rs", 0, 1))
+    ///     .span(Span::builder().file("a.rs").start(0).end(1).build())
     ///     .build();
     ///
     /// assert_eq!(error.rule(), RuleId::new("lint.bar"));
@@ -68,7 +68,7 @@ impl UndeclaredRule {
     /// let error = UndeclaredRule::builder()
     ///     .rule(RuleId::new("lint.bar"))
     ///     .declared(Vec::new())
-    ///     .span(Span::new("a.rs", 0, 1))
+    ///     .span(Span::builder().file("a.rs").start(0).end(1).build())
     ///     .build();
     ///
     /// assert_eq!(error.span().start(), 0);
@@ -109,7 +109,7 @@ mod tests {
         let error = UndeclaredRule::builder()
             .rule(RuleId::new("lint.bar"))
             .declared(Vec::new())
-            .span(Span::new("a.rs", 0, 1))
+            .span(Span::builder().file("a.rs").start(0).end(1).build())
             .build();
 
         let message = error.to_string();
@@ -122,7 +122,7 @@ mod tests {
         let error = UndeclaredRule::builder()
             .rule(RuleId::new("lint.bar"))
             .declared(vec![RuleId::new("lint.foo"), RuleId::new("lint.baz")])
-            .span(Span::new("a.rs", 0, 1))
+            .span(Span::builder().file("a.rs").start(0).end(1).build())
             .build();
 
         let message = error.to_string();

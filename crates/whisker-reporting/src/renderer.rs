@@ -196,12 +196,18 @@ mod tests {
     }
 
     fn test_diagnostic() -> Diagnostic {
-        Diagnostic::new(
-            RuleId::new("lint.test"),
-            Severity::Warn,
-            "test warning".into(),
-            Span::new(PathBuf::from("test.rs"), 0, 12),
-        )
+        Diagnostic::builder()
+            .rule_id(RuleId::new("lint.test"))
+            .severity(Severity::Warn)
+            .message("test warning")
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("test.rs"))
+                    .start(0)
+                    .end(12)
+                    .build(),
+            )
+            .build()
     }
 
     #[test]
@@ -215,10 +221,18 @@ mod tests {
 
     #[test]
     fn render_to_string_includes_origin_annotation() {
-        let diag = test_diagnostic().with_origin(Location::new(
-            Span::new(PathBuf::from("test.rs"), 3, 7),
-            "defined here".into(),
-        ));
+        let diag = test_diagnostic().with_origin(
+            Location::builder()
+                .span(
+                    Span::builder()
+                        .file(PathBuf::from("test.rs"))
+                        .start(3)
+                        .end(7)
+                        .build(),
+                )
+                .message("defined here")
+                .build(),
+        );
 
         let output = render_to_string(&[diag], &test_source()).unwrap();
 
@@ -230,10 +244,18 @@ mod tests {
 
     #[test]
     fn render_to_string_includes_related_annotation() {
-        let diag = test_diagnostic().with_related(Location::new(
-            Span::new(PathBuf::from("test.rs"), 3, 7),
-            "also here".into(),
-        ));
+        let diag = test_diagnostic().with_related(
+            Location::builder()
+                .span(
+                    Span::builder()
+                        .file(PathBuf::from("test.rs"))
+                        .start(3)
+                        .end(7)
+                        .build(),
+                )
+                .message("also here")
+                .build(),
+        );
 
         let output = render_to_string(&[diag], &test_source()).unwrap();
 
@@ -254,11 +276,19 @@ mod tests {
 
     #[test]
     fn render_to_string_includes_suggestion_message() {
-        let diag = test_diagnostic().with_suggestion(Suggestion::new(
-            Span::new(PathBuf::from("test.rs"), 0, 2),
-            "pub fn".into(),
-            "make it public".into(),
-        ));
+        let diag = test_diagnostic().with_suggestion(
+            Suggestion::builder()
+                .span(
+                    Span::builder()
+                        .file(PathBuf::from("test.rs"))
+                        .start(0)
+                        .end(2)
+                        .build(),
+                )
+                .replacement("pub fn")
+                .message("make it public")
+                .build(),
+        );
 
         let output = render_to_string(&[diag], &test_source()).unwrap();
 
@@ -270,11 +300,19 @@ mod tests {
 
     #[test]
     fn render_to_string_includes_suggestion_replacement() {
-        let diag = test_diagnostic().with_suggestion(Suggestion::new(
-            Span::new(PathBuf::from("test.rs"), 0, 2),
-            "pub fn".into(),
-            "make it public".into(),
-        ));
+        let diag = test_diagnostic().with_suggestion(
+            Suggestion::builder()
+                .span(
+                    Span::builder()
+                        .file(PathBuf::from("test.rs"))
+                        .start(0)
+                        .end(2)
+                        .build(),
+                )
+                .replacement("pub fn")
+                .message("make it public")
+                .build(),
+        );
 
         let output = render_to_string(&[diag], &test_source()).unwrap();
 
@@ -286,18 +324,30 @@ mod tests {
 
     #[test]
     fn render_to_string_renders_multiple_diagnostics() {
-        let d1 = Diagnostic::new(
-            RuleId::new("lint.a"),
-            Severity::Warn,
-            "first".into(),
-            Span::new(PathBuf::from("test.rs"), 0, 2),
-        );
-        let d2 = Diagnostic::new(
-            RuleId::new("lint.b"),
-            Severity::Error,
-            "second".into(),
-            Span::new(PathBuf::from("test.rs"), 3, 7),
-        );
+        let d1 = Diagnostic::builder()
+            .rule_id(RuleId::new("lint.a"))
+            .severity(Severity::Warn)
+            .message("first")
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("test.rs"))
+                    .start(0)
+                    .end(2)
+                    .build(),
+            )
+            .build();
+        let d2 = Diagnostic::builder()
+            .rule_id(RuleId::new("lint.b"))
+            .severity(Severity::Error)
+            .message("second")
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("test.rs"))
+                    .start(3)
+                    .end(7)
+                    .build(),
+            )
+            .build();
 
         let output = render_to_string(&[d1, d2], &test_source()).unwrap();
 
@@ -310,12 +360,18 @@ mod tests {
 
     #[test]
     fn render_to_string_shows_error_severity() {
-        let diag = Diagnostic::new(
-            RuleId::new("lint.err"),
-            Severity::Error,
-            "test error".into(),
-            Span::new(PathBuf::from("test.rs"), 0, 12),
-        );
+        let diag = Diagnostic::builder()
+            .rule_id(RuleId::new("lint.err"))
+            .severity(Severity::Error)
+            .message("test error")
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("test.rs"))
+                    .start(0)
+                    .end(12)
+                    .build(),
+            )
+            .build();
 
         let output = render_to_string(&[diag], &test_source()).unwrap();
 
@@ -369,12 +425,12 @@ mod tests {
                 message in "[a-z ]{1,30}",
                 severity in arb_severity(),
             ) {
-                let diag = Diagnostic::new(
-                    RuleId::new("lint.prop"),
-                    severity,
-                    message.clone(),
-                    Span::new(PathBuf::from("test.rs"), 0, 5),
-                );
+                let diag = Diagnostic::builder()
+                    .rule_id(RuleId::new("lint.prop"))
+                    .severity(severity)
+                    .message(message.clone())
+                    .span(Span::builder().file(PathBuf::from("test.rs")).start(0).end(5).build())
+                    .build();
                 let output = render_to_string(
                     &[diag],
                     &test_source(),
@@ -386,12 +442,12 @@ mod tests {
             fn render_to_string_always_contains_rule_id(
                 severity in arb_severity(),
             ) {
-                let diag = Diagnostic::new(
-                    RuleId::new("lint.propcheck"),
-                    severity,
-                    "msg".into(),
-                    Span::new(PathBuf::from("test.rs"), 0, 5),
-                );
+                let diag = Diagnostic::builder()
+                    .rule_id(RuleId::new("lint.propcheck"))
+                    .severity(severity)
+                    .message("msg")
+                    .span(Span::builder().file(PathBuf::from("test.rs")).start(0).end(5).build())
+                    .build();
                 let output = render_to_string(
                     &[diag],
                     &test_source(),
@@ -405,12 +461,16 @@ mod tests {
             ) {
                 let diagnostics: Vec<Diagnostic> = (0..count)
                     .map(|i| {
-                        Diagnostic::new(
-                            RuleId::new("lint.multi"),
-                            Severity::Warn,
-                            format!("diag_{i}"),
-                            Span::new(PathBuf::from("test.rs"), 0, 5),
-                        )
+                        Diagnostic::builder()
+                            .rule_id(RuleId::new("lint.multi"))
+                            .severity(Severity::Warn)
+                            .message(format!("diag_{i}"))
+                            .span(Span::builder()
+                                .file(PathBuf::from("test.rs"))
+                                .start(0)
+                                .end(5)
+                                .build())
+                            .build()
                     })
                     .collect();
                 let output = render_to_string(

@@ -26,7 +26,12 @@ pub fn parse(source: &str, language: Language) -> DecoratedTree {
         .parse(source, None)
         .expect("tree-sitter parse returned None");
 
-    DecoratedTree::new(tree, language, source.to_string(), PathBuf::from("<test>"))
+    DecoratedTree::builder()
+        .tree(tree)
+        .language(language)
+        .source(source.to_string())
+        .file(PathBuf::from("<test>"))
+        .build()
 }
 
 /// Attaches manual decorations to a parsed tree
@@ -167,7 +172,11 @@ impl DiagnosticAssertion<'_> {
     ///
     /// Panics if the span does not match the expected file, start, and end.
     pub fn has_span(self, file: &str, start: usize, end: usize) -> Self {
-        let expected = Span::new(PathBuf::from(file), start, end);
+        let expected = Span::builder()
+            .file(PathBuf::from(file))
+            .start(start)
+            .end(end)
+            .build();
         assert_eq!(
             self.diagnostic.span(),
             &expected,
@@ -256,12 +265,18 @@ mod tests {
     #[test]
     #[should_panic(expected = "expected no diagnostics")]
     fn assert_no_diagnostics_with_non_empty_slice_panics() {
-        let diag = Diagnostic::new(
-            RuleId::new("test"),
-            Severity::Warn,
-            "msg".into(),
-            whisker_types::Span::new(std::path::PathBuf::from("f.rs"), 0, 1),
-        );
+        let diag = Diagnostic::builder()
+            .rule_id(RuleId::new("test"))
+            .severity(Severity::Warn)
+            .message("msg")
+            .span(
+                whisker_types::Span::builder()
+                    .file(std::path::PathBuf::from("f.rs"))
+                    .start(0)
+                    .end(1)
+                    .build(),
+            )
+            .build();
         assert_no_diagnostics(&[diag]);
     }
 
@@ -289,12 +304,14 @@ mod tests {
 
             extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
                 let found = match node.kind() == "function_item" {
-                    true => vec![Diagnostic::new(
-                        RuleId::new("test.fn"),
-                        Severity::Warn,
-                        "found fn".into(),
-                        node.span(),
-                    )],
+                    true => vec![
+                        Diagnostic::builder()
+                            .rule_id(RuleId::new("test.fn"))
+                            .severity(Severity::Warn)
+                            .message("found fn")
+                            .span(node.span())
+                            .build(),
+                    ],
                     false => Vec::new(),
                 };
                 Checked::Ok(found.into_iter().collect())

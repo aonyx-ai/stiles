@@ -41,7 +41,10 @@ use crate::decorations::PublicPath;
 /// ```
 /// use whisker_rust::decorations::{PublicPath, Reexports};
 ///
-/// let reexports = Reexports::new([PublicPath::new("facade", ["thing", "Thing"])]);
+/// let reexports = Reexports::new([PublicPath::builder()
+///     .krate("facade")
+///     .segments(["thing", "Thing"])
+///     .build()]);
 ///
 /// let path = reexports.through("facade").expect("facade exposes the item");
 ///
@@ -63,7 +66,10 @@ impl Reexports {
     /// ```
     /// use whisker_rust::decorations::{PublicPath, Reexports};
     ///
-    /// let reexports = Reexports::new([PublicPath::new("facade", ["Shape"])]);
+    /// let reexports = Reexports::new([PublicPath::builder()
+    ///     .krate("facade")
+    ///     .segments(["Shape"])
+    ///     .build()]);
     ///
     /// assert_eq!(reexports.paths().len(), 1);
     /// ```
@@ -101,7 +107,10 @@ impl Reexports {
     /// ```
     /// use whisker_rust::decorations::{PublicPath, Reexports};
     ///
-    /// let reexports = Reexports::new([PublicPath::new("facade", ["Shape"])]);
+    /// let reexports = Reexports::new([PublicPath::builder()
+    ///     .krate("facade")
+    ///     .segments(["Shape"])
+    ///     .build()]);
     ///
     /// assert!(reexports.through("facade").is_some());
     /// assert!(reexports.through("facade_core").is_none());
@@ -123,8 +132,14 @@ mod tests {
 
     #[test]
     fn paths_return_every_path_in_order() {
-        let first = PublicPath::new("facade", ["Shape"]);
-        let second = PublicPath::new("other_facade", ["shapes", "Shape"]);
+        let first = PublicPath::builder()
+            .krate("facade")
+            .segments(["Shape"])
+            .build();
+        let second = PublicPath::builder()
+            .krate("other_facade")
+            .segments(["shapes", "Shape"])
+            .build();
 
         let reexports = Reexports::new([first.clone(), second.clone()]);
 
@@ -137,7 +152,10 @@ mod tests {
     /// constituent crate for the facade that wraps it.
     #[test]
     fn through_with_a_crate_sharing_a_prefix_returns_none() {
-        let reexports = Reexports::new([PublicPath::new("facade_core", ["Shape"])]);
+        let reexports = Reexports::new([PublicPath::builder()
+            .krate("facade_core")
+            .segments(["Shape"])
+            .build()]);
 
         let path = reexports.through("facade");
 
@@ -147,8 +165,14 @@ mod tests {
     #[test]
     fn through_with_a_listed_crate_returns_its_path() {
         let reexports = Reexports::new([
-            PublicPath::new("facade", ["Shape"]),
-            PublicPath::new("other_facade", ["shapes", "Shape"]),
+            PublicPath::builder()
+                .krate("facade")
+                .segments(["Shape"])
+                .build(),
+            PublicPath::builder()
+                .krate("other_facade")
+                .segments(["shapes", "Shape"])
+                .build(),
         ]);
 
         let path = reexports

@@ -654,7 +654,13 @@ fn type_path(ctx: &DecorateCtx<'_, '_>, ty: &Type<'_>) -> Option<TypePath> {
         .collect();
     let name = adt.name(db).display(db, ctx.edition).to_string();
 
-    Some(TypePath::new(&krate.to_string(), modules, &name))
+    Some(
+        TypePath::builder()
+            .krate(&krate.to_string())
+            .modules(modules)
+            .name(&name)
+            .build(),
+    )
 }
 
 /// Classifies the `E` of a [`Result<T, E>`]
@@ -694,7 +700,7 @@ fn resolve_function(ctx: &DecorateCtx<'_, '_>, range: TextRange) -> Option<FnSig
 
     let (ret_type, return_mode) = effective_return_type(ctx, func);
     let Some(ret_type) = ret_type else {
-        return Some(FnSignature::new(None, None, return_mode));
+        return Some(FnSignature::builder().return_mode(return_mode).build());
     };
 
     let display = ctx.display_type(&ret_type, &func);
@@ -704,7 +710,13 @@ fn resolve_function(ctx: &DecorateCtx<'_, '_>, range: TextRange) -> Option<FnSig
         .with_result(is_instance_of(&ret_type, ctx.core_result))
         .with_never(ret_type.is_never());
 
-    Some(FnSignature::new(Some(resolved), error_type, return_mode))
+    Some(
+        FnSignature::builder()
+            .return_type(resolved)
+            .maybe_error_type(error_type)
+            .return_mode(return_mode)
+            .build(),
+    )
 }
 
 fn resolve_match_scrutinee(
@@ -1025,10 +1037,12 @@ fn public_paths(
         };
 
         let krate_name = name.display(db, ctx.edition).to_string();
-        paths.push(PublicPath::new(
-            &krate_name,
-            segments.iter().chain(suffix.iter()),
-        ));
+        paths.push(
+            PublicPath::builder()
+                .krate(&krate_name)
+                .segments(segments.iter().chain(suffix.iter()))
+                .build(),
+        );
     }
 
     paths
@@ -1076,7 +1090,12 @@ mod tests {
             .expect("the Rust grammar should load");
         let tree = parser.parse(source, None).expect("should parse");
 
-        DecoratedTree::new(tree, Language::Rust, source.to_string(), file_path)
+        DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::Rust)
+            .source(source.to_string())
+            .file(file_path)
+            .build()
     }
 
     /// A zero-width span must not take the type of the token around it

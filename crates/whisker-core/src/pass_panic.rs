@@ -24,7 +24,7 @@ use whisker_types::{Panic, Span};
 ///
 /// let error = PassPanic::builder()
 ///     .kind("function_item")
-///     .span(Span::new("src/lib.rs", 3, 9))
+///     .span(Span::builder().file("src/lib.rs").start(3).end(9).build())
 ///     .panic(panic)
 ///     .build();
 ///
@@ -85,7 +85,7 @@ mod tests {
     fn pass_panic() -> PassPanic {
         PassPanic::builder()
             .kind("function_item")
-            .span(Span::new("src/lib.rs", 3, 9))
+            .span(Span::builder().file("src/lib.rs").start(3).end(9).build())
             .panic(panic())
             .build()
     }
@@ -94,7 +94,7 @@ mod tests {
     fn display_names_the_node_the_file_and_the_message() {
         let error = PassPanic::builder()
             .kind("function_item")
-            .span(Span::new("src/lib.rs", 3, 9))
+            .span(Span::builder().file("src/lib.rs").start(3).end(9).build())
             .panic(panic())
             .build();
 
@@ -124,7 +124,10 @@ mod tests {
     fn span_returns_the_span() {
         let error = pass_panic();
 
-        assert_eq!(error.span(), &Span::new("src/lib.rs", 3, 9));
+        assert_eq!(
+            error.span(),
+            &Span::builder().file("src/lib.rs").start(3).end(9).build()
+        );
     }
 
     #[test]

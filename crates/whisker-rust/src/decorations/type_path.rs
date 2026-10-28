@@ -23,7 +23,7 @@ use crate::decorations::TypePathRef;
 /// ```
 /// use whisker_rust::decorations::TypePath;
 ///
-/// let path = TypePath::new("syn", ["error"], "Error");
+/// let path = TypePath::builder().krate("syn").modules(["error"]).name("Error").build();
 ///
 /// assert_eq!(path.to_string(), "syn::error::Error");
 /// ```
@@ -44,11 +44,15 @@ impl TypePath {
     /// ```
     /// use whisker_rust::decorations::TypePath;
     ///
-    /// let path = TypePath::new("anyhow", [] as [&str; 0], "Error");
+    /// let path = TypePath::builder()
+    ///     .krate("anyhow")
+    ///     .modules([] as [&str; 0])
+    ///     .name("Error")
+    ///     .build();
     ///
     /// assert_eq!(path.to_string(), "anyhow::Error");
     /// ```
-    #[builder(start_fn = builder)]
+    #[builder]
     pub fn new<M>(krate: &str, modules: M, name: &str) -> Self
     where
         M: IntoIterator,
@@ -71,7 +75,7 @@ impl TypePath {
     /// ```
     /// use whisker_rust::decorations::TypePath;
     ///
-    /// let path = TypePath::new("syn", ["error"], "Error");
+    /// let path = TypePath::builder().krate("syn").modules(["error"]).name("Error").build();
     ///
     /// assert_eq!(path.krate(), "syn");
     /// ```
@@ -86,7 +90,7 @@ impl TypePath {
     /// ```
     /// use whisker_rust::decorations::TypePath;
     ///
-    /// let path = TypePath::new("syn", ["error"], "Error");
+    /// let path = TypePath::builder().krate("syn").modules(["error"]).name("Error").build();
     ///
     /// assert_eq!(path.modules().collect::<Vec<_>>(), vec!["error"]);
     /// ```
@@ -101,7 +105,7 @@ impl TypePath {
     /// ```
     /// use whisker_rust::decorations::TypePath;
     ///
-    /// let path = TypePath::new("syn", ["error"], "Error");
+    /// let path = TypePath::builder().krate("syn").modules(["error"]).name("Error").build();
     ///
     /// assert_eq!(path.name(), "Error");
     /// ```
@@ -153,7 +157,11 @@ mod tests {
 
     #[test]
     fn display_joins_segments_with_double_colons() {
-        let path = TypePath::new("syn", ["error"], "Error");
+        let path = TypePath::builder()
+            .krate("syn")
+            .modules(["error"])
+            .name("Error")
+            .build();
 
         let rendered = path.to_string();
 
@@ -162,7 +170,11 @@ mod tests {
 
     #[test]
     fn display_with_no_modules_renders_crate_and_name() {
-        let path = TypePath::new("anyhow", [] as [&str; 0], "Error");
+        let path = TypePath::builder()
+            .krate("anyhow")
+            .modules([] as [&str; 0])
+            .name("Error")
+            .build();
 
         let rendered = path.to_string();
 
@@ -171,9 +183,18 @@ mod tests {
 
     #[test]
     fn eq_with_different_crate_is_false() {
-        let path = TypePath::new("thiserror", [] as [&str; 0], "Error");
+        let path = TypePath::builder()
+            .krate("thiserror")
+            .modules([] as [&str; 0])
+            .name("Error")
+            .build();
 
-        let matches = path == TypePathRef::new("anyhow", &[], "Error");
+        let matches = path
+            == TypePathRef::builder()
+                .krate("anyhow")
+                .modules(&[])
+                .name("Error")
+                .build();
 
         assert!(!matches);
     }
@@ -184,27 +205,54 @@ mod tests {
     /// modules are a prefix of another's compares equal.
     #[test]
     fn eq_with_different_module_depth_is_false() {
-        let path = TypePath::new("core", ["io", "error"], "Error");
+        let path = TypePath::builder()
+            .krate("core")
+            .modules(["io", "error"])
+            .name("Error")
+            .build();
 
-        let matches = path == TypePathRef::new("core", &["io"], "Error");
+        let matches = path
+            == TypePathRef::builder()
+                .krate("core")
+                .modules(&["io"])
+                .name("Error")
+                .build();
 
         assert!(!matches);
     }
 
     #[test]
     fn eq_with_different_name_is_false() {
-        let path = TypePath::new("anyhow", [] as [&str; 0], "Chain");
+        let path = TypePath::builder()
+            .krate("anyhow")
+            .modules([] as [&str; 0])
+            .name("Chain")
+            .build();
 
-        let matches = path == TypePathRef::new("anyhow", &[], "Error");
+        let matches = path
+            == TypePathRef::builder()
+                .krate("anyhow")
+                .modules(&[])
+                .name("Error")
+                .build();
 
         assert!(!matches);
     }
 
     #[test]
     fn eq_with_matching_type_path_ref_is_true() {
-        let path = TypePath::new("syn", ["error"], "Error");
+        let path = TypePath::builder()
+            .krate("syn")
+            .modules(["error"])
+            .name("Error")
+            .build();
 
-        let matches = path == TypePathRef::new("syn", &["error"], "Error");
+        let matches = path
+            == TypePathRef::builder()
+                .krate("syn")
+                .modules(&["error"])
+                .name("Error")
+                .build();
 
         assert!(matches);
     }
@@ -212,9 +260,21 @@ mod tests {
     #[test]
     fn hash_agrees_with_eq() {
         let mut paths = HashSet::new();
-        paths.insert(TypePath::new("syn", ["error"], "Error"));
+        paths.insert(
+            TypePath::builder()
+                .krate("syn")
+                .modules(["error"])
+                .name("Error")
+                .build(),
+        );
 
-        let found = paths.contains(&TypePath::new("syn", ["error"], "Error"));
+        let found = paths.contains(
+            &TypePath::builder()
+                .krate("syn")
+                .modules(["error"])
+                .name("Error")
+                .build(),
+        );
 
         assert!(found);
     }
@@ -222,23 +282,43 @@ mod tests {
     #[test]
     fn hash_with_other_modules_misses() {
         let mut paths = HashSet::new();
-        paths.insert(TypePath::new("syn", ["error"], "Error"));
+        paths.insert(
+            TypePath::builder()
+                .krate("syn")
+                .modules(["error"])
+                .name("Error")
+                .build(),
+        );
 
-        let found = paths.contains(&TypePath::new("syn", [] as [&str; 0], "Error"));
+        let found = paths.contains(
+            &TypePath::builder()
+                .krate("syn")
+                .modules([] as [&str; 0])
+                .name("Error")
+                .build(),
+        );
 
         assert!(!found);
     }
 
     #[test]
     fn krate_returns_the_crate() {
-        let path = TypePath::new("syn", ["error"], "Error");
+        let path = TypePath::builder()
+            .krate("syn")
+            .modules(["error"])
+            .name("Error")
+            .build();
 
         assert_eq!(path.krate(), "syn");
     }
 
     #[test]
     fn modules_returns_each_module_in_order() {
-        let path = TypePath::new("syn", ["error"], "Error");
+        let path = TypePath::builder()
+            .krate("syn")
+            .modules(["error"])
+            .name("Error")
+            .build();
 
         let modules: Vec<&str> = path.modules().collect();
 
@@ -247,7 +327,11 @@ mod tests {
 
     #[test]
     fn name_returns_the_name() {
-        let path = TypePath::new("syn", ["error"], "Error");
+        let path = TypePath::builder()
+            .krate("syn")
+            .modules(["error"])
+            .name("Error")
+            .build();
 
         assert_eq!(path.name(), "Error");
     }

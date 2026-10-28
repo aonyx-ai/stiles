@@ -40,7 +40,7 @@ pub struct DecoratedNode<'a> {
 #[bon]
 impl<'a> DecoratedNode<'a> {
     /// Creates a decorated node wrapping a tree-sitter node
-    #[builder(start_fn = builder)]
+    #[builder]
     pub fn new(
         node: tree_sitter::Node<'a>,
         source: &'a str,
@@ -97,7 +97,11 @@ impl<'a> DecoratedNode<'a> {
     pub fn span(&self) -> Span {
         let node = self.inner();
 
-        Span::new(self.file.clone(), node.start_byte(), node.end_byte())
+        Span::builder()
+            .file(self.file.clone())
+            .start(node.start_byte())
+            .end(node.end_byte())
+            .build()
     }
 
     /// Returns the number of named children
@@ -254,7 +258,12 @@ mod tests {
         decorations.insert(node_id, TestDeco(42));
 
         let file = FilePath::from("test.rs");
-        let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
+        let root = DecoratedNode::builder()
+            .node(tree.root_node())
+            .source(source)
+            .file(&file)
+            .decorations(decorations.lookup())
+            .build();
         let deco = root
             .decoration::<TestDeco>()
             .expect("should find decoration");
@@ -267,7 +276,12 @@ mod tests {
         let tree = parse_tree(source);
         let decorations = DecorationMap::new();
         let file = FilePath::from("test.rs");
-        let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
+        let root = DecoratedNode::builder()
+            .node(tree.root_node())
+            .source(source)
+            .file(&file)
+            .decorations(decorations.lookup())
+            .build();
 
         assert!(root.decoration::<Missing>().is_none());
     }
@@ -282,7 +296,12 @@ mod tests {
         decorations.insert(node_id, Value(9));
         decorations.insert(node_id, TestDeco(2));
         let file = FilePath::from("test.rs");
-        let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
+        let root = DecoratedNode::builder()
+            .node(tree.root_node())
+            .source(source)
+            .file(&file)
+            .decorations(decorations.lookup())
+            .build();
 
         let found = root.decorations_of_type::<TestDeco>();
 
@@ -295,7 +314,12 @@ mod tests {
         let tree = parse_tree(source);
         let decorations = DecorationMap::new();
         let file = FilePath::from("test.rs");
-        let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
+        let root = DecoratedNode::builder()
+            .node(tree.root_node())
+            .source(source)
+            .file(&file)
+            .decorations(decorations.lookup())
+            .build();
 
         assert_eq!(root.kind(), "source_file");
     }
@@ -306,7 +330,12 @@ mod tests {
         let tree = parse_tree(source);
         let decorations = DecorationMap::new();
         let file = FilePath::from("test.rs");
-        let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
+        let root = DecoratedNode::builder()
+            .node(tree.root_node())
+            .source(source)
+            .file(&file)
+            .decorations(decorations.lookup())
+            .build();
 
         let first_child = root.named_child(0).expect("should have a child");
         assert_eq!(first_child.kind(), "function_item");
@@ -318,7 +347,12 @@ mod tests {
         let tree = parse_tree(source);
         let decorations = DecorationMap::new();
         let file = FilePath::from("test.rs");
-        let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
+        let root = DecoratedNode::builder()
+            .node(tree.root_node())
+            .source(source)
+            .file(&file)
+            .decorations(decorations.lookup())
+            .build();
         let span = root.span();
 
         assert_eq!(span.start()..span.end(), 0..source.len());
@@ -330,7 +364,12 @@ mod tests {
         let tree = parse_tree(source);
         let decorations = DecorationMap::new();
         let file = FilePath::from("test.rs");
-        let root = DecoratedNode::new(tree.root_node(), source, &file, decorations.lookup());
+        let root = DecoratedNode::builder()
+            .node(tree.root_node())
+            .source(source)
+            .file(&file)
+            .decorations(decorations.lookup())
+            .build();
 
         assert_eq!(root.text(), source);
     }
@@ -364,12 +403,12 @@ mod tests {
                 let tree = parse_tree(&source);
                 let decorations = DecorationMap::new();
                 let file = FilePath::from("test.rs");
-                let root = DecoratedNode::new(
-                    tree.root_node(),
-                    &source,
-                    &file,
-                    decorations.lookup(),
-                );
+                let root = DecoratedNode::builder()
+                    .node(tree.root_node())
+                    .source(&source)
+                    .file(&file)
+                    .decorations(decorations.lookup())
+                    .build();
 
                 prop_assert_eq!(root.text(), source.as_str());
             }
@@ -379,12 +418,12 @@ mod tests {
                 let tree = parse_tree(&source);
                 let decorations = DecorationMap::new();
                 let file = FilePath::from("test.rs");
-                let root = DecoratedNode::new(
-                    tree.root_node(),
-                    &source,
-                    &file,
-                    decorations.lookup(),
-                );
+                let root = DecoratedNode::builder()
+                    .node(tree.root_node())
+                    .source(&source)
+                    .file(&file)
+                    .decorations(decorations.lookup())
+                    .build();
 
                 prop_assert_eq!(root.span().start(), 0);
                 prop_assert_eq!(root.span().end(), source.len());
@@ -395,12 +434,12 @@ mod tests {
                 let tree = parse_tree(&source);
                 let decorations = DecorationMap::new();
                 let file = FilePath::from("test.rs");
-                let root = DecoratedNode::new(
-                    tree.root_node(),
-                    &source,
-                    &file,
-                    decorations.lookup(),
-                );
+                let root = DecoratedNode::builder()
+                    .node(tree.root_node())
+                    .source(&source)
+                    .file(&file)
+                    .decorations(decorations.lookup())
+                    .build();
 
                 prop_assert_eq!(
                     root.named_child_count(),
@@ -416,12 +455,12 @@ mod tests {
                 let tree = parse_tree(source);
                 let decorations = DecorationMap::new();
                 let file = FilePath::from("test.rs");
-                let root = DecoratedNode::new(
-                    tree.root_node(),
-                    source,
-                    &file,
-                    decorations.lookup(),
-                );
+                let root = DecoratedNode::builder()
+                    .node(tree.root_node())
+                    .source(source)
+                    .file(&file)
+                    .decorations(decorations.lookup())
+                    .build();
 
                 prop_assert!(root.named_child(index).is_none());
             }
@@ -434,12 +473,12 @@ mod tests {
                 decorations.insert(tree.root_node().id(), Value(value));
 
                 let file = FilePath::from("test.rs");
-                let root = DecoratedNode::new(
-                    tree.root_node(),
-                    source,
-                    &file,
-                    decorations.lookup(),
-                );
+                let root = DecoratedNode::builder()
+                    .node(tree.root_node())
+                    .source(source)
+                    .file(&file)
+                    .decorations(decorations.lookup())
+                    .build();
 
                 prop_assert_eq!(root.decoration::<Value>(), Some(&Value(value)));
             }

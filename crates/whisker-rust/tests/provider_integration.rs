@@ -98,7 +98,12 @@ fn parse_source(source: String, file_path: PathBuf) -> DecoratedTree {
     parser.set_language(&whisker_rust::language()).unwrap();
     let tree = parser.parse(&source, None).unwrap();
 
-    DecoratedTree::new(tree, Language::Rust, source, file_path)
+    DecoratedTree::builder()
+        .tree(tree)
+        .language(Language::Rust)
+        .source(source)
+        .file(file_path)
+        .build()
 }
 
 fn parse_fixture_file(relative: &str) -> DecoratedTree {
@@ -706,12 +711,20 @@ fn flagged_within_with_a_span_past_the_function_end_returns_nothing() {
     let root = tree.root_node();
     let func = find_function_by_name(&root, "match_on_enum").expect("should find match_on_enum");
     let Range { start, end } = func.raw().byte_range();
-    let diagnostics = vec![Diagnostic::new(
-        RuleId::new("lint.test"),
-        Severity::Warn,
-        "a span that leaves the function".to_string(),
-        Span::new(tree.file().to_path_buf(), start, end + 1),
-    )];
+    let diagnostics = vec![
+        Diagnostic::builder()
+            .rule_id(RuleId::new("lint.test"))
+            .severity(Severity::Warn)
+            .message("a span that leaves the function".to_string())
+            .span(
+                Span::builder()
+                    .file(tree.file().to_path_buf())
+                    .start(start)
+                    .end(end + 1)
+                    .build(),
+            )
+            .build(),
+    ];
 
     let flagged = flagged_within(&tree, &diagnostics, &func);
 
@@ -746,7 +759,11 @@ fn fn_signature_on_async_function_reports_the_awaited_error() {
     let error = sig.error_type().expect("should have an error type");
 
     assert!(
-        error.is(TypePathRef::new("anyhow", &[], "Error")),
+        error.is(TypePathRef::builder()
+            .krate("anyhow")
+            .modules(&[])
+            .name("Error")
+            .build()),
         "the awaited error should be anyhow's, got: {error:?}"
     );
 }
@@ -818,7 +835,11 @@ fn fn_signature_on_io_result_function() {
     let error = sig.error_type().expect("should have an error type");
 
     assert!(
-        error.is(TypePathRef::new("core", &["io", "error"], "Error")),
+        error.is(TypePathRef::builder()
+            .krate("core")
+            .modules(&["io", "error"])
+            .name("Error")
+            .build()),
         "the error should be io's, got: {error:?}"
     );
 }
@@ -892,7 +913,11 @@ fn fn_signature_on_trait_method_without_body() {
 
     let error = sig.error_type().expect("should have an error type");
     assert!(
-        error.is(TypePathRef::new("anyhow", &[], "Error")),
+        error.is(TypePathRef::builder()
+            .krate("anyhow")
+            .modules(&[])
+            .name("Error")
+            .build()),
         "the error should be anyhow's, got: {error:?}"
     );
 }
@@ -1263,7 +1288,10 @@ fn reexports_on_a_reexported_item_lists_the_facade_path() {
 
     assert_eq!(
         reexports.paths(),
-        &[PublicPath::new("facade", ["thing", "Thing"])]
+        &[PublicPath::builder()
+            .krate("facade")
+            .segments(["thing", "Thing"])
+            .build()]
     );
 }
 

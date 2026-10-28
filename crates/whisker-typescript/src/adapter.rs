@@ -22,24 +22,26 @@ mod tests {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&crate::language()).unwrap();
         let tree = parser.parse(source, None).unwrap();
-        DecoratedTree::new(
-            tree,
-            Language::TypeScript,
-            source.to_string(),
-            PathBuf::from("test.ts"),
-        )
+        DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::TypeScript)
+            .source(source.to_string())
+            .file(PathBuf::from("test.ts"))
+            .build()
     }
 
     struct WarnOnFunction;
 
     impl TypeScriptLintPass for WarnOnFunction {
         fn check_function_declaration(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-            vec![Diagnostic::new(
-                RuleId::new("test.function"),
-                Severity::Warn,
-                "found a function".into(),
-                node.span(),
-            )]
+            vec![
+                Diagnostic::builder()
+                    .rule_id(RuleId::new("test.function"))
+                    .severity(Severity::Warn)
+                    .message("found a function")
+                    .span(node.span())
+                    .build(),
+            ]
         }
     }
 

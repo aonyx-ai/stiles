@@ -32,11 +32,11 @@ use stabby::{string, vec};
 /// ```
 /// use whisker_types::RuleOption;
 ///
-/// let option = RuleOption::new(
-///     "lint.repeated-primitive-params".to_owned(),
-///     "boundary-attributes".to_owned(),
-///     vec!["shard".to_owned(), "procedure".to_owned()],
-/// );
+/// let option = RuleOption::builder()
+///     .rule("lint.repeated-primitive-params")
+///     .name("boundary-attributes")
+///     .values(vec!["shard".to_owned(), "procedure".to_owned()])
+///     .build();
 ///
 /// assert_eq!(option.name(), "boundary-attributes");
 /// ```
@@ -57,15 +57,15 @@ impl RuleOption {
     /// ```
     /// use whisker_types::RuleOption;
     ///
-    /// let option = RuleOption::new(
-    ///     "lint.bool-param".to_owned(),
-    ///     "boundary-attributes".to_owned(),
-    ///     vec!["shard".to_owned()],
-    /// );
+    /// let option = RuleOption::builder()
+    ///     .rule("lint.bool-param")
+    ///     .name("boundary-attributes")
+    ///     .values(vec!["shard".to_owned()])
+    ///     .build();
     ///
     /// assert_eq!(option.values().collect::<Vec<_>>(), ["shard"]);
     /// ```
-    #[builder(start_fn = builder)]
+    #[builder]
     pub fn new(
         #[builder(into)] rule: String,
         #[builder(into)] name: String,
@@ -88,11 +88,11 @@ impl RuleOption {
     /// ```
     /// use whisker_types::RuleOption;
     ///
-    /// let option = RuleOption::new(
-    ///     "lint.bool-param".to_owned(),
-    ///     "boundary-attributes".to_owned(),
-    ///     Vec::new(),
-    /// );
+    /// let option = RuleOption::builder()
+    ///     .rule("lint.bool-param")
+    ///     .name("boundary-attributes")
+    ///     .values(Vec::new())
+    ///     .build();
     ///
     /// assert_eq!(option.rule(), "lint.bool-param");
     /// ```
@@ -107,11 +107,11 @@ impl RuleOption {
     /// ```
     /// use whisker_types::RuleOption;
     ///
-    /// let option = RuleOption::new(
-    ///     "lint.bool-param".to_owned(),
-    ///     "boundary-attributes".to_owned(),
-    ///     Vec::new(),
-    /// );
+    /// let option = RuleOption::builder()
+    ///     .rule("lint.bool-param")
+    ///     .name("boundary-attributes")
+    ///     .values(Vec::new())
+    ///     .build();
     ///
     /// assert_eq!(option.name(), "boundary-attributes");
     /// ```
@@ -126,11 +126,11 @@ impl RuleOption {
     /// ```
     /// use whisker_types::RuleOption;
     ///
-    /// let option = RuleOption::new(
-    ///     "lint.bool-param".to_owned(),
-    ///     "boundary-attributes".to_owned(),
-    ///     vec!["shard".to_owned()],
-    /// );
+    /// let option = RuleOption::builder()
+    ///     .rule("lint.bool-param")
+    ///     .name("boundary-attributes")
+    ///     .values(vec!["shard".to_owned()])
+    ///     .build();
     ///
     /// assert_eq!(option.values().count(), 1);
     /// ```
@@ -154,11 +154,11 @@ mod tests {
     use super::*;
 
     fn option() -> RuleOption {
-        RuleOption::new(
-            "lint.repeated-primitive-params".to_owned(),
-            "boundary-attributes".to_owned(),
-            vec!["shard".to_owned(), "procedure".to_owned()],
-        )
+        RuleOption::builder()
+            .rule("lint.repeated-primitive-params")
+            .name("boundary-attributes")
+            .values(vec!["shard".to_owned(), "procedure".to_owned()])
+            .build()
     }
 
     #[test]

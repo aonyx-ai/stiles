@@ -196,12 +196,12 @@ impl RustLintPass for {pass} {{
             return Vec::new();
         }}
 
-        vec![Diagnostic::new(
-            RuleId::new("{rule}"),
-            Severity::Warn,
-            "finish this before it ships".into(),
-            node.span(),
-        )]
+        vec![Diagnostic::builder()
+            .rule_id(RuleId::new("{rule}"))
+            .severity(Severity::Warn)
+            .message("finish this before it ships")
+            .span(node.span())
+            .build()]
     }}
 }}
 

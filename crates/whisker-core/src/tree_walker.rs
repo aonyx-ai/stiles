@@ -123,12 +123,12 @@ mod tests {
             .set_language(&tree_sitter_rust::LANGUAGE.into())
             .unwrap();
         let tree = parser.parse(source, None).unwrap();
-        DecoratedTree::new(
-            tree,
-            Language::Rust,
-            source.to_string(),
-            PathBuf::from("test.rs"),
-        )
+        DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::Rust)
+            .source(source.to_string())
+            .file(PathBuf::from("test.rs"))
+            .build()
     }
 
     fn parse_typescript(source: &str) -> DecoratedTree {
@@ -137,12 +137,12 @@ mod tests {
             .set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
             .unwrap();
         let tree = parser.parse(source, None).unwrap();
-        DecoratedTree::new(
-            tree,
-            Language::TypeScript,
-            source.to_string(),
-            PathBuf::from("test.ts"),
-        )
+        DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::TypeScript)
+            .source(source.to_string())
+            .file(PathBuf::from("test.ts"))
+            .build()
     }
 
     /// Counts the nodes a pass of one language sees
@@ -211,12 +211,14 @@ mod tests {
 
             extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
                 let found = match node.kind() == "function_item" {
-                    true => vec![Diagnostic::new(
-                        RuleId::new(self.0),
-                        Severity::Warn,
-                        format!("{} found fn", self.0),
-                        node.span(),
-                    )],
+                    true => vec![
+                        Diagnostic::builder()
+                            .rule_id(RuleId::new(self.0))
+                            .severity(Severity::Warn)
+                            .message(format!("{} found fn", self.0))
+                            .span(node.span())
+                            .build(),
+                    ],
                     false => Vec::new(),
                 };
                 Checked::Ok(found.into_iter().collect())
@@ -437,12 +439,12 @@ mod tests {
 
         extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
             Checked::Ok(
-                [Diagnostic::new(
-                    RuleId::new("test"),
-                    whisker_types::Severity::Info,
-                    "span check".into(),
-                    node.span(),
-                )]
+                [Diagnostic::builder()
+                    .rule_id(RuleId::new("test"))
+                    .severity(whisker_types::Severity::Info)
+                    .message("span check")
+                    .span(node.span())
+                    .build()]
                 .into_iter()
                 .collect(),
             )
@@ -553,12 +555,14 @@ mod tests {
 
             extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
                 let found = match node.kind() == "function_item" {
-                    true => vec![Diagnostic::new(
-                        RuleId::new("pass.copied"),
-                        Severity::Warn,
-                        "found fn".into(),
-                        node.span(),
-                    )],
+                    true => vec![
+                        Diagnostic::builder()
+                            .rule_id(RuleId::new("pass.copied"))
+                            .severity(Severity::Warn)
+                            .message("found fn")
+                            .span(node.span())
+                            .build(),
+                    ],
                     false => Vec::new(),
                 };
                 Checked::Ok(found.into_iter().collect())
@@ -624,12 +628,12 @@ mod tests {
                         node: &DecoratedNode<'_>,
                     ) -> Checked {
                         Checked::Ok(
-                            [Diagnostic::new(
-                                whisker_types::RuleId::new("test"),
-                                whisker_types::Severity::Warn,
-                                "hit".into(),
-                                node.span(),
-                            )]
+                            [Diagnostic::builder()
+                                .rule_id(whisker_types::RuleId::new("test"))
+                                .severity(whisker_types::Severity::Warn)
+                                .message("hit")
+                                .span(node.span())
+                                .build()]
                             .into_iter()
                             .collect(),
                         )
