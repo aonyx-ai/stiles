@@ -28,13 +28,14 @@ license = "Apache-2.0 OR MIT"
 # >
 
 [dependencies]
-whisker-rust = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.4", default-features = false }
-whisker-types = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.4" }
+whisker-plugin = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.5" }
+whisker-rust = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.5", default-features = false }
+whisker-types = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.5" }
 
 [lib]
 crate-type = ["cdylib"]
 
 # <
 [dev-dependencies]
-whisker-testing = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.4" }
+whisker-testing = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.5" }
 # >

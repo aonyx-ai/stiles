@@ -78,8 +78,8 @@ what I control: what is mine to get right. one thing. pin the whisker crates to
 the whisker that will load the plugin.
 -->
 
-One thing: pin `whisker-types`, `whisker-rust`, and `whisker-testing` to the
-Whisker release that will load your rule.
+One thing: pin `whisker-plugin`, `whisker-types`, `whisker-rust`, and
+`whisker-testing` to the Whisker release that will load your rule.
 
 ## How often that costs me
 

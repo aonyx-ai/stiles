@@ -11,7 +11,8 @@ The API documentation for each Whisker crate is on docs.rs.
 
 | Crate                              | Holds                                                                                               |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------- |
-| [whisker-rust][whisker-rust]       | `RustLintPass`, one method per node kind, plus `DeclaresRules` and `export_lints!`                  |
+| [whisker-plugin][whisker-plugin]   | `DeclaresRules` and `export_lints!`, which hand the lints of a crate to Whisker                     |
+| [whisker-rust][whisker-rust]       | `RustLintPass`, one method per node kind                                                            |
 | [whisker-types][whisker-types]     | `Diagnostic`, `Span`, `Suggestion`, `Severity`, `RuleId`, `DecoratedNode`, and the decoration types |
 | [whisker-testing][whisker-testing] | `parse`, `decorate`, `execute`, `fixtures`, and `assert_diagnostic`                                 |
 
@@ -20,6 +21,7 @@ every link points at docs.rs and every crate sets publish = false, so nothing
 resolves today. decide whether a page that cannot work yet ships or waits.
 -->
 
+[whisker-plugin]: https://docs.rs/whisker-plugin
 [whisker-rust]: https://docs.rs/whisker-rust
 [whisker-testing]: https://docs.rs/whisker-testing
 [whisker-types]: https://docs.rs/whisker-types

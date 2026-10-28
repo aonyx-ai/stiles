@@ -22,8 +22,8 @@ Download the archive for your platform from the [releases page][releases],
 check it against the `.sha256` beside it, and unpack it:
 
 ```bash
-shasum -a 256 -c whisker-0.1.0-rc.4-aarch64-apple-darwin.tar.gz.sha256
-tar -xzf whisker-0.1.0-rc.4-aarch64-apple-darwin.tar.gz
+shasum -a 256 -c whisker-0.1.0-rc.5-aarch64-apple-darwin.tar.gz.sha256
+tar -xzf whisker-0.1.0-rc.5-aarch64-apple-darwin.tar.gz
 ```
 
 The archive unpacks to a directory that holds the binary, both licenses, and
