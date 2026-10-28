@@ -20,26 +20,28 @@ impl RustLintPass for DocSummaryBreak {
             return Vec::new();
         }
 
-        vec![Diagnostic::new(
-            RULE_ID,
-            Severity::Warn,
-            "the summary line needs a blank `///` line after it".into(),
-            node.span(),
-        )]
+        vec![
+            Diagnostic::builder()
+                .rule_id(RULE_ID)
+                .severity(Severity::Warn)
+                .message("the summary line needs a blank `///` line after it")
+                .span(node.span())
+                .build(),
+        ]
     }
 }
 
 // 3: Rule ID
 const RULE_ID: RuleId = RuleId::new("lint.doc-summary-break");
 
-impl whisker_rust::DeclaresRules for DocSummaryBreak {
+impl whisker_plugin::DeclaresRules for DocSummaryBreak {
     fn rules(&self) -> Vec<RuleId> {
         vec![RULE_ID]
     }
 }
 
 // 4: Lint registration
-whisker_rust::export_lints![DocSummaryBreak];
+whisker_plugin::export_lints![rust: [DocSummaryBreak]];
 
 // ... and some helper functions for the lint
 

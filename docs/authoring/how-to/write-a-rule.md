@@ -35,8 +35,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-whisker-rust = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.4", default-features = false }
-whisker-types = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.4" }
+whisker-plugin = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.5" }
+whisker-rust = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.5", default-features = false }
+whisker-types = { git = "https://github.com/aonyx-ai/whisker.git", tag = "v0.1.0-rc.5" }
 
 [lib]
 crate-type = ["cdylib"]
@@ -51,12 +52,14 @@ impl RustLintPass for DocSummaryBreak {
             return Vec::new();
         }
 
-        vec![Diagnostic::new(
-            RULE_ID,
-            Severity::Warn,
-            "the summary line needs a blank `///` line after it".into(),
-            node.span(),
-        )]
+        vec![
+            Diagnostic::builder()
+                .rule_id(RULE_ID)
+                .severity(Severity::Warn)
+                .message("the summary line needs a blank `///` line after it")
+                .span(node.span())
+                .build(),
+        ]
     }
 }
 ```
@@ -66,13 +69,13 @@ impl RustLintPass for DocSummaryBreak {
 ```rust
 const RULE_ID: RuleId = RuleId::new("lint.doc-summary-break");
 
-impl whisker_rust::DeclaresRules for DocSummaryBreak {
+impl whisker_plugin::DeclaresRules for DocSummaryBreak {
     fn rules(&self) -> Vec<RuleId> {
         vec![RULE_ID]
     }
 }
 
-whisker_rust::export_lints![DocSummaryBreak];
+whisker_plugin::export_lints![rust: [DocSummaryBreak]];
 ```
 
 ## test it

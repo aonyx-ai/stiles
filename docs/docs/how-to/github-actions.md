@@ -14,9 +14,9 @@ We publish a Github Action to install Whisker directly from the Whisker
 repository:
 
 ```yaml
-- uses: aonyx-ai/whisker@v0.1.0-rc.4
+- uses: aonyx-ai/whisker@v0.1.0-rc.5
   with:
-    version: v0.1.0-rc.4
+    version: v0.1.0-rc.5
 - run: whisker check .
 ```
 

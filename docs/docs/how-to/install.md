@@ -23,8 +23,8 @@ Releases][gh-releases]. You'll have to move the file someplace on your `$PATH`
 yourself.
 
 ```bash
-shasum -a 256 -c whisker-0.1.0-rc.4-aarch64-apple-darwin.tar.gz.sha256
-tar -xzf whisker-0.1.0-rc.4-aarch64-apple-darwin.tar.gz
+shasum -a 256 -c whisker-0.1.0-rc.5-aarch64-apple-darwin.tar.gz.sha256
+tar -xzf whisker-0.1.0-rc.5-aarch64-apple-darwin.tar.gz
 ```
 
 ## From source
