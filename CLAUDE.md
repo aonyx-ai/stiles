@@ -179,6 +179,8 @@ git show <commit> --stat
 - Prefix a path into a submodule of the current module with `self::`, as in
   `pub use self::error::ParseNameError;` or `self::text::render(..)`. A bare
   first segment reads like a crate.
+- Import an item through a crate the file already imports from when that crate
+  exports it. Do not import it again from the crate that defines it.
 
 ### Memory and performance
 

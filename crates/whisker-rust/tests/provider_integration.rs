@@ -9,10 +9,10 @@ use whisker_rust::decorations::{
     AdtFlags, FnSignature, ImportSource, PublicPath, Reexports, ResolvedType, ReturnMode,
     TypePathRef,
 };
-use whisker_rust::{RustDecorationProvider, RustLintPassAdapter};
+use whisker_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter};
 use whisker_types::{
     Coverage, CoverageGap, DecoratedNode, DecoratedTree, DecorationProvider, Diagnostic, Language,
-    LintPass, RuleId, Severity, Span,
+    LintPass, Severity, Span,
 };
 
 static PROVIDER: OnceLock<RustDecorationProvider> = OnceLock::new();

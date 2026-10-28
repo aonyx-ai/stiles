@@ -105,9 +105,9 @@ mod tests {
     use std::path::PathBuf;
 
     use stabby::closure::Call0Dyn;
-    use whisker_rust::RustLintPass;
+    use whisker_rust::{RuleId, RustLintPass};
     use whisker_types::{
-        BoxedLintPass, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic, RuleId,
+        BoxedLintPass, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic,
         Severity,
     };
     use whisker_typescript::TypeScriptLintPass;

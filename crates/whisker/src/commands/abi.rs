@@ -1,4 +1,3 @@
-use anyhow::Context as _;
 use clawless::prelude::*;
 
 use crate::custom_lints::AbiTag;

@@ -1,6 +1,6 @@
-use whisker_rust::{RustLintPass, RustLintPassAdapter};
+use whisker_rust::{RuleId, RustLintPass, RustLintPassAdapter};
 use whisker_testing::{assert_diagnostic, assert_no_diagnostics, execute, parse};
-use whisker_types::{DecoratedNode, Diagnostic, Language, LintPass, RuleId, Severity};
+use whisker_types::{DecoratedNode, Diagnostic, Language, LintPass, Severity};
 
 fn adapt<P: RustLintPass + Send + Sync + 'static>(pass: P) -> Box<dyn LintPass> {
     Box::new(RustLintPassAdapter::new(pass))
