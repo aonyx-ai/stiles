@@ -27,4 +27,4 @@ stiles-source = "."
 # check here runs exactly the rules it ran yesterday.
 [[lints]]
 git = "https://github.com/aonyx-ai/stiles-aonyx-rules"
-rev = "8f39356148f98f0516ba356cd596af8631db4d2b"
+rev = "4d401f8ca0950ad2112948eba5e9889e240bcd0e"
