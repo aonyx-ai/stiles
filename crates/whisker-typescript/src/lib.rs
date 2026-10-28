@@ -74,12 +74,12 @@ mod tests {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(grammar).unwrap();
         let tree = parser.parse(source, None).unwrap();
-        DecoratedTree::new(
-            tree,
-            Language::TypeScript,
-            source.to_string(),
-            PathBuf::from("test.ts"),
-        )
+        DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::TypeScript)
+            .source(source.to_string())
+            .file(PathBuf::from("test.ts"))
+            .build()
     }
 
     fn walk_and_dispatch(node: &DecoratedNode<'_>, pass: &mut impl TypeScriptLintPass) {

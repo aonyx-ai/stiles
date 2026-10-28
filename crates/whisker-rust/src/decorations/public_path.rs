@@ -27,7 +27,7 @@ use stabby::{string, vec};
 /// ```
 /// use whisker_rust::decorations::PublicPath;
 ///
-/// let path = PublicPath::new("facade", ["thing", "Thing"]);
+/// let path = PublicPath::builder().krate("facade").segments(["thing", "Thing"]).build();
 ///
 /// assert_eq!(path.to_string(), "facade::thing::Thing");
 /// ```
@@ -51,11 +51,11 @@ impl PublicPath {
     /// ```
     /// use whisker_rust::decorations::PublicPath;
     ///
-    /// let path = PublicPath::new("facade", ["Shape", "Circle"]);
+    /// let path = PublicPath::builder().krate("facade").segments(["Shape", "Circle"]).build();
     ///
     /// assert_eq!(path.to_string(), "facade::Shape::Circle");
     /// ```
-    #[builder(start_fn = builder)]
+    #[builder]
     pub fn new<S>(krate: &str, segments: S) -> Self
     where
         S: IntoIterator,
@@ -77,7 +77,7 @@ impl PublicPath {
     /// ```
     /// use whisker_rust::decorations::PublicPath;
     ///
-    /// let path = PublicPath::new("facade", ["thing", "Thing"]);
+    /// let path = PublicPath::builder().krate("facade").segments(["thing", "Thing"]).build();
     ///
     /// assert_eq!(path.krate(), "facade");
     /// ```
@@ -92,7 +92,7 @@ impl PublicPath {
     /// ```
     /// use whisker_rust::decorations::PublicPath;
     ///
-    /// let path = PublicPath::new("facade", ["thing", "Thing"]);
+    /// let path = PublicPath::builder().krate("facade").segments(["thing", "Thing"]).build();
     ///
     /// assert_eq!(path.segments().collect::<Vec<_>>(), vec!["thing", "Thing"]);
     /// ```
@@ -127,7 +127,10 @@ mod tests {
 
     #[test]
     fn display_joins_segments_with_double_colons() {
-        let path = PublicPath::new("facade", ["thing", "Thing"]);
+        let path = PublicPath::builder()
+            .krate("facade")
+            .segments(["thing", "Thing"])
+            .build();
 
         let rendered = path.to_string();
 
@@ -137,7 +140,10 @@ mod tests {
     /// Pins that a path with no segments does not end in `::`
     #[test]
     fn display_with_no_segments_renders_the_crate() {
-        let path = PublicPath::new("facade", [] as [&str; 0]);
+        let path = PublicPath::builder()
+            .krate("facade")
+            .segments([] as [&str; 0])
+            .build();
 
         let rendered = path.to_string();
 
@@ -147,9 +153,19 @@ mod tests {
     #[test]
     fn hash_agrees_with_eq() {
         let mut paths = HashSet::new();
-        paths.insert(PublicPath::new("facade", ["thing", "Thing"]));
+        paths.insert(
+            PublicPath::builder()
+                .krate("facade")
+                .segments(["thing", "Thing"])
+                .build(),
+        );
 
-        let found = paths.contains(&PublicPath::new("facade", ["thing", "Thing"]));
+        let found = paths.contains(
+            &PublicPath::builder()
+                .krate("facade")
+                .segments(["thing", "Thing"])
+                .build(),
+        );
 
         assert!(found);
     }
@@ -157,23 +173,39 @@ mod tests {
     #[test]
     fn hash_with_other_segments_misses() {
         let mut paths = HashSet::new();
-        paths.insert(PublicPath::new("facade", ["thing", "Thing"]));
+        paths.insert(
+            PublicPath::builder()
+                .krate("facade")
+                .segments(["thing", "Thing"])
+                .build(),
+        );
 
-        let found = paths.contains(&PublicPath::new("facade", ["Thing"]));
+        let found = paths.contains(
+            &PublicPath::builder()
+                .krate("facade")
+                .segments(["Thing"])
+                .build(),
+        );
 
         assert!(!found);
     }
 
     #[test]
     fn krate_returns_the_crate() {
-        let path = PublicPath::new("facade", ["thing", "Thing"]);
+        let path = PublicPath::builder()
+            .krate("facade")
+            .segments(["thing", "Thing"])
+            .build();
 
         assert_eq!(path.krate(), "facade");
     }
 
     #[test]
     fn segments_returns_each_segment_in_order() {
-        let path = PublicPath::new("facade", ["thing", "Thing"]);
+        let path = PublicPath::builder()
+            .krate("facade")
+            .segments(["thing", "Thing"])
+            .build();
 
         let segments: Vec<&str> = path.segments().collect();
 

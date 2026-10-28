@@ -62,7 +62,12 @@ fn parse(path: &Path, source: &str) -> DecoratedTree {
         .set_language(&grammar)
         .expect("the grammar should load");
     let tree = parser.parse(source, None).expect("the source should parse");
-    DecoratedTree::new(tree, Language::TypeScript, source.to_owned(), path)
+    DecoratedTree::builder()
+        .tree(tree)
+        .language(Language::TypeScript)
+        .source(source.to_owned())
+        .file(path)
+        .build()
 }
 
 /// Decorates the file at `relative` with its text on disk
@@ -148,12 +153,16 @@ impl TypeScriptLintPass for SwappableParameters {
                     && one.alias() != other.alias()
             })
             .map(|(first, second)| {
-                Diagnostic::new(
-                    RuleId::new("test.swappable-parameters"),
-                    Severity::Warn,
-                    format!("`{}` and `{}` can be swapped", first.name(), second.name()),
-                    node.span(),
-                )
+                Diagnostic::builder()
+                    .rule_id(RuleId::new("test.swappable-parameters"))
+                    .severity(Severity::Warn)
+                    .message(format!(
+                        "`{}` and `{}` can be swapped",
+                        first.name(),
+                        second.name()
+                    ))
+                    .span(node.span())
+                    .build()
             })
             .collect()
     }

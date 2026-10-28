@@ -55,12 +55,18 @@ mod tests {
     use super::*;
 
     fn test_diagnostic(severity: Severity) -> Diagnostic {
-        Diagnostic::new(
-            RuleId::new("lint.test"),
-            severity,
-            "test message".into(),
-            Span::new(PathBuf::from("test.rs"), 0, 10),
-        )
+        Diagnostic::builder()
+            .rule_id(RuleId::new("lint.test"))
+            .severity(severity)
+            .message("test message")
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("test.rs"))
+                    .start(0)
+                    .end(10)
+                    .build(),
+            )
+            .build()
     }
 
     #[test]

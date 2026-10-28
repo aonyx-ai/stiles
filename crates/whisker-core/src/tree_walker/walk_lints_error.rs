@@ -17,7 +17,7 @@ use crate::{PassPanic, UndeclaredRule};
 ///     source: UndeclaredRule::builder()
 ///         .rule(RuleId::new("lint.bar"))
 ///         .declared(Vec::new())
-///         .span(Span::new("src/lib.rs", 3, 9))
+///         .span(Span::builder().file("src/lib.rs").start(3).end(9).build())
 ///         .build(),
 /// };
 ///

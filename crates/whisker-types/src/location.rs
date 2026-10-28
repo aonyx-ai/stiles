@@ -23,7 +23,7 @@ pub struct Location {
 #[bon]
 impl Location {
     /// Creates a location with the given span and descriptive message
-    #[builder(start_fn = builder)]
+    #[builder]
     pub fn new(span: Span, #[builder(into)] message: String) -> Self {
         Self {
             span,
@@ -50,16 +50,30 @@ mod tests {
 
     #[test]
     fn message_returns_the_message() {
-        let span = Span::new(PathBuf::from("test.rs"), 0, 10);
-        let location = Location::new(span, "defined here".into());
+        let span = Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(0)
+            .end(10)
+            .build();
+        let location = Location::builder()
+            .span(span)
+            .message("defined here")
+            .build();
 
         assert_eq!(location.message(), "defined here");
     }
 
     #[test]
     fn span_returns_the_span() {
-        let span = Span::new(PathBuf::from("test.rs"), 0, 10);
-        let location = Location::new(span.clone(), "defined here".into());
+        let span = Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(0)
+            .end(10)
+            .build();
+        let location = Location::builder()
+            .span(span.clone())
+            .message("defined here")
+            .build();
 
         assert_eq!(location.span(), &span);
     }
@@ -95,8 +109,15 @@ mod tests {
                 delta in 0..=1000usize,
                 message in "\\PC{0,50}",
             ) {
-                let span = Span::new(PathBuf::from(&file), start, start + delta);
-                let location = Location::new(span.clone(), message.clone());
+                let span = Span::builder()
+                    .file(PathBuf::from(&file))
+                    .start(start)
+                    .end(start + delta)
+                    .build();
+                let location = Location::builder()
+                    .span(span.clone())
+                    .message(message.clone())
+                    .build();
 
                 prop_assert_eq!(location.span(), &span);
                 prop_assert_eq!(location.message(), message);

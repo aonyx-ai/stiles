@@ -33,7 +33,7 @@ pub struct Diagnostic {
 #[bon]
 impl Diagnostic {
     /// Creates a new diagnostic with the required fields
-    #[builder(start_fn = builder)]
+    #[builder]
     pub fn new(
         rule_id: RuleId,
         severity: Severity,
@@ -81,12 +81,12 @@ impl Diagnostic {
     ///
     /// use whisker_types::{Diagnostic, RuleId, Severity, Span};
     ///
-    /// let diagnostic = Diagnostic::new(
-    ///     RuleId::new("lint.bool-param"),
-    ///     Severity::Warn,
-    ///     "parameter has type `bool`".into(),
-    ///     Span::new(PathBuf::from("src/lib.rs"), 0, 10),
-    /// );
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.bool-param"))
+    ///     .severity(Severity::Warn)
+    ///     .message("parameter has type `bool`")
+    ///     .span(Span::builder().file(PathBuf::from("src/lib.rs")).start(0).end(10).build())
+    ///     .build();
     ///
     /// let denied = diagnostic.with_severity(Severity::Error);
     ///
@@ -140,12 +140,18 @@ mod tests {
     use super::*;
 
     fn test_diagnostic() -> Diagnostic {
-        Diagnostic::new(
-            RuleId::new("lint.test"),
-            Severity::Warn,
-            "test message".into(),
-            Span::new(PathBuf::from("test.rs"), 0, 10),
-        )
+        Diagnostic::builder()
+            .rule_id(RuleId::new("lint.test"))
+            .severity(Severity::Warn)
+            .message("test message")
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("test.rs"))
+                    .start(0)
+                    .end(10)
+                    .build(),
+            )
+            .build()
     }
 
     #[test]
@@ -177,10 +183,16 @@ mod tests {
 
     /// Returns a location that a test attaches as an origin
     fn origin() -> Location {
-        Location::new(
-            Span::new(PathBuf::from("other.rs"), 5, 15),
-            "defined here".into(),
-        )
+        Location::builder()
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("other.rs"))
+                    .start(5)
+                    .end(15)
+                    .build(),
+            )
+            .message("defined here")
+            .build()
     }
 
     #[test]
@@ -238,7 +250,14 @@ mod tests {
     fn span_returns_the_span() {
         let diag = test_diagnostic();
 
-        assert_eq!(diag.span(), &Span::new(PathBuf::from("test.rs"), 0, 10));
+        assert_eq!(
+            diag.span(),
+            &Span::builder()
+                .file(PathBuf::from("test.rs"))
+                .start(0)
+                .end(10)
+                .build()
+        );
     }
 
     #[test]
@@ -268,10 +287,16 @@ mod tests {
 
     #[test]
     fn with_related_adds_related() {
-        let related = Location::new(
-            Span::new(PathBuf::from("other.rs"), 5, 15),
-            "also used here".into(),
-        );
+        let related = Location::builder()
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("other.rs"))
+                    .start(5)
+                    .end(15)
+                    .build(),
+            )
+            .message("also used here")
+            .build();
 
         let diag = test_diagnostic().with_related(related.clone());
 
@@ -311,7 +336,14 @@ mod tests {
             .with_origin(origin())
             .with_severity(Severity::Error);
 
-        assert_eq!(diag.span(), &Span::new(PathBuf::from("test.rs"), 0, 10));
+        assert_eq!(
+            diag.span(),
+            &Span::builder()
+                .file(PathBuf::from("test.rs"))
+                .start(0)
+                .end(10)
+                .build()
+        );
     }
 
     #[test]
@@ -323,11 +355,17 @@ mod tests {
 
     #[test]
     fn with_suggestion_adds_suggestion() {
-        let suggestion = Suggestion::new(
-            Span::new(PathBuf::from("test.rs"), 0, 10),
-            "replacement".into(),
-            "try this".into(),
-        );
+        let suggestion = Suggestion::builder()
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("test.rs"))
+                    .start(0)
+                    .end(10)
+                    .build(),
+            )
+            .replacement("replacement")
+            .message("try this")
+            .build();
 
         let diag = test_diagnostic().with_suggestion(suggestion.clone());
 
@@ -350,7 +388,11 @@ mod tests {
 
         fn arb_span() -> impl Strategy<Value = Span> {
             (0..=1000usize, 0..=1000usize).prop_map(|(start, delta)| {
-                Span::new(PathBuf::from("test.rs"), start, start + delta)
+                Span::builder()
+                    .file(PathBuf::from("test.rs"))
+                    .start(start)
+                    .end(start + delta)
+                    .build()
             })
         }
 
@@ -361,12 +403,12 @@ mod tests {
                 message in "\\PC{0,50}",
                 span in arb_span(),
             ) {
-                let diag = Diagnostic::new(
-                    RuleId::new("lint.prop"),
-                    severity,
-                    message.clone(),
-                    span.clone(),
-                );
+                let diag = Diagnostic::builder()
+                    .rule_id(RuleId::new("lint.prop"))
+                    .severity(severity)
+                    .message(message.clone())
+                    .span(span.clone())
+                    .build();
 
                 prop_assert_eq!(diag.rule_id(), RuleId::new("lint.prop"));
                 prop_assert_eq!(diag.severity(), severity);
@@ -378,12 +420,12 @@ mod tests {
             fn new_starts_with_empty_collections(
                 severity in arb_severity(),
             ) {
-                let diag = Diagnostic::new(
-                    RuleId::new("lint.prop"),
-                    severity,
-                    "msg".into(),
-                    Span::new(PathBuf::from("f.rs"), 0, 1),
-                );
+                let diag = Diagnostic::builder()
+                    .rule_id(RuleId::new("lint.prop"))
+                    .severity(severity)
+                    .message("msg")
+                    .span(Span::builder().file(PathBuf::from("f.rs")).start(0).end(1).build())
+                    .build();
 
                 prop_assert!(diag.origins().is_empty());
                 prop_assert!(diag.related().is_empty());
@@ -394,10 +436,14 @@ mod tests {
             fn with_origin_accumulates(count in 1..=10usize) {
                 let mut diag = test_diagnostic();
                 for i in 0..count {
-                    let origin = Location::new(
-                        Span::new(PathBuf::from("f.rs"), i, i + 1),
-                        format!("origin {i}"),
-                    );
+                    let origin = Location::builder()
+                        .span(Span::builder()
+                            .file(PathBuf::from("f.rs"))
+                            .start(i)
+                            .end(i + 1)
+                            .build())
+                        .message(format!("origin {i}"))
+                        .build();
                     diag = diag.with_origin(origin);
                 }
                 prop_assert_eq!(diag.origins().len(), count);
@@ -407,10 +453,14 @@ mod tests {
             fn with_related_accumulates(count in 1..=10usize) {
                 let mut diag = test_diagnostic();
                 for i in 0..count {
-                    let related = Location::new(
-                        Span::new(PathBuf::from("f.rs"), i, i + 1),
-                        format!("related {i}"),
-                    );
+                    let related = Location::builder()
+                        .span(Span::builder()
+                            .file(PathBuf::from("f.rs"))
+                            .start(i)
+                            .end(i + 1)
+                            .build())
+                        .message(format!("related {i}"))
+                        .build();
                     diag = diag.with_related(related);
                 }
                 prop_assert_eq!(diag.related().len(), count);
@@ -420,11 +470,15 @@ mod tests {
             fn with_suggestion_accumulates(count in 1..=10usize) {
                 let mut diag = test_diagnostic();
                 for i in 0..count {
-                    let suggestion = Suggestion::new(
-                        Span::new(PathBuf::from("f.rs"), i, i + 1),
-                        format!("fix {i}"),
-                        format!("suggestion {i}"),
-                    );
+                    let suggestion = Suggestion::builder()
+                        .span(Span::builder()
+                            .file(PathBuf::from("f.rs"))
+                            .start(i)
+                            .end(i + 1)
+                            .build())
+                        .replacement(format!("fix {i}"))
+                        .message(format!("suggestion {i}"))
+                        .build();
                     diag = diag.with_suggestion(suggestion);
                 }
                 prop_assert_eq!(diag.suggestions().len(), count);

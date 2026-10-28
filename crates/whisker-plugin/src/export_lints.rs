@@ -124,12 +124,14 @@ mod tests {
 
     impl RustLintPass for FlagEveryFunction {
         fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-            vec![Diagnostic::new(
-                RuleId::new("test.flag-every-function"),
-                Severity::Warn,
-                "found a function".into(),
-                node.span(),
-            )]
+            vec![
+                Diagnostic::builder()
+                    .rule_id(RuleId::new("test.flag-every-function"))
+                    .severity(Severity::Warn)
+                    .message("found a function")
+                    .span(node.span())
+                    .build(),
+            ]
         }
     }
 
@@ -137,12 +139,14 @@ mod tests {
 
     impl FlagEveryComment {
         fn flag(node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-            vec![Diagnostic::new(
-                RuleId::new("test.flag-every-comment"),
-                Severity::Warn,
-                "found a comment".into(),
-                node.span(),
-            )]
+            vec![
+                Diagnostic::builder()
+                    .rule_id(RuleId::new("test.flag-every-comment"))
+                    .severity(Severity::Warn)
+                    .message("found a comment")
+                    .span(node.span())
+                    .build(),
+            ]
         }
     }
 
@@ -183,7 +187,12 @@ mod tests {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&grammar).unwrap();
         let tree = parser.parse(source, None).unwrap();
-        DecoratedTree::new(tree, language, source.into(), PathBuf::from("test"))
+        DecoratedTree::builder()
+            .tree(tree)
+            .language(language)
+            .source(source.into())
+            .file(PathBuf::from("test"))
+            .build()
     }
 
     fn loaded() -> Plugin {

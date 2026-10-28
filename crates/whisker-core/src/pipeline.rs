@@ -98,8 +98,12 @@ impl Pipeline {
             .parse(source, None)
             .ok_or(RunPipelineError::NoSyntaxTree)?;
 
-        let mut decorated =
-            DecoratedTree::new(tree, self.language, source.to_string(), path.to_path_buf());
+        let mut decorated = DecoratedTree::builder()
+            .tree(tree)
+            .language(self.language)
+            .source(source.to_string())
+            .file(path.to_path_buf())
+            .build();
 
         let mut covered = Vec::new();
         let mut gaps = Vec::new();
@@ -255,12 +259,12 @@ mod tests {
                 return Checked::Ok(vec::Vec::new());
             };
             Checked::Ok(
-                [Diagnostic::new(
-                    RuleId::new("test.marker"),
-                    Severity::Warn,
-                    marker.0.as_str().into(),
-                    node.span(),
-                )]
+                [Diagnostic::builder()
+                    .rule_id(RuleId::new("test.marker"))
+                    .severity(Severity::Warn)
+                    .message(marker.0.as_str())
+                    .span(node.span())
+                    .build()]
                 .into_iter()
                 .collect(),
             )
@@ -450,12 +454,14 @@ mod tests {
 
             extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
                 let found = match node.kind() == "function_item" {
-                    true => vec![Diagnostic::new(
-                        RuleId::new("test.always"),
-                        Severity::Warn,
-                        "found function".into(),
-                        node.span(),
-                    )],
+                    true => vec![
+                        Diagnostic::builder()
+                            .rule_id(RuleId::new("test.always"))
+                            .severity(Severity::Warn)
+                            .message("found function")
+                            .span(node.span())
+                            .build(),
+                    ],
                     false => Vec::new(),
                 };
                 Checked::Ok(found.into_iter().collect())

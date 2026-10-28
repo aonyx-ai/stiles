@@ -118,12 +118,18 @@ mod tests {
     fn finding(source: &str, start: usize, end: usize) -> Finding {
         let path: Arc<Path> = Path::new("src/lib.rs").into();
         let sources = HashMap::from([(path, source.to_owned())]);
-        let diagnostic = Diagnostic::new(
-            RuleId::new("lint.test"),
-            Severity::Warn,
-            "test message".into(),
-            Span::new(PathBuf::from("src/lib.rs"), start, end),
-        );
+        let diagnostic = Diagnostic::builder()
+            .rule_id(RuleId::new("lint.test"))
+            .severity(Severity::Warn)
+            .message("test message")
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("src/lib.rs"))
+                    .start(start)
+                    .end(end)
+                    .build(),
+            )
+            .build();
 
         Finding::builder()
             .diagnostic(&diagnostic)
@@ -183,12 +189,18 @@ mod tests {
     #[test]
     fn new_with_a_file_missing_from_the_sources_reports_line_one() {
         let sources = HashMap::new();
-        let diagnostic = Diagnostic::new(
-            RuleId::new("lint.test"),
-            Severity::Error,
-            "test message".into(),
-            Span::new(PathBuf::from("other.rs"), 5, 6),
-        );
+        let diagnostic = Diagnostic::builder()
+            .rule_id(RuleId::new("lint.test"))
+            .severity(Severity::Error)
+            .message("test message")
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("other.rs"))
+                    .start(5)
+                    .end(6)
+                    .build(),
+            )
+            .build();
 
         let finding = Finding::builder()
             .diagnostic(&diagnostic)

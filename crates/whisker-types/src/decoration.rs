@@ -125,12 +125,12 @@ mod tests {
             .expect("language should be valid");
         let tree = parser.parse(source, None).expect("should parse");
 
-        DecoratedTree::new(
-            tree,
-            Language::Rust,
-            source.to_string(),
-            PathBuf::from("test.rs"),
-        )
+        DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::Rust)
+            .source(source.to_string())
+            .file(PathBuf::from("test.rs"))
+            .build()
     }
 
     #[test]

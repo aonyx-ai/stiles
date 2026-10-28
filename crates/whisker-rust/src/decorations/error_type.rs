@@ -37,9 +37,17 @@ impl ErrorType {
     /// ```
     /// use whisker_rust::decorations::{ErrorType, TypePath, TypePathRef};
     ///
-    /// const ANYHOW_ERROR: TypePathRef<'static> = TypePathRef::new("anyhow", &[], "Error");
+    /// const ANYHOW_ERROR: TypePathRef<'static> = TypePathRef::builder()
+    ///     .krate("anyhow")
+    ///     .modules(&[])
+    ///     .name("Error")
+    ///     .build();
     ///
-    /// let error = ErrorType::Named(TypePath::new("syn", ["error"], "Error"));
+    /// let error = ErrorType::Named(TypePath::builder()
+    ///     .krate("syn")
+    ///     .modules(["error"])
+    ///     .name("Error")
+    ///     .build());
     ///
     /// assert!(!error.is(ANYHOW_ERROR));
     /// ```
@@ -56,7 +64,11 @@ impl ErrorType {
 mod tests {
     use super::*;
 
-    const ANYHOW_ERROR: TypePathRef<'static> = TypePathRef::new("anyhow", &[], "Error");
+    const ANYHOW_ERROR: TypePathRef<'static> = TypePathRef::builder()
+        .krate("anyhow")
+        .modules(&[])
+        .name("Error")
+        .build();
 
     #[test]
     fn is_with_generic_returns_false() {
@@ -69,7 +81,13 @@ mod tests {
 
     #[test]
     fn is_with_matching_path_returns_true() {
-        let error = ErrorType::Named(TypePath::new("anyhow", [] as [&str; 0], "Error"));
+        let error = ErrorType::Named(
+            TypePath::builder()
+                .krate("anyhow")
+                .modules([] as [&str; 0])
+                .name("Error")
+                .build(),
+        );
 
         let matches = error.is(ANYHOW_ERROR);
 
@@ -81,7 +99,13 @@ mod tests {
     /// Both render as `Error`, so only the definition path distinguishes them.
     #[test]
     fn is_with_same_name_in_another_crate_returns_false() {
-        let error = ErrorType::Named(TypePath::new("syn", ["error"], "Error"));
+        let error = ErrorType::Named(
+            TypePath::builder()
+                .krate("syn")
+                .modules(["error"])
+                .name("Error")
+                .build(),
+        );
 
         let matches = error.is(ANYHOW_ERROR);
 

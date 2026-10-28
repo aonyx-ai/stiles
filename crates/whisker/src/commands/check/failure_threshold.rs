@@ -62,12 +62,18 @@ mod tests {
     ];
 
     fn test_diagnostic(severity: Severity) -> Diagnostic {
-        Diagnostic::new(
-            RuleId::new("lint.test"),
-            severity,
-            "test message".into(),
-            Span::new(PathBuf::from("test.rs"), 0, 10),
-        )
+        Diagnostic::builder()
+            .rule_id(RuleId::new("lint.test"))
+            .severity(severity)
+            .message("test message")
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("test.rs"))
+                    .start(0)
+                    .end(10)
+                    .build(),
+            )
+            .build()
     }
 
     #[test]
@@ -156,25 +162,43 @@ mod tests {
     }
 
     fn origin() -> Location {
-        Location::new(
-            Span::new(PathBuf::from("other.rs"), 1, 2),
-            "defined here".into(),
-        )
+        Location::builder()
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("other.rs"))
+                    .start(1)
+                    .end(2)
+                    .build(),
+            )
+            .message("defined here")
+            .build()
     }
 
     fn related() -> Location {
-        Location::new(
-            Span::new(PathBuf::from("other.rs"), 3, 4),
-            "also here".into(),
-        )
+        Location::builder()
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("other.rs"))
+                    .start(3)
+                    .end(4)
+                    .build(),
+            )
+            .message("also here")
+            .build()
     }
 
     fn suggestion() -> Suggestion {
-        Suggestion::new(
-            Span::new(PathBuf::from("test.rs"), 0, 1),
-            "replacement".into(),
-            "try this".into(),
-        )
+        Suggestion::builder()
+            .span(
+                Span::builder()
+                    .file(PathBuf::from("test.rs"))
+                    .start(0)
+                    .end(1)
+                    .build(),
+            )
+            .replacement("replacement")
+            .message("try this")
+            .build()
     }
 
     /// Returns a warning with an origin, a related location, and a
@@ -199,7 +223,14 @@ mod tests {
     fn promote_with_warnings_preserves_the_span() {
         let promoted = promoted_detailed_warning();
 
-        assert_eq!(promoted.span(), &Span::new(PathBuf::from("test.rs"), 0, 10));
+        assert_eq!(
+            promoted.span(),
+            &Span::builder()
+                .file(PathBuf::from("test.rs"))
+                .start(0)
+                .end(10)
+                .build()
+        );
     }
 
     #[test]

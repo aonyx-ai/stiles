@@ -17,12 +17,12 @@ mod tests {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&crate::language()).unwrap();
         let tree = parser.parse(source, None).unwrap();
-        DecoratedTree::new(
-            tree,
-            Language::Rust,
-            source.to_string(),
-            PathBuf::from("test.rs"),
-        )
+        DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::Rust)
+            .source(source.to_string())
+            .file(PathBuf::from("test.rs"))
+            .build()
     }
 
     #[test]
@@ -30,12 +30,14 @@ mod tests {
         struct WarnOnFn;
         impl RustLintPass for WarnOnFn {
             fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-                vec![Diagnostic::new(
-                    RuleId::new("test.warn"),
-                    Severity::Warn,
-                    "function found".into(),
-                    node.span(),
-                )]
+                vec![
+                    Diagnostic::builder()
+                        .rule_id(RuleId::new("test.warn"))
+                        .severity(Severity::Warn)
+                        .message("function found")
+                        .span(node.span())
+                        .build(),
+                ]
             }
         }
 
@@ -54,12 +56,14 @@ mod tests {
         impl RustLintPass for FnFinder {
             fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
                 self.found = true;
-                vec![Diagnostic::new(
-                    RuleId::new("test.fn"),
-                    Severity::Warn,
-                    "found".into(),
-                    node.span(),
-                )]
+                vec![
+                    Diagnostic::builder()
+                        .rule_id(RuleId::new("test.fn"))
+                        .severity(Severity::Warn)
+                        .message("found")
+                        .span(node.span())
+                        .build(),
+                ]
             }
         }
 

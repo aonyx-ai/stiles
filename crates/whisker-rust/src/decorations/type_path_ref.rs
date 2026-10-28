@@ -1,3 +1,5 @@
+use bon::Builder;
+
 /// A borrowed [`TypePath`] a rule can declare as a `const`
 ///
 /// [`TypePath`] owns its segments and cannot be a `const`. This type
@@ -9,14 +11,30 @@
 /// ```
 /// use whisker_rust::decorations::{TypePath, TypePathRef};
 ///
-/// const ANYHOW_ERROR: TypePathRef<'static> = TypePathRef::new("anyhow", &[], "Error");
+/// const ANYHOW_ERROR: TypePathRef<'static> = TypePathRef::builder()
+///     .krate("anyhow")
+///     .modules(&[])
+///     .name("Error")
+///     .build();
 ///
-/// assert!(TypePath::new("anyhow", [] as [&str; 0], "Error") == ANYHOW_ERROR);
-/// assert!(TypePath::new("syn", ["error"], "Error") != ANYHOW_ERROR);
+/// let anyhow = TypePath::builder()
+///     .krate("anyhow")
+///     .modules([] as [&str; 0])
+///     .name("Error")
+///     .build();
+/// let syn = TypePath::builder()
+///     .krate("syn")
+///     .modules(["error"])
+///     .name("Error")
+///     .build();
+///
+/// assert!(anyhow == ANYHOW_ERROR);
+/// assert!(syn != ANYHOW_ERROR);
 /// ```
 ///
 /// [`TypePath`]: crate::decorations::TypePath
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Builder)]
+#[builder(const)]
 pub struct TypePathRef<'a> {
     krate: &'a str,
     modules: &'a [&'a str],
@@ -50,7 +68,7 @@ impl<'a> TypePathRef<'a> {
     /// ```
     /// use whisker_rust::decorations::TypePathRef;
     ///
-    /// let path = TypePathRef::new("syn", &["error"], "Error");
+    /// let path = TypePathRef::builder().krate("syn").modules(&["error"]).name("Error").build();
     ///
     /// assert_eq!(path.krate(), "syn");
     /// ```
@@ -65,7 +83,7 @@ impl<'a> TypePathRef<'a> {
     /// ```
     /// use whisker_rust::decorations::TypePathRef;
     ///
-    /// let path = TypePathRef::new("syn", &["error"], "Error");
+    /// let path = TypePathRef::builder().krate("syn").modules(&["error"]).name("Error").build();
     ///
     /// assert_eq!(path.modules(), &["error"]);
     /// ```
@@ -80,7 +98,7 @@ impl<'a> TypePathRef<'a> {
     /// ```
     /// use whisker_rust::decorations::TypePathRef;
     ///
-    /// let path = TypePathRef::new("syn", &["error"], "Error");
+    /// let path = TypePathRef::builder().krate("syn").modules(&["error"]).name("Error").build();
     ///
     /// assert_eq!(path.name(), "Error");
     /// ```
@@ -95,21 +113,33 @@ mod tests {
 
     #[test]
     fn krate_returns_the_crate() {
-        let path = TypePathRef::new("core", &["io", "error"], "Error");
+        let path = TypePathRef::builder()
+            .krate("core")
+            .modules(&["io", "error"])
+            .name("Error")
+            .build();
 
         assert_eq!(path.krate(), "core");
     }
 
     #[test]
     fn modules_returns_the_modules() {
-        let path = TypePathRef::new("core", &["io", "error"], "Error");
+        let path = TypePathRef::builder()
+            .krate("core")
+            .modules(&["io", "error"])
+            .name("Error")
+            .build();
 
         assert_eq!(path.modules(), &["io", "error"]);
     }
 
     #[test]
     fn name_returns_the_name() {
-        let path = TypePathRef::new("core", &["io", "error"], "Error");
+        let path = TypePathRef::builder()
+            .krate("core")
+            .modules(&["io", "error"])
+            .name("Error")
+            .build();
 
         assert_eq!(path.name(), "Error");
     }

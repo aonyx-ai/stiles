@@ -30,7 +30,7 @@ impl Span {
     /// # Panics
     ///
     /// Panics if `start > end`.
-    #[builder(start_fn = builder)]
+    #[builder]
     pub fn new(file: impl Into<FilePath>, start: usize, end: usize) -> Self {
         let file = file.into();
         assert!(
@@ -55,9 +55,9 @@ impl Span {
     /// ```
     /// use whisker_types::Span;
     ///
-    /// let span = Span::new("src/lib.rs", 10, 20);
+    /// let span = Span::builder().file("src/lib.rs").start(10).end(20).build();
     ///
-    /// let narrower = Span::new(span.file_path().clone(), 12, 14);
+    /// let narrower = Span::builder().file(span.file_path().clone()).start(12).end(14).build();
     ///
     /// assert_eq!(narrower.file(), span.file());
     /// ```
@@ -84,20 +84,32 @@ mod tests {
 
     #[test]
     fn empty_span_is_allowed() {
-        let span = Span::new(PathBuf::from("test.rs"), 5, 5);
+        let span = Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(5)
+            .end(5)
+            .build();
         assert_eq!(span.start(), span.end());
     }
 
     #[test]
     fn end_returns_the_end() {
-        let span = Span::new(PathBuf::from("test.rs"), 10, 20);
+        let span = Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(10)
+            .end(20)
+            .build();
 
         assert_eq!(span.end(), 20);
     }
 
     #[test]
     fn file_path_is_shared_by_a_clone() {
-        let span = Span::new(PathBuf::from("test.rs"), 0, 10);
+        let span = Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(0)
+            .end(10)
+            .build();
 
         let copy = span.clone();
 
@@ -106,29 +118,56 @@ mod tests {
 
     #[test]
     fn file_returns_the_file() {
-        let span = Span::new(PathBuf::from("test.rs"), 10, 20);
+        let span = Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(10)
+            .end(20)
+            .build();
 
         assert_eq!(span.file(), Path::new("test.rs"));
     }
 
     #[test]
     fn new_accepts_a_shared_file_path() {
-        let span = Span::new(PathBuf::from("test.rs"), 0, 10);
+        let span = Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(0)
+            .end(10)
+            .build();
 
-        let narrower = Span::new(span.file_path().clone(), 2, 4);
+        let narrower = Span::builder()
+            .file(span.file_path().clone())
+            .start(2)
+            .end(4)
+            .build();
 
-        assert_eq!(narrower, Span::new(PathBuf::from("test.rs"), 2, 4));
+        assert_eq!(
+            narrower,
+            Span::builder()
+                .file(PathBuf::from("test.rs"))
+                .start(2)
+                .end(4)
+                .build()
+        );
     }
 
     #[test]
     #[should_panic(expected = "span start")]
     fn new_with_inverted_range_panics() {
-        Span::new(PathBuf::from("test.rs"), 20, 10);
+        Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(20)
+            .end(10)
+            .build();
     }
 
     #[test]
     fn start_returns_the_start() {
-        let span = Span::new(PathBuf::from("test.rs"), 10, 20);
+        let span = Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(10)
+            .end(20)
+            .build();
 
         assert_eq!(span.start(), 10);
     }
@@ -164,7 +203,7 @@ mod tests {
                 delta in 0..=1000usize,
             ) {
                 let end = start + delta;
-                let span = Span::new(PathBuf::from(&file), start, end);
+                let span = Span::builder().file(PathBuf::from(&file)).start(start).end(end).build();
 
                 prop_assert_eq!(span.file(), Path::new(&file));
                 prop_assert_eq!(span.start(), start);
@@ -178,7 +217,7 @@ mod tests {
                 delta in 0..=1000usize,
             ) {
                 let end = start + delta;
-                let span = Span::new(PathBuf::from(&file), start, end);
+                let span = Span::builder().file(PathBuf::from(&file)).start(start).end(end).build();
                 prop_assert!(span.start() <= span.end());
             }
         }

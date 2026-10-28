@@ -18,9 +18,11 @@ and this project adheres to
 
 - `Diagnostic`, `Span`, `Location`, `Suggestion`, `RuleOption`,
   `DecoratedTree`, `DecoratedNode`, and the `TypePath`, `PublicPath`, and
-  `FnSignature` of `whisker-rust` each have a builder, `builder()`, beside
-  their positional `new`. A builder names every field at the call site. The
-  positional constructors go away once the rules use the builders.
+  `FnSignature` of `whisker-rust` each have a builder, `builder()`. A
+  builder names every field at the call site.
+
+- `TypePathRef` has a builder, `builder()`, that runs in a `const`, beside its
+  positional `new`.
 
 - `--json` writes each diagnostic of `whisker check` as one JSON object per
   line, with the rule, severity, message, file, byte offsets, line, and
@@ -204,6 +206,12 @@ and this project adheres to
 - Whisker lists its subcommands in a stable order.
 
 ### Removed
+
+- The positional `new` of `Diagnostic`, `Span`, `Location`, `Suggestion`,
+  `RuleOption`, `DecoratedTree`, `DecoratedNode`, and the `TypePath`,
+  `PublicPath`, and `FnSignature` of `whisker-rust` is gone. Build each one
+  with `builder()`. A plugin that calls `new` no longer compiles against this
+  whisker source. The layouts do not change, so the plugin ABI stays at 0.5.
 
 - `whisker check` no longer accepts trailing arguments. It discarded them,
   and the help called them arguments for the analysis pipeline, which

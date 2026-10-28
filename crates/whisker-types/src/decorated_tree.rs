@@ -26,7 +26,7 @@ impl DecoratedTree {
     ///
     /// The language decides which lint passes see the tree, so it must be
     /// the language of the grammar that produced it.
-    #[builder(start_fn = builder)]
+    #[builder]
     pub fn new(
         tree: tree_sitter::Tree,
         language: Language,
@@ -57,12 +57,12 @@ impl DecoratedTree {
 
     /// Returns the root node wrapped as a [`DecoratedNode`]
     pub fn root_node(&self) -> DecoratedNode<'_> {
-        DecoratedNode::new(
-            self.tree.root_node(),
-            &self.source,
-            &self.file,
-            self.decorations.lookup(),
-        )
+        DecoratedNode::builder()
+            .node(self.tree.root_node())
+            .source(&self.source)
+            .file(&self.file)
+            .decorations(self.decorations.lookup())
+            .build()
     }
 
     /// Returns the language the tree was parsed as
@@ -124,12 +124,12 @@ mod tests {
     fn file_returns_path() {
         let source = "";
         let tree = parse_tree(source);
-        let decorated = DecoratedTree::new(
-            tree,
-            Language::Rust,
-            source.into(),
-            PathBuf::from("test.rs"),
-        );
+        let decorated = DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::Rust)
+            .source(source.into())
+            .file(PathBuf::from("test.rs"))
+            .build();
 
         assert_eq!(decorated.file(), Path::new("test.rs"));
     }
@@ -138,12 +138,12 @@ mod tests {
     fn merge_decorations_makes_decorations_visible_on_nodes() {
         let source = "fn main() {}";
         let tree = parse_tree(source);
-        let mut decorated = DecoratedTree::new(
-            tree,
-            Language::Rust,
-            source.into(),
-            PathBuf::from("test.rs"),
-        );
+        let mut decorated = DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::Rust)
+            .source(source.into())
+            .file(PathBuf::from("test.rs"))
+            .build();
         let root_id = decorated.root_node().id();
         let mut decorations = DecorationMap::new();
         decorations.insert(root_id, Tag(7));
@@ -176,12 +176,12 @@ mod tests {
     fn merged_twice() -> DecoratedTree {
         let source = "fn main() {}";
         let tree = parse_tree(source);
-        let mut decorated = DecoratedTree::new(
-            tree,
-            Language::Rust,
-            source.into(),
-            PathBuf::from("test.rs"),
-        );
+        let mut decorated = DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::Rust)
+            .source(source.into())
+            .file(PathBuf::from("test.rs"))
+            .build();
         let root_id = decorated.root_node().id();
         let mut first = DecorationMap::new();
         first.insert(root_id, Tag(1));
@@ -198,12 +198,12 @@ mod tests {
     fn root_node_kind_is_source_file() {
         let source = "fn main() {}";
         let tree = parse_tree(source);
-        let decorated = DecoratedTree::new(
-            tree,
-            Language::Rust,
-            source.into(),
-            PathBuf::from("test.rs"),
-        );
+        let decorated = DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::Rust)
+            .source(source.into())
+            .file(PathBuf::from("test.rs"))
+            .build();
 
         assert_eq!(decorated.root_node().kind(), "source_file");
     }
@@ -212,12 +212,12 @@ mod tests {
     fn source_returns_original_text() {
         let source = "fn main() {}";
         let tree = parse_tree(source);
-        let decorated = DecoratedTree::new(
-            tree,
-            Language::Rust,
-            source.into(),
-            PathBuf::from("test.rs"),
-        );
+        let decorated = DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::Rust)
+            .source(source.into())
+            .file(PathBuf::from("test.rs"))
+            .build();
 
         assert_eq!(decorated.source(), source);
     }
@@ -249,12 +249,12 @@ mod tests {
             #[test]
             fn source_roundtrips(source in "\\PC{0,200}") {
                 let tree = parse_tree(&source);
-                let decorated = DecoratedTree::new(
-                    tree,
-                    Language::Rust,
-                    source.clone(),
-                    PathBuf::from("test.rs"),
-                );
+                let decorated = DecoratedTree::builder()
+                    .tree(tree)
+                    .language(Language::Rust)
+                    .source(source.clone())
+                    .file(PathBuf::from("test.rs"))
+                    .build();
 
                 prop_assert_eq!(decorated.source(), source);
             }
@@ -262,12 +262,12 @@ mod tests {
             #[test]
             fn file_roundtrips(file in "[a-z]{1,10}\\.rs") {
                 let tree = parse_tree("");
-                let decorated = DecoratedTree::new(
-                    tree,
-                    Language::Rust,
-                    String::new(),
-                    PathBuf::from(&file),
-                );
+                let decorated = DecoratedTree::builder()
+                    .tree(tree)
+                    .language(Language::Rust)
+                    .source(String::new())
+                    .file(PathBuf::from(&file))
+                    .build();
 
                 prop_assert_eq!(decorated.file(), Path::new(&file));
             }
@@ -275,12 +275,12 @@ mod tests {
             #[test]
             fn root_is_source_file_or_error(source in "\\PC{0,200}") {
                 let tree = parse_tree(&source);
-                let decorated = DecoratedTree::new(
-                    tree,
-                    Language::Rust,
-                    source,
-                    PathBuf::from("test.rs"),
-                );
+                let decorated = DecoratedTree::builder()
+                    .tree(tree)
+                    .language(Language::Rust)
+                    .source(source)
+                    .file(PathBuf::from("test.rs"))
+                    .build();
 
                 let root = decorated.root_node();
                 let kind = root.kind();

@@ -23,7 +23,7 @@ pub struct Suggestion {
 #[bon]
 impl Suggestion {
     /// Creates a suggestion to replace the text at `span` with `replacement`
-    #[builder(start_fn = builder)]
+    #[builder]
     pub fn new(
         span: Span,
         #[builder(into)] replacement: String,
@@ -60,24 +60,48 @@ mod tests {
 
     #[test]
     fn message_returns_the_message() {
-        let span = Span::new(PathBuf::from("test.rs"), 0, 5);
-        let suggestion = Suggestion::new(span, "new_text".into(), "try this".into());
+        let span = Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(0)
+            .end(5)
+            .build();
+        let suggestion = Suggestion::builder()
+            .span(span)
+            .replacement("new_text")
+            .message("try this")
+            .build();
 
         assert_eq!(suggestion.message(), "try this");
     }
 
     #[test]
     fn replacement_returns_the_replacement() {
-        let span = Span::new(PathBuf::from("test.rs"), 0, 5);
-        let suggestion = Suggestion::new(span, "new_text".into(), "try this".into());
+        let span = Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(0)
+            .end(5)
+            .build();
+        let suggestion = Suggestion::builder()
+            .span(span)
+            .replacement("new_text")
+            .message("try this")
+            .build();
 
         assert_eq!(suggestion.replacement(), "new_text");
     }
 
     #[test]
     fn span_returns_the_span() {
-        let span = Span::new(PathBuf::from("test.rs"), 0, 5);
-        let suggestion = Suggestion::new(span.clone(), "new_text".into(), "try this".into());
+        let span = Span::builder()
+            .file(PathBuf::from("test.rs"))
+            .start(0)
+            .end(5)
+            .build();
+        let suggestion = Suggestion::builder()
+            .span(span.clone())
+            .replacement("new_text")
+            .message("try this")
+            .build();
 
         assert_eq!(suggestion.span(), &span);
     }
@@ -113,8 +137,16 @@ mod tests {
                 replacement in "\\PC{0,50}",
                 message in "\\PC{0,50}",
             ) {
-                let span = Span::new(PathBuf::from("f.rs"), start, start + delta);
-                let s = Suggestion::new(span.clone(), replacement.clone(), message.clone());
+                let span = Span::builder()
+                    .file(PathBuf::from("f.rs"))
+                    .start(start)
+                    .end(start + delta)
+                    .build();
+                let s = Suggestion::builder()
+                    .span(span.clone())
+                    .replacement(replacement.clone())
+                    .message(message.clone())
+                    .build();
 
                 prop_assert_eq!(s.span(), &span);
                 prop_assert_eq!(s.replacement(), replacement);

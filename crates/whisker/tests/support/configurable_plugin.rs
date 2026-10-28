@@ -63,12 +63,12 @@ impl RustLintPass for {pass} {{
             return Vec::new();
         }}
 
-        vec![Diagnostic::new(
-            RULE_ID,
-            Severity::Warn,
-            "this macro was named in the configuration".into(),
-            node.span(),
-        )]
+        vec![Diagnostic::builder()
+            .rule_id(RULE_ID)
+            .severity(Severity::Warn)
+            .message("this macro was named in the configuration")
+            .span(node.span())
+            .build()]
     }}
 }}
 

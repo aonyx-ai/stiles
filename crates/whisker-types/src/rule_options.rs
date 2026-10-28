@@ -35,11 +35,11 @@ pub use self::validate_rule_options_error::ValidateRuleOptionsError;
 /// ```
 /// use whisker_types::{RuleId, RuleOption, RuleOptions};
 ///
-/// let options = RuleOptions::new(vec![RuleOption::new(
-///     "lint.bool-param".to_owned(),
-///     "boundary-attributes".to_owned(),
-///     vec!["shard".to_owned()],
-/// )]);
+/// let options = RuleOptions::new(vec![RuleOption::builder()
+///     .rule("lint.bool-param")
+///     .name("boundary-attributes")
+///     .values(vec!["shard".to_owned()])
+///     .build()]);
 ///
 /// let names = options.names(RuleId::new("lint.bool-param"), "boundary-attributes");
 ///
@@ -114,8 +114,8 @@ impl RuleOptions {
     /// use whisker_types::{RuleId, RuleOption, RuleOptions};
     ///
     /// let options = RuleOptions::new(vec![
-    ///     RuleOption::new("lint.a".into(), "names".into(), vec!["x".into()]),
-    ///     RuleOption::new("lint.b".into(), "names".into(), vec!["y".into()]),
+    ///     RuleOption::builder().rule("lint.a").name("names").values(vec!["x".into()]).build(),
+    ///     RuleOption::builder().rule("lint.b").name("names").values(vec!["y".into()]).build(),
     /// ]);
     ///
     /// let only_a = options.for_rules(&[RuleId::new("lint.a")]);
@@ -205,25 +205,37 @@ mod tests {
 
     fn options() -> RuleOptions {
         RuleOptions::new(vec![
-            RuleOption::new(
-                "lint.repeated-primitive-params".to_owned(),
-                "boundary-attributes".to_owned(),
-                vec!["shard".to_owned(), "procedure".to_owned()],
-            ),
-            RuleOption::new(
-                "lint.bool-param".to_owned(),
-                "boundary-attributes".to_owned(),
-                Vec::new(),
-            ),
+            RuleOption::builder()
+                .rule("lint.repeated-primitive-params")
+                .name("boundary-attributes")
+                .values(vec!["shard".to_owned(), "procedure".to_owned()])
+                .build(),
+            RuleOption::builder()
+                .rule("lint.bool-param")
+                .name("boundary-attributes")
+                .values(Vec::new())
+                .build(),
         ])
     }
 
     #[test]
     fn for_rules_keeps_the_options_of_the_named_rules_in_order() {
         let options = RuleOptions::new(vec![
-            RuleOption::new("lint.a".into(), "first".into(), Vec::new()),
-            RuleOption::new("lint.b".into(), "skipped".into(), Vec::new()),
-            RuleOption::new("lint.a".into(), "second".into(), Vec::new()),
+            RuleOption::builder()
+                .rule("lint.a")
+                .name("first")
+                .values(Vec::new())
+                .build(),
+            RuleOption::builder()
+                .rule("lint.b")
+                .name("skipped")
+                .values(Vec::new())
+                .build(),
+            RuleOption::builder()
+                .rule("lint.a")
+                .name("second")
+                .values(Vec::new())
+                .build(),
         ]);
 
         let kept = options.for_rules(&[RuleId::new("lint.a")]);
@@ -234,11 +246,13 @@ mod tests {
 
     #[test]
     fn for_rules_with_no_rules_keeps_nothing() {
-        let options = RuleOptions::new(vec![RuleOption::new(
-            "lint.a".into(),
-            "names".into(),
-            Vec::new(),
-        )]);
+        let options = RuleOptions::new(vec![
+            RuleOption::builder()
+                .rule("lint.a")
+                .name("names")
+                .values(Vec::new())
+                .build(),
+        ]);
 
         let kept = options.for_rules(&[]);
 

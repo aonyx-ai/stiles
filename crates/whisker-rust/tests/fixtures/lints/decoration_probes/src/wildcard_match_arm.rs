@@ -65,12 +65,14 @@ impl RustLintPass for WildcardMatchArm {
                 continue;
             };
             if is_wildcard_pattern(&pattern) {
-                diagnostics.push(Diagnostic::new(
-                    RULE_ID,
-                    Severity::Warn,
-                    "wildcard match arm hides unhandled variants".into(),
-                    pattern.span(),
-                ));
+                diagnostics.push(
+                    Diagnostic::builder()
+                        .rule_id(RULE_ID)
+                        .severity(Severity::Warn)
+                        .message("wildcard match arm hides unhandled variants")
+                        .span(pattern.span())
+                        .build(),
+                );
             }
         }
 
