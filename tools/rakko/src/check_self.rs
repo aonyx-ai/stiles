@@ -54,10 +54,7 @@ async fn drive(context: &Context) -> Result<Outcome, HarnessError> {
     )
     .await?;
     if !check.status().success() {
-        return Ok(step::failed(
-            "checking this repository with stiles",
-            &check,
-        ));
+        return Ok(step::failed("checking this repository with stiles", &check));
     }
 
     Ok(Outcome::Passed { summary: None })
