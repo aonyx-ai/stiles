@@ -198,7 +198,9 @@ mod tests {
     #[test]
     fn walk_with_empty_passes_returns_empty() {
         let tree = parse_rust("fn main() {}");
+
         let diagnostics = walk(&tree, &mut Vec::new()).expect("should walk");
+
         assert!(diagnostics.is_empty());
     }
 
@@ -234,7 +236,9 @@ mod tests {
     fn walk_on_empty_source_returns_empty() {
         let tree = parse_rust("");
         let mut passes = vec![lint(CounterPass(0), &[])];
+
         let diagnostics = walk_lints(&tree, &mut passes).expect("should walk");
+
         assert!(diagnostics.is_empty());
     }
 

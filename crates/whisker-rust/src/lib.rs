@@ -50,7 +50,9 @@ mod tests {
     fn language_parses_rust_source() {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&language()).unwrap();
+
         let tree = parser.parse("fn main() {}", None).unwrap();
+
         assert_eq!(tree.root_node().kind(), "source_file");
     }
 

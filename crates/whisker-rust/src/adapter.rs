@@ -29,6 +29,7 @@ mod tests {
     fn trait_send() {
         struct Dummy;
         impl RustLintPass for Dummy {}
+
         fn assert_send<T: Send>() {}
         assert_send::<RustLintPassAdapter<Dummy>>();
     }
@@ -37,6 +38,7 @@ mod tests {
     fn trait_sync() {
         struct Dummy;
         impl RustLintPass for Dummy {}
+
         fn assert_sync<T: Sync>() {}
         assert_sync::<RustLintPassAdapter<Dummy>>();
     }
@@ -45,6 +47,7 @@ mod tests {
     fn trait_unpin() {
         struct Dummy;
         impl RustLintPass for Dummy {}
+
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<RustLintPassAdapter<Dummy>>();
     }

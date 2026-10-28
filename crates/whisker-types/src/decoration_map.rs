@@ -201,7 +201,9 @@ mod tests {
     #[test]
     fn get_all_on_missing_node_returns_empty() {
         let map = DecorationMap::new();
+
         let results = map.get_all::<TypeInfo>(99);
+
         assert!(results.is_empty());
     }
 
