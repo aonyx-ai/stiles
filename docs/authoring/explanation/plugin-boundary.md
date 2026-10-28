@@ -78,8 +78,8 @@ what I control: what is mine to get right. one thing. pin the stiles crates to
 the stiles that will load the plugin.
 -->
 
-One thing: pin `stiles-plugin`, `stiles-types`, `stiles-rust`, and
-`stiles-testing` to the Stiles release that will load your rule.
+One thing: pin `stiles-plugin`, `stiles-types`, `stiles-testing`, and the
+language crates your rule uses to the Stiles release that will load your rule.
 
 ## How often that costs me
 

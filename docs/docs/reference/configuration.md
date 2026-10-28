@@ -56,14 +56,14 @@ ignore = [
   # ignore any fixtures/ directory at any depth
   "fixtures/",
 
-  # ignore all .rs files directly under the /crate/foo/ directory
-  "/crate/foo/*.rs",
+  # ignore every file directly under the /generated/ directory
+  "/generated/*",
 
-  # ignore all .rs files in the /crate/foo/ tree, including all nested subdirectories
-  "/crate/bar/**.rs",
+  # ignore every file in the /vendor/ tree, including all nested subdirectories
+  "/vendor/**",
 
   # don't ignore this specific file, regardless of other ignore rules
-  "!/crate/bar/main.rs",
+  "!/vendor/patched/notes.txt",
 ]
 ```
 
@@ -131,7 +131,7 @@ boundary-attributes = ["shard", "procedure"]
 ## stiles-source
 
 For Stiles's own development we need to patch `stiles-types`,
-`stiles-plugin`, `stiles-rust`, `stiles-typescript`, and `stiles-testing`.
+`stiles-plugin`, `stiles-testing`, and every language crate.
 Lints will be built against these libraries instead of their crates.io
 versions. This utilizes the `stiles-source` property. You probably shouldn't
 need this option. define

@@ -39,6 +39,7 @@ const sidebars: SidebarsConfig = {
       label: "Reference",
       collapsed: true,
       items: [
+        "reference/supported-languages",
         "reference/configuration",
         "reference/command-line",
         "reference/file-discovery",

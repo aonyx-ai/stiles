@@ -1,9 +1,10 @@
 # Architecture
 
-Stiles is a linting platform built on [tree-sitter][ts]. It lints Rust
-today. Stiles ships no rules of its own. Aonyx's rules live in
-[stiles-aonyx-rules][rules] and cover what Clippy does not, like derive
-ordering and wildcard match arms.
+Stiles is a linting platform built on [tree-sitter][ts]. It lints the
+[supported languages][languages], which that page lists with the tooling behind
+each. Stiles ships no rules of its own. Aonyx's rules live in
+[stiles-aonyx-rules][rules] and cover what each language's own linter does
+not.
 
 This document describes the shape of the platform. Each crate documents
 its own API, and each lint crate documents its own rule.
@@ -40,10 +41,10 @@ flowchart LR
     execute --> report[report<br>once per run]
 ```
 
-1. **Parse.** The command builds one parser, fixed to the Rust grammar,
-   before it visits any file. A file's extension decides whether discovery
-   collects it. The tree, its source text, and an empty decoration map
-   together form a decorated tree.
+1. **Parse.** A file's extension decides whether discovery collects it, and
+   which grammar parses it. The command builds one parser per grammar and
+   keeps it for the run. The tree, its source text, and an empty decoration
+   map together form a decorated tree.
 2. **Decorate.** The pipeline offers the tree to every provider. A provider
    either covers the file and returns its decorations, or declines it with
    a reason. This is the only stage that touches a language toolchain.
@@ -83,26 +84,40 @@ stiles generates, and a decoration provider that talks to the toolchain.
 ### The lint pass trait
 
 A tree-sitter grammar ships a machine-readable description of its node
-types. Each language crate keeps a copy of its grammars' descriptions, such
-as `crates/stiles-rust/src/node-types.json`. Its build script calls
+types. Each language crate keeps a copy of its grammars' descriptions in
+`src/`. Its build script calls
 `stiles_codegen::build_language`, which generates a trait with one method
 per named node kind, plus the dispatch that routes a node to its method.
 Rules hook the constructs they care about by name. Grammars also group node
 kinds into supertypes, so a rule can hook every expression at once.
 
-A language may need more than one grammar. TypeScript parses `.tsx` files
-with a grammar that reads JSX and cannot read the angle-bracket type
-assertion, so its trait comes from the union of both grammars' node kinds.
-One rule then runs on either kind of file.
+A language may need more than one grammar, when one variant of its syntax
+conflicts with another. Its trait then comes from the union of the grammars'
+node kinds, and one rule runs on files of either grammar.
 
 A copy tracks its grammar until someone refreshes it. A renamed node then
 breaks compilation at every rule that hooked it. Until the refresh, the
 parser and the trait describe different grammars, and a rule that hooked
-the old name stops firing. stiles-typescript has a test that fails when its
-copies differ from the grammar crate it links. stiles-rust still tracks its
-copy by hand.
+the old name stops firing. A language crate can carry a test that fails when
+its copies differ from the grammar crate it links.
 
 ### The decoration provider
+
+Each language's provider runs that language's own tooling as a library. It
+loads a project once per run and decorates a set of node kinds it chooses. The
+set belongs to the provider, and a rule that needs a decoration on another node
+kind needs a change to the language crate. A file the project leaves out gets
+the gap that names its remedy.
+
+A provider and the syntax tree keep separate parses of the same file, so
+byte offsets tie them together. Each provider compares the text it analyzed
+with the text the pipeline parsed, and declines the file when they differ.
+
+The [supported languages][languages] page lists each language's tooling. The
+sections below record what each provider does that the general shape does not
+say.
+
+#### Rust
 
 Rust's provider uses [rust-analyzer][ra] as a library. The command loads
 it once per run. The load discovers the Cargo manifest nearest the checked
@@ -119,9 +134,9 @@ Those are function items, match scrutinees, else branches, the operand of
 records what it finds as decorations: function signatures, resolved types,
 ADT flags, import sources, and re-exports. The re-exports of an imported
 path are the public paths to the same item through the other crates the
-current crate depends on, which rust-analyzer's import maps prove. The set
-belongs to the provider, and a rule that needs a decoration on another node
-kind needs a change to stiles-rust.
+current crate depends on, which rust-analyzer's import maps prove.
+
+#### TypeScript
 
 TypeScript's provider uses [tsrs][tsrs], a Rust port of the TypeScript 7
 checker, as a library. A TypeScript file belongs to the project of the
@@ -133,9 +148,9 @@ primitive no type of its own, so the alias comes from the annotation, not
 from the type. An identifier of a union of string literals also gets the
 members. A function or method declaration gets its signature, and the
 specifier of an import gets where the program resolved it: a relative
-file, a dependency in `node_modules`, or a package of the workspace. A
-file the project leaves out gets the gap that names its remedy, as for
-Rust.
+file, a dependency in `node_modules`, or a package of the workspace. `.tsx`
+files parse with a second grammar, which reads JSX and cannot read the
+angle-bracket type assertion.
 
 tsrs publishes no crates, and crates.io refuses a crate that depends on a
 repository. `mise run rakko -- bundle-tsrs` therefore copies the tsrs crates
@@ -144,10 +159,6 @@ rewrites only the paths that name a crate. A bump moves the `vendor/tsrs`
 submodule and runs the tool again. `mise run rakko -- check-bundle-tsrs`
 fails when the committed crate differs from a fresh run, so no fix to tsrs
 lands in the copy by hand.
-
-A provider and the syntax tree keep separate parses of the same file, so
-byte offsets tie them together. Each provider compares the text it analyzed
-with the text the pipeline parsed, and declines the file when they differ.
 
 ### Adding a language
 
@@ -166,13 +177,15 @@ The platform does not change for a new language. These places do:
   `LANGUAGE_FINGERPRINT` joins the new crate's.
 - The check command picks the grammar per file and loads the provider when
   discovery finds a file in the language.
+- The [supported languages][languages] table gains a row. It is the only page
+  of the documentation that names a language, so no other page changes.
 
 A new variant breaks every `match` on `Language` that has no arm for it, so
 the compiler lists the places that still need one.
 
-The rust-analyzer stack sits behind the crate's default `provider`
-feature. A lint crate switches it off and depends on the generated trait,
-the adapter, and the decoration types alone.
+A language's tooling sits behind its crate's default `provider` feature. A
+lint crate switches it off and depends on the generated trait, the adapter,
+and the decoration types alone.
 
 ### Decorations
 
@@ -441,15 +454,15 @@ workspace, and `rakko test-fixture-lint` runs the tests of the probes.
 
 Dependencies flow one way. `stiles-types`, `stiles-codegen`, and
 `stiles-macros` depend on no other stiles crate. `stiles-core` and
-`stiles-reporting` rest on `stiles-types`. `stiles-rust` rests on
+`stiles-reporting` rest on `stiles-types`. Each language crate rests on
 `stiles-types` and `stiles-macros`, and uses `stiles-codegen` at build
-time. `stiles-typescript` rests on `stiles-types` and uses
-`stiles-codegen` the same way. `stiles-plugin` rests on `stiles-types`
+time. `stiles-plugin` rests on `stiles-types`
 and the language crates, without their providers. `stiles-testing` rests
 on `stiles-core`. The CLI ties the platform, the languages, and the
 loaded lints together.
 
 [discovery]: https://aonyx-ai.github.io/stiles/docs/reference/file-discovery
+[languages]: https://aonyx-ai.github.io/stiles/docs/reference/supported-languages
 [ra]: https://rust-analyzer.github.io/
 [tsrs]: https://github.com/oxc-project/tsrs
 [rules]: https://github.com/aonyx-ai/stiles-aonyx-rules

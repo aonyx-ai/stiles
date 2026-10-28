@@ -51,6 +51,8 @@ project is paid once per run, before the first file.
 
 Rules can read type facts as well as syntax. To supply them, Stiles loads your
 project through the language's own tooling before it checks the first file.
+[Supported languages][supported-languages] names the tooling for each
+language.
 
 The load has four consequences:
 
@@ -100,3 +102,4 @@ Stiles ignores every other file.
 [file-discovery]: /docs/reference/file-discovery
 [configuration-lints]: /docs/reference/configuration#lints
 [write-a-rule]: /authoring/how-to/write-a-rule
+[supported-languages]: /docs/reference/supported-languages
