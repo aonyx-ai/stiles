@@ -21,8 +21,8 @@ mod git_source;
 mod handshake;
 mod prebuilt;
 
-pub use abi_tag::AbiTag;
-pub use prebuilt::PrebuiltNotice;
+pub use self::abi_tag::AbiTag;
+pub use self::prebuilt::PrebuiltNotice;
 
 /// The lint passes loaded from the project's configured custom lint crates
 ///
@@ -368,20 +368,20 @@ fn resolve_git(
     tag: &AbiTag,
     notices: &mut Vec<PrebuiltNotice>,
 ) -> anyhow::Result<(PathBuf, Contents)> {
-    if let Some(directory) = prebuilt::cached(source, tag)? {
+    if let Some(directory) = self::prebuilt::cached(source, tag)? {
         return Ok((directory, Contents::Libraries));
     }
 
-    if let Some(directory) = git_source::cached(source)? {
+    if let Some(directory) = self::git_source::cached(source)? {
         return Ok((directory, Contents::Sources(Locking::Locked)));
     }
 
-    if let Some(directory) = prebuilt::fetch(source, tag, notices)? {
+    if let Some(directory) = self::prebuilt::fetch(source, tag, notices)? {
         return Ok((directory, Contents::Libraries));
     }
 
     Ok((
-        git_source::checkout(source)?,
+        self::git_source::checkout(source)?,
         Contents::Sources(Locking::Locked),
     ))
 }
@@ -415,7 +415,7 @@ fn load_sources(
 /// Returns an error if the directory cannot be read, if it holds no
 /// library, or if any library fails to load.
 fn load_prebuilt(directory: &Path, host: &AbiIdentity) -> anyhow::Result<Loaded> {
-    let libraries = prebuilt::libraries(directory)?;
+    let libraries = self::prebuilt::libraries(directory)?;
 
     anyhow::ensure!(
         !libraries.is_empty(),
@@ -496,7 +496,7 @@ fn build(
 
     let stdout = String::from_utf8(output.stdout).context("cargo build wrote invalid UTF-8")?;
 
-    artifact::cdylib_artifacts(&stdout, directory)
+    self::artifact::cdylib_artifacts(&stdout, directory)
 }
 
 /// Opens the built library, performs the handshake, and collects factories
@@ -553,7 +553,7 @@ fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loade
     // library's `whisker_plugin_declaration` static.
     let plugin_abi_version = unsafe { abi_version(declaration) };
     if !host.abi_version.accepts(plugin_abi_version) {
-        return Err(handshake::HandshakeMismatch::AbiVersion {
+        return Err(self::handshake::HandshakeMismatch::AbiVersion {
             plugin: plugin_abi_version,
             host: host.abi_version,
         }
@@ -568,7 +568,7 @@ fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loade
         // SAFETY: as for `types_fingerprint` above.
         language_fingerprint: unsafe { (&raw const (*declaration).language_fingerprint).read() },
     };
-    handshake::validate(host, &plugin)?;
+    self::handshake::validate(host, &plugin)?;
 
     // SAFETY: the handshake passed, so the plugin lays the declaration
     // out the way this binary does, and `load` holds a function this

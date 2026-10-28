@@ -23,10 +23,10 @@ mod provider;
 #[cfg(feature = "provider")]
 mod queries;
 
-pub use adapter::TypeScriptLintPassAdapter;
-pub use language_fingerprint::LANGUAGE_FINGERPRINT;
+pub use self::adapter::TypeScriptLintPassAdapter;
+pub use self::language_fingerprint::LANGUAGE_FINGERPRINT;
 #[cfg(feature = "provider")]
-pub use provider::{LoadTypeScriptProjectError, TypeScriptDecorationProvider};
+pub use self::provider::{LoadTypeScriptProjectError, TypeScriptDecorationProvider};
 
 include!(concat!(env!("OUT_DIR"), "/lint_pass.rs"));
 

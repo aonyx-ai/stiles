@@ -8,8 +8,8 @@ use crate::RuleId;
 mod rule_option;
 mod validate_rule_options_error;
 
-pub use rule_option::RuleOption;
-pub use validate_rule_options_error::ValidateRuleOptionsError;
+pub use self::rule_option::RuleOption;
+pub use self::validate_rule_options_error::ValidateRuleOptionsError;
 
 /// Every option a project set, for every rule it runs
 ///

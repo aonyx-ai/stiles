@@ -176,6 +176,9 @@ git show <commit> --stat
   Never import types or modules within function contexts, unless the function is
   gated by a `cfg()` of some kind.
 - It is okay to import enum variants for pattern matching, though.
+- Prefix a path into a submodule of the current module with `self::`, as in
+  `pub use self::error::ParseNameError;` or `self::text::render(..)`. A bare
+  first segment reads like a crate.
 
 ### Memory and performance
 

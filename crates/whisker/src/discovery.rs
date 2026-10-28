@@ -11,8 +11,8 @@ use crate::config::WhiskerConfig;
 mod walk_error_policy;
 mod walk_failure;
 
-pub use walk_error_policy::WalkErrorPolicy;
-use walk_failure::WalkFailure;
+pub use self::walk_error_policy::WalkErrorPolicy;
+use self::walk_failure::WalkFailure;
 
 /// The source files a `whisker check` run will inspect
 ///

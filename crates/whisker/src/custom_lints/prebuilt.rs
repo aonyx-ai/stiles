@@ -91,7 +91,7 @@ pub(crate) fn fetch(
     notices: &mut Vec<PrebuiltNotice>,
 ) -> anyhow::Result<Option<PathBuf>> {
     let directory = cache::prebuilt_directory(source, tag)?;
-    let host = github_release::configured_repository_host();
+    let host = self::github_release::configured_repository_host();
 
     let Some(repository) = GitHubRepository::from_url()
         .url(source.url())
@@ -242,8 +242,8 @@ fn install(
 /// because whisker installs the libraries and nothing else.
 fn unpack(
     api: &GitHubApi,
-    archive: &github_release::ReleaseAsset,
-    sidecar: &github_release::ReleaseAsset,
+    archive: &self::github_release::ReleaseAsset,
+    sidecar: &self::github_release::ReleaseAsset,
     staging: &Path,
 ) -> anyhow::Result<()> {
     let downloaded = staging.join(DOWNLOAD);
@@ -257,7 +257,7 @@ fn unpack(
         "the archive has digest {arrived}, but the sidecar beside it publishes {published}"
     );
 
-    archive::extract(&downloaded, staging)?;
+    self::archive::extract(&downloaded, staging)?;
 
     std::fs::remove_file(&downloaded)
         .with_context(|| format!("failed to remove {}", downloaded.display()))?;

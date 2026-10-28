@@ -16,12 +16,12 @@ mod lint_path;
 mod lint_source;
 mod rule_filter;
 
-pub use git_rev::GitRev;
-pub use git_url::GitUrl;
-pub use ignore_pattern::IgnorePattern;
-pub use lint_path::LintPath;
-pub use lint_source::{GitLintSource, LintSource};
-pub use rule_filter::RuleFilter;
+pub use self::git_rev::GitRev;
+pub use self::git_url::GitUrl;
+pub use self::ignore_pattern::IgnorePattern;
+pub use self::lint_path::LintPath;
+pub use self::lint_source::{GitLintSource, LintSource};
+pub use self::rule_filter::RuleFilter;
 
 /// The name whisker's configuration file carries
 ///

@@ -8,7 +8,9 @@ use tempfile::TempDir;
 #[path = "support/fixture_repository.rs"]
 mod fixture_repository;
 
-use fixture_repository::{FixtureRepository, Standalone, git, write_lint_package, write_lockfile};
+use self::fixture_repository::{
+    FixtureRepository, Standalone, git, write_lint_package, write_lockfile,
+};
 
 /// Source that trips the fixture lints and nothing whisker ships
 const TODO_SOURCE: &str = "pub fn later() {\n    todo!()\n}\n";
