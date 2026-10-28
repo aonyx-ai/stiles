@@ -83,23 +83,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          version="${TAG#v}"
+          version="${TAG#stiles@}"
           target="${TARGET}"
 
           # The tag names the version, and `Cargo.toml` names it too. A tag that
           # disagrees would ship an archive whose name promises a version the
           # binary does not report, so the disagreement stops the release here.
-          #
-          # A prerelease tag such as `v0.1.0-rc.1` carries a suffix that the
-          # crate version never holds, and the binary reports `0.1.0` whatever
-          # the suffix says. The comparison therefore drops the suffix, while
-          # the archive keeps the whole tag in its name.
-          release="${version%%-*}"
+          # Otto writes a pre-release version such as `0.1.0-rc.6` into
+          # `Cargo.toml` as well, so the two compare in full.
           pinned="$(cargo pkgid -p stiles)"
           pinned="${pinned##*#}"
           pinned="${pinned##*@}"
-          if [ "${release}" != "${pinned}" ]; then
-              echo "the tag names version ${release}, but Cargo.toml holds ${pinned}" >&2
+          if [ "${TAG}" != "stiles@${pinned}" ]; then
+              echo "the tag ${TAG} does not name version ${pinned} from Cargo.toml" >&2
               exit 1
           fi
 

@@ -77,10 +77,13 @@ main() {
         exit 1
     fi
 
-    # Archive names carry the version without its leading `v`, as
-    # `Cargo.toml` holds it. The same name is the directory the archive
-    # unpacks to.
-    stem="stiles-${version#v}-${target}"
+    # Archive names carry the version as `Cargo.toml` holds it, without the
+    # `stiles@` of the tag. Releases before Otto tagged `v<version>`, and the
+    # newest release can still be one of those, so both forms lose their
+    # prefix. The same name is the directory the archive unpacks to.
+    number="${version#stiles@}"
+    number="${number#v}"
+    stem="stiles-${number}-${target}"
     name="${stem}.tar.gz"
     base="https://github.com/${REPOSITORY}/releases/download/${version}"
 

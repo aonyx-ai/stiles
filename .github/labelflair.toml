@@ -22,16 +22,3 @@ labels = [
     "feature-request",
   ] },
 ]
-
-[[group]]
-prefix = "R-"
-colors = { tailwind = "slate" }
-labels = [
-  { name = "added", description = "Add a new feature to the release notes" },
-  { name = "changed", description = "Add a change in existing functionality to the release notes" },
-  { name = "deprecated", description = "Add a soon-to-be removed feature to the release notes" },
-  { name = "fixed", description = "Add a fixed bug to the release notes" },
-  { name = "ignore", description = "Do not add this pull request to the release notes" },
-  { name = "removed", description = "Add a now removed feature to the release notes" },
-  { name = "security", description = "Add a vulnerability warning to the release notes" },
-]
