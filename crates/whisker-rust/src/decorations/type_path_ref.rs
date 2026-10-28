@@ -42,25 +42,6 @@ pub struct TypePathRef<'a> {
 }
 
 impl<'a> TypePathRef<'a> {
-    /// Creates a borrowed path usable in a `const`
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use whisker_rust::decorations::TypePathRef;
-    ///
-    /// const ANYHOW_ERROR: TypePathRef<'static> = TypePathRef::new("anyhow", &[], "Error");
-    ///
-    /// assert_eq!(ANYHOW_ERROR.krate(), "anyhow");
-    /// ```
-    pub const fn new(krate: &'a str, modules: &'a [&'a str], name: &'a str) -> Self {
-        Self {
-            krate,
-            modules,
-            name,
-        }
-    }
-
     /// Returns the name of the crate that defines the type
     ///
     /// # Examples
