@@ -29,9 +29,11 @@ fn wildcard_finder_detects_wildcard_arm() {
     let tree = parse("fn f() { match x { 1 => {} _ => {} } }", Language::Rust);
     let mut passes = vec![adapt(MatchArmWildcardFinder)];
     let diagnostics = execute(&tree, &mut passes);
+    let [diagnostic] = diagnostics.as_slice() else {
+        panic!("expected one diagnostic, got {diagnostics:?}");
+    };
 
-    assert_eq!(diagnostics.len(), 1);
-    assert_diagnostic(&diagnostics[0])
+    assert_diagnostic(diagnostic)
         .has_rule_id("lint.wildcard-match-arm")
         .has_severity(Severity::Warn)
         .message_contains("wildcard");
@@ -69,9 +71,11 @@ fn macro_finder_detects_matches_macro() {
     let tree = parse("fn f() { let _ = matches!(x, 1); }", Language::Rust);
     let mut passes = vec![adapt(MacroInvocationFinder)];
     let diagnostics = execute(&tree, &mut passes);
+    let [diagnostic] = diagnostics.as_slice() else {
+        panic!("expected one diagnostic, got {diagnostics:?}");
+    };
 
-    assert_eq!(diagnostics.len(), 1);
-    assert_diagnostic(&diagnostics[0])
+    assert_diagnostic(diagnostic)
         .has_rule_id("lint.no-matches-macro")
         .message_contains("matches!");
 }
@@ -108,9 +112,11 @@ fn bool_finder_detects_bool_param() {
     let tree = parse("fn f(x: bool) {}", Language::Rust);
     let mut passes = vec![adapt(BoolParamFinder)];
     let diagnostics = execute(&tree, &mut passes);
+    let [diagnostic] = diagnostics.as_slice() else {
+        panic!("expected one diagnostic, got {diagnostics:?}");
+    };
 
-    assert_eq!(diagnostics.len(), 1);
-    assert_diagnostic(&diagnostics[0])
+    assert_diagnostic(diagnostic)
         .has_rule_id("lint.bool-param")
         .message_contains("bool");
 }
@@ -133,11 +139,9 @@ fn multiple_lint_passes_run_together() {
     let mut passes = vec![adapt(BoolParamFinder), adapt(MacroInvocationFinder)];
     let diagnostics = execute(&tree, &mut passes);
 
-    assert_eq!(diagnostics.len(), 2);
-
-    let rule_ids: Vec<&str> = diagnostics.iter().map(|d| d.rule_id().as_str()).collect();
-    assert!(rule_ids.contains(&"lint.bool-param"));
-    assert!(rule_ids.contains(&"lint.no-matches-macro"));
+    let mut rule_ids: Vec<&str> = diagnostics.iter().map(|d| d.rule_id().as_str()).collect();
+    rule_ids.sort_unstable();
+    assert_eq!(rule_ids, ["lint.bool-param", "lint.no-matches-macro"]);
 }
 
 #[test]
@@ -146,9 +150,11 @@ fn diagnostic_spans_point_to_correct_byte_ranges() {
     let tree = parse(source, Language::Rust);
     let mut passes = vec![adapt(MacroInvocationFinder)];
     let diagnostics = execute(&tree, &mut passes);
+    let [diagnostic] = diagnostics.as_slice() else {
+        panic!("expected one diagnostic, got {diagnostics:?}");
+    };
 
-    assert_eq!(diagnostics.len(), 1);
-    let span = diagnostics[0].span();
+    let span = diagnostic.span();
     let spanned_text = &source[span.start()..span.end()];
     assert!(
         spanned_text.contains("matches!"),

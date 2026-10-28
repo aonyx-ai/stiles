@@ -137,8 +137,9 @@ mod tests {
             .build()
             .expect("should build");
 
-        assert!(filter.admits(&rule("lint.wanted")));
-        assert!(!filter.admits(&rule("lint.other")));
+        let admitted = ["lint.wanted", "lint.other"].map(|name| filter.admits(&rule(name)));
+
+        assert_eq!(admitted, [true, false]);
     }
 
     #[test]
@@ -149,8 +150,9 @@ mod tests {
             .build()
             .expect("should build");
 
-        assert!(!filter.admits(&rule("lint.noisy")));
-        assert!(filter.admits(&rule("lint.other")));
+        let admitted = ["lint.noisy", "lint.other"].map(|name| filter.admits(&rule(name)));
+
+        assert_eq!(admitted, [false, true]);
     }
 
     #[test]
@@ -172,8 +174,9 @@ mod tests {
             .build()
             .expect("should build");
 
-        assert_eq!(filter.named().len(), 1);
-        assert!(filter.named().contains("lint.noisy"));
+        let named = filter.named();
+
+        assert_eq!(named, &BTreeSet::from(["lint.noisy".to_owned()]));
     }
 
     #[test]
@@ -188,8 +191,9 @@ mod tests {
         filter.validate(&declared).expect("should accept");
     }
 
-    #[test]
-    fn validate_refuses_a_name_no_lint_declares() {
+    /// Returns the error of a filter that disables `lint.typo` in a run
+    /// whose lints declare only `lint.known`
+    fn undeclared_name_error() -> String {
         let filter = RuleFilter::builder()
             .enable(Vec::new())
             .disable(names(&["lint.typo"]))
@@ -199,8 +203,21 @@ mod tests {
 
         let error = filter.validate(&declared).expect_err("should fail");
 
-        assert!(format!("{error:#}").contains("lint.typo"), "{error:#}");
-        assert!(format!("{error:#}").contains("lint.known"), "{error:#}");
+        format!("{error:#}")
+    }
+
+    #[test]
+    fn validate_names_the_declared_rules() {
+        let error = undeclared_name_error();
+
+        assert!(error.contains("lint.known"), "{error}");
+    }
+
+    #[test]
+    fn validate_refuses_a_name_no_lint_declares() {
+        let error = undeclared_name_error();
+
+        assert!(error.contains("lint.typo"), "{error}");
     }
 
     #[test]

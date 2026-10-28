@@ -166,52 +166,104 @@ mod tests {
         assert_unpin::<Diagnostic>();
     }
 
-    #[test]
-    fn accessors_return_correct_values() {
-        let diag = test_diagnostic();
-
-        assert_eq!(diag.rule_id(), RuleId::new("lint.test"));
-        assert_eq!(diag.severity(), Severity::Warn);
-        assert_eq!(diag.message(), "test message");
-        assert_eq!(diag.span().start(), 0);
-        assert_eq!(diag.span().end(), 10);
+    /// Returns a location that a test attaches as an origin
+    fn origin() -> Location {
+        Location::new(
+            Span::new(PathBuf::from("other.rs"), 5, 15),
+            "defined here".into(),
+        )
     }
 
     #[test]
-    fn clone_copies_every_field() {
-        let origin = Location::new(
-            Span::new(PathBuf::from("other.rs"), 5, 15),
-            "defined here".into(),
-        );
-        let diag = test_diagnostic().with_origin(origin);
+    fn clone_copies_the_message() {
+        let diag = test_diagnostic().with_origin(origin());
 
         let copy = diag.clone();
 
-        assert_eq!(copy.rule_id(), diag.rule_id());
         assert_eq!(copy.message(), diag.message());
-        assert_eq!(copy.span(), diag.span());
+    }
+
+    #[test]
+    fn clone_copies_the_origins() {
+        let diag = test_diagnostic().with_origin(origin());
+
+        let copy = diag.clone();
+
         assert_eq!(copy.origins(), diag.origins());
     }
 
     #[test]
-    fn new_diagnostic_has_empty_collections() {
+    fn clone_copies_the_rule_id() {
+        let diag = test_diagnostic().with_origin(origin());
+
+        let copy = diag.clone();
+
+        assert_eq!(copy.rule_id(), diag.rule_id());
+    }
+
+    #[test]
+    fn clone_copies_the_span() {
+        let diag = test_diagnostic().with_origin(origin());
+
+        let copy = diag.clone();
+
+        assert_eq!(copy.span(), diag.span());
+    }
+
+    #[test]
+    fn message_returns_the_message() {
+        let diag = test_diagnostic();
+
+        assert_eq!(diag.message(), "test message");
+    }
+
+    #[test]
+    fn new_diagnostic_has_no_origins() {
         let diag = test_diagnostic();
 
         assert!(diag.origins().is_empty());
+    }
+
+    #[test]
+    fn new_diagnostic_has_no_related_locations() {
+        let diag = test_diagnostic();
+
         assert!(diag.related().is_empty());
+    }
+
+    #[test]
+    fn new_diagnostic_has_no_suggestions() {
+        let diag = test_diagnostic();
+
         assert!(diag.suggestions().is_empty());
     }
 
     #[test]
-    fn with_origin_adds_origin() {
-        let origin = Location::new(
-            Span::new(PathBuf::from("other.rs"), 5, 15),
-            "defined here".into(),
-        );
-        let diag = test_diagnostic().with_origin(origin);
+    fn rule_id_returns_the_rule_id() {
+        let diag = test_diagnostic();
 
-        assert_eq!(diag.origins().len(), 1);
-        assert_eq!(diag.origins()[0].message(), "defined here");
+        assert_eq!(diag.rule_id(), RuleId::new("lint.test"));
+    }
+
+    #[test]
+    fn severity_returns_the_severity() {
+        let diag = test_diagnostic();
+
+        assert_eq!(diag.severity(), Severity::Warn);
+    }
+
+    #[test]
+    fn span_returns_the_span() {
+        let diag = test_diagnostic();
+
+        assert_eq!(diag.span(), &Span::new(PathBuf::from("test.rs"), 0, 10));
+    }
+
+    #[test]
+    fn with_origin_adds_origin() {
+        let diag = test_diagnostic().with_origin(origin());
+
+        assert_eq!(diag.origins(), [origin()]);
     }
 
     #[test]
@@ -220,27 +272,46 @@ mod tests {
             Span::new(PathBuf::from("other.rs"), 5, 15),
             "also used here".into(),
         );
-        let diag = test_diagnostic().with_related(related);
 
-        assert_eq!(diag.related().len(), 1);
-        assert_eq!(diag.related()[0].message(), "also used here");
+        let diag = test_diagnostic().with_related(related.clone());
+
+        assert_eq!(diag.related(), [related]);
     }
 
     #[test]
-    fn with_severity_preserves_other_fields() {
-        let origin = Location::new(
-            Span::new(PathBuf::from("other.rs"), 5, 15),
-            "defined here".into(),
-        );
-
+    fn with_severity_preserves_the_message() {
         let diag = test_diagnostic()
-            .with_origin(origin)
+            .with_origin(origin())
+            .with_severity(Severity::Error);
+
+        assert_eq!(diag.message(), "test message");
+    }
+
+    #[test]
+    fn with_severity_preserves_the_origins() {
+        let diag = test_diagnostic()
+            .with_origin(origin())
+            .with_severity(Severity::Error);
+
+        assert_eq!(diag.origins(), [origin()]);
+    }
+
+    #[test]
+    fn with_severity_preserves_the_rule_id() {
+        let diag = test_diagnostic()
+            .with_origin(origin())
             .with_severity(Severity::Error);
 
         assert_eq!(diag.rule_id(), RuleId::new("lint.test"));
-        assert_eq!(diag.message(), "test message");
-        assert_eq!(diag.span().start(), 0);
-        assert_eq!(diag.origins().len(), 1);
+    }
+
+    #[test]
+    fn with_severity_preserves_the_span() {
+        let diag = test_diagnostic()
+            .with_origin(origin())
+            .with_severity(Severity::Error);
+
+        assert_eq!(diag.span(), &Span::new(PathBuf::from("test.rs"), 0, 10));
     }
 
     #[test]
@@ -257,10 +328,10 @@ mod tests {
             "replacement".into(),
             "try this".into(),
         );
-        let diag = test_diagnostic().with_suggestion(suggestion);
 
-        assert_eq!(diag.suggestions().len(), 1);
-        assert_eq!(diag.suggestions()[0].replacement(), "replacement");
+        let diag = test_diagnostic().with_suggestion(suggestion.clone());
+
+        assert_eq!(diag.suggestions(), [suggestion]);
     }
 
     mod prop {

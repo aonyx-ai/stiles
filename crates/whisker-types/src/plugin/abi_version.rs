@@ -202,9 +202,17 @@ mod tests {
     /// them, so a field that moved would make a plugin claim a version
     /// it never named.
     #[test]
-    fn major_sits_first_and_the_pair_is_eight_bytes() {
+    fn major_sits_first() {
         assert_eq!(offset_of!(AbiVersion, major), 0);
+    }
+
+    #[test]
+    fn minor_sits_after_the_major() {
         assert_eq!(offset_of!(AbiVersion, minor), 4);
+    }
+
+    #[test]
+    fn the_pair_is_eight_bytes() {
         assert_eq!(size_of::<AbiVersion>(), 8);
     }
 
@@ -213,6 +221,10 @@ mod tests {
     #[test]
     fn ord_compares_the_major_before_the_minor() {
         assert!(AbiVersion { major: 1, minor: 0 } > AbiVersion { major: 0, minor: 9 });
+    }
+
+    #[test]
+    fn ord_with_one_major_compares_the_minor() {
         assert!(AbiVersion { major: 1, minor: 1 } > AbiVersion { major: 1, minor: 0 });
     }
 

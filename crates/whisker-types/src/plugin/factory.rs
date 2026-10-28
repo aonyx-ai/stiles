@@ -122,26 +122,56 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
+    fn trait_send_exported_lint() {
+        fn assert_send<T: Send>() {}
+        assert_send::<ExportedLint>();
+    }
+
+    #[test]
+    fn trait_send_lint_pass_factory() {
         fn assert_send<T: Send>() {}
         assert_send::<LintPassFactory>();
-        assert_send::<ExportedLint>();
+    }
+
+    #[test]
+    fn trait_send_plugin() {
+        fn assert_send<T: Send>() {}
         assert_send::<Plugin>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_sync_exported_lint() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<ExportedLint>();
+    }
+
+    #[test]
+    fn trait_sync_lint_pass_factory() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<LintPassFactory>();
-        assert_sync::<ExportedLint>();
+    }
+
+    #[test]
+    fn trait_sync_plugin() {
+        fn assert_sync<T: Sync>() {}
         assert_sync::<Plugin>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_unpin_exported_lint() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<ExportedLint>();
+    }
+
+    #[test]
+    fn trait_unpin_lint_pass_factory() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<LintPassFactory>();
-        assert_unpin::<ExportedLint>();
+    }
+
+    #[test]
+    fn trait_unpin_plugin() {
+        fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Plugin>();
     }
 }

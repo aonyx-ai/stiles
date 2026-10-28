@@ -101,11 +101,25 @@ mod tests {
     fn resolved_type_builder_defaults_to_false() {
         let ty = ResolvedType::new("i32".into());
 
+        let flags = [ty.is_enum(), ty.is_never(), ty.is_result(), ty.is_option()];
+
+        assert_eq!(flags, [false; 4]);
+    }
+
+    #[test]
+    fn resolved_type_display_returns_the_text() {
+        let ty = ResolvedType::new("i32".into());
+
         assert_eq!(ty.display(), "i32");
-        assert!(!ty.is_enum());
+    }
+
+    #[test]
+    fn resolved_type_builder_clears_a_flag() {
+        let ty = ResolvedType::new("MyEnum".into())
+            .with_enum(true)
+            .with_never(false);
+
         assert!(!ty.is_never());
-        assert!(!ty.is_result());
-        assert!(!ty.is_option());
     }
 
     #[test]
@@ -115,18 +129,24 @@ mod tests {
             .with_never(false);
 
         assert!(ty.is_enum());
-        assert!(!ty.is_never());
     }
 
     #[test]
-    fn resolved_type_result_and_option_flags() {
-        let result_ty = ResolvedType::new("Result<T, E>".into()).with_result(true);
+    fn resolved_type_with_option_sets_only_option() {
         let option_ty = ResolvedType::new("Option<T>".into()).with_option(true);
 
-        assert!(result_ty.is_result());
-        assert!(!result_ty.is_option());
-        assert!(option_ty.is_option());
-        assert!(!option_ty.is_result());
+        let flags = (option_ty.is_option(), option_ty.is_result());
+
+        assert_eq!(flags, (true, false));
+    }
+
+    #[test]
+    fn resolved_type_with_result_sets_only_result() {
+        let result_ty = ResolvedType::new("Result<T, E>".into()).with_result(true);
+
+        let flags = (result_ty.is_result(), result_ty.is_option());
+
+        assert_eq!(flags, (true, false));
     }
 
     #[test]

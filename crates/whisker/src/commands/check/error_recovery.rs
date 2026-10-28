@@ -115,23 +115,38 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
+    fn trait_send_error_recovery() {
         fn assert_send<T: Send>() {}
         assert_send::<ErrorRecovery>();
+    }
+
+    #[test]
+    fn trait_send_walk() {
+        fn assert_send<T: Send>() {}
         assert_send::<Walk>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_sync_error_recovery() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<ErrorRecovery>();
+    }
+
+    #[test]
+    fn trait_sync_walk() {
+        fn assert_sync<T: Sync>() {}
         assert_sync::<Walk>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_unpin_error_recovery() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<ErrorRecovery>();
+    }
+
+    #[test]
+    fn trait_unpin_walk() {
+        fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Walk>();
     }
 }

@@ -101,12 +101,24 @@ mod tests {
     }
 
     #[test]
-    fn accessors_return_correct_values() {
+    fn end_returns_the_end() {
+        let span = Span::new(PathBuf::from("test.rs"), 10, 20);
+
+        assert_eq!(span.end(), 20);
+    }
+
+    #[test]
+    fn file_returns_the_file() {
         let span = Span::new(PathBuf::from("test.rs"), 10, 20);
 
         assert_eq!(span.file(), Path::new("test.rs"));
+    }
+
+    #[test]
+    fn start_returns_the_start() {
+        let span = Span::new(PathBuf::from("test.rs"), 10, 20);
+
         assert_eq!(span.start(), 10);
-        assert_eq!(span.end(), 20);
     }
 
     #[test]
@@ -130,9 +142,7 @@ mod tests {
 
         let narrower = Span::new(span.file_path().clone(), 2, 4);
 
-        assert_eq!(narrower.file(), Path::new("test.rs"));
-        assert_eq!(narrower.start(), 2);
-        assert_eq!(narrower.end(), 4);
+        assert_eq!(narrower, Span::new(PathBuf::from("test.rs"), 2, 4));
     }
 
     #[test]

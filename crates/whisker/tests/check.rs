@@ -652,12 +652,9 @@ fn check_with_diagnostics_and_errors_splits_report_and_errors() {
         .stderr(predicate::str::contains("wildcard-match-arm").not());
 }
 
-/// Pins that `--json` writes each diagnostic as one JSON object per line
-///
-/// A caller reads the report line by line from stdout, so every line must
-/// parse on its own and name the rule, the file, and the position.
-#[test]
-fn check_with_json_writes_one_object_per_diagnostic() {
+/// Runs `whisker check --json` over a package with one diagnostic, and
+/// returns whether it succeeded and the objects it wrote, one per line
+fn json_check() -> (bool, Vec<serde_json::Value>) {
     let package = with_no_todo(package(WARNING_SOURCE));
 
     let output = whisker()
@@ -667,21 +664,56 @@ fn check_with_json_writes_one_object_per_diagnostic() {
         .expect("whisker should run");
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
-    let findings: Vec<serde_json::Value> = stdout
+    let findings = stdout
         .lines()
         .map(|line| serde_json::from_str(line).expect("each line should be JSON"))
         .collect();
-    assert!(output.status.success());
-    assert_eq!(findings.len(), 1, "{stdout}");
-    assert_eq!(findings[0]["rule"], "custom.no-todo");
-    assert_eq!(findings[0]["severity"], "warning");
-    assert_eq!(findings[0]["line"], 2);
-    assert!(
-        findings[0]["file"]
-            .as_str()
-            .is_some_and(|file| file.ends_with("lib.rs")),
-        "{stdout}"
+    (output.status.success(), findings)
+}
+
+/// Pins that `--json` writes each diagnostic as one JSON object per line
+///
+/// A caller reads the report line by line from stdout, so every line must
+/// parse on its own and name the rule, the file, and the position.
+#[test]
+fn check_with_json_writes_one_object_per_diagnostic() {
+    let (_, findings) = json_check();
+
+    let named: Vec<(&serde_json::Value, &serde_json::Value, &serde_json::Value)> = findings
+        .iter()
+        .map(|finding| (&finding["rule"], &finding["severity"], &finding["line"]))
+        .collect();
+
+    assert_eq!(
+        named,
+        [(
+            &serde_json::json!("custom.no-todo"),
+            &serde_json::json!("warning"),
+            &serde_json::json!(2)
+        )]
     );
+}
+
+#[test]
+fn check_with_json_names_the_file() {
+    let (_, findings) = json_check();
+
+    let files: Vec<Option<&str>> = findings
+        .iter()
+        .map(|finding| finding["file"].as_str())
+        .collect();
+    let [Some(file)] = files.as_slice() else {
+        panic!("expected one finding with a file, got {files:?}");
+    };
+
+    assert!(file.ends_with("lib.rs"), "{file}");
+}
+
+#[test]
+fn check_with_json_succeeds_on_a_warning() {
+    let (success, _) = json_check();
+
+    assert!(success);
 }
 
 /// Pins the exit code to the failure recorded while walking the files, not

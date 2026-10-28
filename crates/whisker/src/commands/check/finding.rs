@@ -133,13 +133,21 @@ mod tests {
     }
 
     #[test]
+    fn display_shows_the_location() {
+        let finding = finding("fn a() {}\n", 3, 4);
+
+        let text = finding.to_string();
+
+        assert!(text.contains("src/lib.rs:1:4"));
+    }
+
+    #[test]
     fn display_shows_the_rendered_snippet() {
         let finding = finding("fn a() {}\n", 3, 4);
 
         let text = finding.to_string();
 
         assert!(text.starts_with("warning[lint.test]: test message"));
-        assert!(text.contains("src/lib.rs:1:4"));
     }
 
     #[test]

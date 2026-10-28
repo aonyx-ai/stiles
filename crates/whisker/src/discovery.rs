@@ -419,13 +419,9 @@ mod tests {
         assert_eq!(path, Path::new("./src/main.rs"));
     }
 
-    /// Pins the exclusions whisker's own configuration file declares
-    ///
-    /// The fixture projects exist to violate lint rules, so a pattern that
-    /// stops matching would fill an otherwise clean run with their
-    /// diagnostics.
-    #[test]
-    fn run_over_whiskers_own_repository_excludes_its_fixture_projects() {
+    /// Returns the files that discovery finds in whisker's own repository
+    /// under its own configuration file
+    fn own_repository_files() -> Vec<String> {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..");
         let config = WhiskerConfig::load(&root).expect("whisker's own configuration should load");
 
@@ -436,11 +432,18 @@ mod tests {
             .call()
             .expect("discovery should succeed");
 
-        let files = discovered(&discovery, &root);
-        assert!(
-            files.contains(&"crates/whisker/src/discovery.rs".to_owned()),
-            "discovery should have found whisker's own source: {files:?}"
-        );
+        discovered(&discovery, &root)
+    }
+
+    /// Pins the exclusions whisker's own configuration file declares
+    ///
+    /// The fixture projects exist to violate lint rules, so a pattern that
+    /// stops matching would fill an otherwise clean run with their
+    /// diagnostics.
+    #[test]
+    fn run_over_whiskers_own_repository_excludes_its_fixture_projects() {
+        let files = own_repository_files();
+
         let fixtures: Vec<&String> = files
             .iter()
             .filter(|file| {
@@ -448,19 +451,27 @@ mod tests {
                     || file.starts_with("crates/whisker-rust/tests/fixtures/")
             })
             .collect();
+
         assert!(
             fixtures.is_empty(),
             "the configured patterns should have excluded every fixture project: {fixtures:?}"
         );
     }
 
-    /// The sort makes diagnostics reproducible across machines
-    ///
-    /// This test uses enough files for the storage order to differ from the
-    /// sorted order, so it fails without the sort.
     #[test]
-    fn run_returns_files_in_sorted_order() {
-        let directory = tree(&[
+    fn run_over_whiskers_own_repository_finds_its_source() {
+        let files = own_repository_files();
+
+        assert!(
+            files.contains(&"crates/whisker/src/discovery.rs".to_owned()),
+            "discovery should have found whisker's own source: {files:?}"
+        );
+    }
+
+    /// Returns a tree of eight files whose names the file system stores
+    /// out of sorted order
+    fn unsorted_tree() -> TempDir {
+        tree(&[
             "zebra.rs",
             "yak.rs",
             "xray.rs",
@@ -469,8 +480,18 @@ mod tests {
             "umbrella.rs",
             "tiger.rs",
             "snake.rs",
-        ]);
-        assert_stored_out_of_order(directory.path());
+        ])
+    }
+
+    /// The sort makes diagnostics reproducible across machines
+    ///
+    /// This test uses enough files for the storage order to differ from the
+    /// sorted order, so it fails without the sort.
+    /// `unsorted_tree_reads_back_out_of_order` pins that the storage order
+    /// differs.
+    #[test]
+    fn run_returns_files_in_sorted_order() {
+        let directory = unsorted_tree();
         let config = config(directory.path(), &[]);
 
         let discovery = Discovery::run()
@@ -493,6 +514,13 @@ mod tests {
                 "zebra.rs"
             ]
         );
+    }
+
+    #[test]
+    fn unsorted_tree_reads_back_out_of_order() {
+        let directory = unsorted_tree();
+
+        assert_stored_out_of_order(directory.path());
     }
 
     #[test]
@@ -633,18 +661,14 @@ mod tests {
         );
     }
 
-    /// Pins that an invalid pattern is an error for a file target too
-    ///
-    /// Patterns do not select an explicit file, so the file branch has no
-    /// other reason to compile them. The error then reaches the user only
-    /// on some invocations.
-    #[test]
-    fn run_with_explicit_file_target_and_invalid_pattern_returns_error() {
+    /// Returns the errors of discovery over a file and over its directory,
+    /// with a configuration that holds an invalid pattern
+    fn invalid_pattern_errors() -> (String, String) {
         let directory = tree(&["src/main.rs"]);
         let config = config(directory.path(), &["{a,b"]);
         let target = directory.path().join("src").join("main.rs");
 
-        let error = Discovery::run()
+        let over_file = Discovery::run()
             .path(&target)
             .config(&config)
             .on_error(WalkErrorPolicy::Fail)
@@ -657,11 +681,29 @@ mod tests {
             .call()
             .expect_err("discovery should fail");
 
+        (format!("{over_file:#}"), format!("{over_directory:#}"))
+    }
+
+    /// Pins that an invalid pattern is an error for a file target too
+    ///
+    /// Patterns do not select an explicit file, so the file branch has no
+    /// other reason to compile them. The error then reaches the user only
+    /// on some invocations.
+    #[test]
+    fn run_with_explicit_file_target_and_invalid_pattern_returns_error() {
+        let (over_file, _) = invalid_pattern_errors();
+
         assert!(
-            format!("{error:#}").contains("failed to read the ignore pattern `{a,b`"),
-            "error should name the offending pattern: {error:#}"
+            over_file.contains("failed to read the ignore pattern `{a,b`"),
+            "error should name the offending pattern: {over_file}"
         );
-        assert_eq!(format!("{error:#}"), format!("{over_directory:#}"));
+    }
+
+    #[test]
+    fn run_with_explicit_file_target_and_invalid_pattern_matches_the_directory_error() {
+        let (over_file, over_directory) = invalid_pattern_errors();
+
+        assert_eq!(over_file, over_directory);
     }
 
     #[test]
@@ -869,6 +911,20 @@ mod tests {
             discovered(&discovery, directory.path()),
             ["src/lib.rs", "src/main.rs"]
         );
+    }
+
+    #[test]
+    fn run_with_pattern_matching_nothing_records_no_errors() {
+        let directory = tree(&["src/main.rs", "src/lib.rs"]);
+        let config = config(directory.path(), &["vendor/", "*.py"]);
+
+        let discovery = Discovery::run()
+            .path(directory.path())
+            .config(&config)
+            .on_error(WalkErrorPolicy::Fail)
+            .call()
+            .expect("discovery should succeed");
+
         assert!(discovery.errors().is_empty());
     }
 
@@ -952,13 +1008,9 @@ mod tests {
         assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
     }
 
-    /// Pins that an ignore file is named as one wherever the walker found it
-    ///
-    /// An ignore file above the root fails before the walk has an entry, so
-    /// it takes the walker's generic error path. The error must still name
-    /// an ignore file, not a directory entry.
-    #[test]
-    fn run_with_unparsable_ignore_file_above_the_root_returns_error() {
+    /// Returns the error of discovery below a directory whose ignore file
+    /// does not parse
+    fn unparsable_ignore_file_above_the_root_error() -> String {
         let directory = tree(&["proj/src/main.rs"]);
         std::fs::write(directory.path().join(".gitignore"), "{a,b\n")
             .expect("gitignore should be written");
@@ -972,25 +1024,50 @@ mod tests {
             .call()
             .expect_err("discovery should fail");
 
-        let error = format!("{error:#}");
-        assert!(
-            error.contains("failed to read an ignore file"),
-            "error should describe the unparsable ignore file: {error}"
-        );
+        format!("{error:#}")
+    }
+
+    #[test]
+    fn run_with_unparsable_ignore_file_above_the_root_does_not_blame_the_walk() {
+        let error = unparsable_ignore_file_above_the_root_error();
+
         assert!(
             !error.contains("failed to read a directory entry"),
             "error should not blame the directory walk: {error}"
         );
     }
 
+    /// Pins that an ignore file is named as one wherever the walker found it
+    ///
+    /// An ignore file above the root fails before the walk has an entry, so
+    /// it takes the walker's generic error path. The error must still name
+    /// an ignore file, not a directory entry.
     #[test]
-    fn run_with_unparsable_ignore_file_and_fail_policy_returns_error() {
+    fn run_with_unparsable_ignore_file_above_the_root_returns_error() {
+        let error = unparsable_ignore_file_above_the_root_error();
+
+        assert!(
+            error.contains("failed to read an ignore file"),
+            "error should describe the unparsable ignore file: {error}"
+        );
+    }
+
+    /// Writes a tree whose `generated` directory holds an ignore file that
+    /// does not parse
+    fn tree_with_unparsable_ignore_file() -> TempDir {
         let directory = tree(&["src/main.rs", "generated/schema.rs"]);
         std::fs::write(
             directory.path().join("generated").join(".gitignore"),
             "{a,b\n",
         )
         .expect("gitignore should be written");
+        directory
+    }
+
+    /// Returns the error of discovery with the fail policy over
+    /// [`tree_with_unparsable_ignore_file`]
+    fn unparsable_ignore_file_error() -> String {
+        let directory = tree_with_unparsable_ignore_file();
         let config = config(directory.path(), &[]);
 
         let error = Discovery::run()
@@ -1000,15 +1077,23 @@ mod tests {
             .call()
             .expect_err("discovery should fail");
 
-        let error = format!("{error:#}");
-        assert!(
-            error.contains("failed to read an ignore file"),
-            "error should describe the unparsable ignore file: {error}"
-        );
+        format!("{error:#}")
+    }
+
+    #[test]
+    fn run_with_unparsable_ignore_file_and_fail_policy_names_the_file() {
+        let error = unparsable_ignore_file_error();
+
         assert!(
             error.contains(".gitignore"),
             "error should name the file the walker could not parse: {error}"
         );
+    }
+
+    #[test]
+    fn run_with_unparsable_ignore_file_and_fail_policy_quotes_the_glob() {
+        let error = unparsable_ignore_file_error();
+
         assert!(
             error.contains("{a,b"),
             "error should quote the glob the walker could not parse: {error}"
@@ -1016,13 +1101,19 @@ mod tests {
     }
 
     #[test]
-    fn run_with_unparsable_ignore_file_and_keep_going_records_the_error() {
-        let directory = tree(&["src/main.rs", "generated/schema.rs"]);
-        std::fs::write(
-            directory.path().join("generated").join(".gitignore"),
-            "{a,b\n",
-        )
-        .expect("gitignore should be written");
+    fn run_with_unparsable_ignore_file_and_fail_policy_returns_error() {
+        let error = unparsable_ignore_file_error();
+
+        assert!(
+            error.contains("failed to read an ignore file"),
+            "error should describe the unparsable ignore file: {error}"
+        );
+    }
+
+    /// Returns the result of discovery with the policy that keeps going over
+    /// [`tree_with_unparsable_ignore_file`], and the files it found
+    fn unparsable_ignore_file_kept_going() -> (Discovery, Vec<String>) {
+        let directory = tree_with_unparsable_ignore_file();
         let config = config(directory.path(), &[]);
 
         let discovery = Discovery::run()
@@ -1032,10 +1123,21 @@ mod tests {
             .call()
             .expect("discovery should succeed");
 
-        assert_eq!(
-            discovered(&discovery, directory.path()),
-            ["generated/schema.rs", "src/main.rs"]
-        );
+        let files = discovered(&discovery, directory.path());
+        (discovery, files)
+    }
+
+    #[test]
+    fn run_with_unparsable_ignore_file_and_keep_going_keeps_every_file() {
+        let (_, files) = unparsable_ignore_file_kept_going();
+
+        assert_eq!(files, ["generated/schema.rs", "src/main.rs"]);
+    }
+
+    #[test]
+    fn run_with_unparsable_ignore_file_and_keep_going_records_the_error() {
+        let (discovery, _) = unparsable_ignore_file_kept_going();
+
         assert_eq!(discovery.errors().len(), 1);
     }
 
@@ -1059,9 +1161,10 @@ mod tests {
         );
     }
 
+    /// Returns the error of discovery with the fail policy over a tree whose
+    /// `locked` directory cannot be read
     #[cfg(unix)]
-    #[test]
-    fn run_with_unreadable_directory_and_fail_policy_returns_error() {
+    fn unreadable_directory_error() -> String {
         let directory = tree(&["src/main.rs", "locked/inner.rs"]);
         let config = config(directory.path(), &[]);
         let locked = directory.path().join("locked");
@@ -1074,15 +1177,14 @@ mod tests {
             .call()
             .expect_err("discovery should fail");
 
-        let error = format!("{error:#}");
-        assert!(
-            error.contains("failed to read a directory entry"),
-            "error should describe the unreadable entry: {error}"
-        );
-        assert!(
-            error.contains("locked"),
-            "error should name the directory the walker could not read: {error}"
-        );
+        format!("{error:#}")
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_with_unreadable_directory_and_fail_policy_gives_the_reason() {
+        let error = unreadable_directory_error();
+
         assert!(
             error.contains("Permission denied"),
             "error should give the reason the walker reported: {error}"
@@ -1091,7 +1193,30 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn run_with_unreadable_directory_and_keep_going_records_the_error() {
+    fn run_with_unreadable_directory_and_fail_policy_names_the_directory() {
+        let error = unreadable_directory_error();
+
+        assert!(
+            error.contains("locked"),
+            "error should name the directory the walker could not read: {error}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_with_unreadable_directory_and_fail_policy_returns_error() {
+        let error = unreadable_directory_error();
+
+        assert!(
+            error.contains("failed to read a directory entry"),
+            "error should describe the unreadable entry: {error}"
+        );
+    }
+
+    /// Returns the result of discovery with the policy that keeps going over
+    /// a tree whose `locked` directory cannot be read, and the files it found
+    #[cfg(unix)]
+    fn unreadable_directory_kept_going() -> (Discovery, Vec<String>) {
         let directory = tree(&["src/main.rs", "locked/inner.rs"]);
         let config = config(directory.path(), &[]);
         let locked = directory.path().join("locked");
@@ -1104,7 +1229,23 @@ mod tests {
             .call()
             .expect("discovery should succeed");
 
-        assert_eq!(discovered(&discovery, directory.path()), ["src/main.rs"]);
+        let files = discovered(&discovery, directory.path());
+        (discovery, files)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_with_unreadable_directory_and_keep_going_keeps_the_readable_files() {
+        let (_, files) = unreadable_directory_kept_going();
+
+        assert_eq!(files, ["src/main.rs"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_with_unreadable_directory_and_keep_going_records_the_error() {
+        let (discovery, _) = unreadable_directory_kept_going();
+
         assert_eq!(discovery.errors().len(), 1);
     }
 

@@ -417,6 +417,17 @@ mod tests {
             .expect("configuration should be written");
     }
 
+    /// Returns the error, with its causes, of loading a repository whose
+    /// configuration file holds `contents`
+    fn load_error(contents: &str) -> String {
+        let directory = repository();
+        write_config(directory.path(), contents);
+
+        let error = WhiskerConfig::load(directory.path()).expect_err("configuration should fail");
+
+        format!("{error:#}")
+    }
+
     /// Pins that an error names which entry the reader has to go and fix
     ///
     /// The keys of a broken entry rarely tell it apart from the entry
@@ -439,6 +450,18 @@ mod tests {
     }
 
     #[test]
+    fn load_with_config_above_the_target_reads_its_patterns() {
+        let directory = repository();
+        write_config(directory.path(), "ignore = [\"examples/\"]\n");
+        let nested = directory.path().join("src").join("inner");
+        std::fs::create_dir_all(&nested).expect("directories should be created");
+
+        let config = WhiskerConfig::load(&nested).expect("configuration should load");
+
+        assert_eq!(config.ignore(), vec![IgnorePattern::new("examples/")]);
+    }
+
+    #[test]
     fn load_with_config_above_the_target_walks_up() {
         let directory = repository();
         write_config(directory.path(), "ignore = [\"examples/\"]\n");
@@ -448,7 +471,6 @@ mod tests {
         let config = WhiskerConfig::load(&nested).expect("configuration should load");
 
         assert_eq!(config.root(), &resolved(&directory));
-        assert_eq!(config.ignore(), vec![IgnorePattern::new("examples/")]);
     }
 
     #[test]
@@ -463,6 +485,15 @@ mod tests {
             &resolved(&directory),
             "patterns must anchor beside .config, not inside it"
         );
+    }
+
+    #[test]
+    fn load_with_config_file_reads_its_patterns() {
+        let directory = repository();
+        write_config(directory.path(), "ignore = [\"examples/\"]\n");
+
+        let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
+
         assert_eq!(config.ignore(), vec![IgnorePattern::new("examples/")]);
     }
 
@@ -501,6 +532,18 @@ mod tests {
             config.root().get(),
             std::fs::canonicalize(&inner).expect("the inner project should resolve")
         );
+    }
+
+    #[test]
+    fn load_with_configured_subdirectory_reads_its_patterns() {
+        let directory = repository();
+        write_config(directory.path(), "ignore = [\"outer/\"]\n");
+        let inner = directory.path().join("packages").join("inner");
+        std::fs::create_dir_all(&inner).expect("directories should be created");
+        write_config(&inner, "ignore = [\"inner/\"]\n");
+
+        let config = WhiskerConfig::load(&inner).expect("configuration should load");
+
         assert_eq!(config.ignore(), vec![IgnorePattern::new("inner/")]);
     }
 
@@ -548,6 +591,19 @@ mod tests {
     }
 
     #[test]
+    fn load_with_file_target_reads_the_config_patterns() {
+        let directory = repository();
+        write_config(directory.path(), "ignore = [\"examples/\"]\n");
+        std::fs::create_dir(directory.path().join("src")).expect("src should be created");
+        let file = directory.path().join("src").join("main.rs");
+        std::fs::write(&file, "fn main() {}").expect("source should be written");
+
+        let config = WhiskerConfig::load(&file).expect("configuration should load");
+
+        assert_eq!(config.ignore(), vec![IgnorePattern::new("examples/")]);
+    }
+
+    #[test]
     fn load_with_file_target_uses_the_config_root() {
         let directory = repository();
         write_config(directory.path(), "ignore = [\"examples/\"]\n");
@@ -558,26 +614,25 @@ mod tests {
         let config = WhiskerConfig::load(&file).expect("configuration should load");
 
         assert_eq!(config.root(), &resolved(&directory));
-        assert_eq!(config.ignore(), vec![IgnorePattern::new("examples/")]);
+    }
+
+    #[test]
+    fn load_with_git_lint_entry_holding_a_branch_name_names_the_entry() {
+        let error = load_error("[[lints]]\ngit = \"https://example.com/rules\"\nrev = \"main\"\n");
+
+        assert!(
+            error.contains("[[lints]] entry 1"),
+            "error should name the entry it read: {error}"
+        );
     }
 
     #[test]
     fn load_with_git_lint_entry_holding_a_branch_name_returns_error() {
-        let directory = repository();
-        write_config(
-            directory.path(),
-            "[[lints]]\ngit = \"https://example.com/rules\"\nrev = \"main\"\n",
-        );
-
-        let error = WhiskerConfig::load(directory.path()).expect_err("configuration should fail");
+        let error = load_error("[[lints]]\ngit = \"https://example.com/rules\"\nrev = \"main\"\n");
 
         assert!(
-            format!("{error:#}").contains("40 characters"),
-            "error should explain the pin: {error:#}"
-        );
-        assert!(
-            format!("{error:#}").contains("[[lints]] entry 1"),
-            "error should name the entry it read: {error:#}"
+            error.contains("40 characters"),
+            "error should explain the pin: {error}"
         );
     }
 
@@ -620,22 +675,22 @@ mod tests {
     }
 
     #[test]
+    fn load_with_git_lint_entry_missing_rev_names_the_entry() {
+        let error = load_error("[[lints]]\ngit = \"https://example.com/rules\"\n");
+
+        assert!(
+            error.contains("[[lints]] entry 1"),
+            "error should name the entry it read: {error}"
+        );
+    }
+
+    #[test]
     fn load_with_git_lint_entry_missing_rev_returns_error() {
-        let directory = repository();
-        write_config(
-            directory.path(),
-            "[[lints]]\ngit = \"https://example.com/rules\"\n",
-        );
-
-        let error = WhiskerConfig::load(directory.path()).expect_err("configuration should fail");
+        let error = load_error("[[lints]]\ngit = \"https://example.com/rules\"\n");
 
         assert!(
-            format!("{error:#}").contains("must define rev with git"),
-            "error should name the missing key: {error:#}"
-        );
-        assert!(
-            format!("{error:#}").contains("[[lints]] entry 1"),
-            "error should name the entry it read: {error:#}"
+            error.contains("must define rev with git"),
+            "error should name the missing key: {error}"
         );
     }
 
@@ -680,19 +735,22 @@ mod tests {
     }
 
     #[test]
-    fn load_with_invalid_toml_returns_error() {
-        let directory = repository();
-        write_config(directory.path(), "ignore = [\nthis is not toml\n");
-
-        let error = WhiskerConfig::load(directory.path()).expect_err("configuration should fail");
+    fn load_with_invalid_toml_names_the_line() {
+        let error = load_error("ignore = [\nthis is not toml\n");
 
         assert!(
-            format!("{error:#}").contains("whisker.toml"),
-            "error should name the file it could not read: {error:#}"
+            error.contains("line 2"),
+            "error should name where parsing stopped: {error}"
         );
+    }
+
+    #[test]
+    fn load_with_invalid_toml_returns_error() {
+        let error = load_error("ignore = [\nthis is not toml\n");
+
         assert!(
-            format!("{error:#}").contains("line 2"),
-            "error should name where parsing stopped: {error:#}"
+            error.contains("whisker.toml"),
+            "error should name the file it could not read: {error}"
         );
     }
 
@@ -816,16 +874,14 @@ mod tests {
         let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
 
         let options = config.options();
+        let names = ["lint.repeated-primitive-params", "lint.bool-param"]
+            .map(|rule| options.names(RuleId::new(rule), "boundary-attributes"));
         assert_eq!(
-            options.names(
-                RuleId::new("lint.repeated-primitive-params"),
-                "boundary-attributes"
-            ),
-            Some(vec!["shard".to_owned(), "procedure".to_owned()])
-        );
-        assert_eq!(
-            options.names(RuleId::new("lint.bool-param"), "boundary-attributes"),
-            Some(Vec::new())
+            names,
+            [
+                Some(vec!["shard".to_owned(), "procedure".to_owned()]),
+                Some(Vec::new()),
+            ]
         );
     }
 
@@ -856,31 +912,50 @@ mod tests {
     }
 
     #[test]
-    fn load_with_malformed_ignore_value_returns_error() {
-        let directory = repository();
-        write_config(directory.path(), "ignore = \"examples/\"\n");
-
-        let error = WhiskerConfig::load(directory.path()).expect_err("configuration should fail");
+    fn load_with_malformed_ignore_value_describes_the_mismatch() {
+        let error = load_error("ignore = \"examples/\"\n");
 
         assert!(
-            format!("{error:#}").contains("whisker.toml"),
-            "error should name the offending file: {error:#}"
-        );
-        assert!(
-            format!("{error:#}").contains("invalid type"),
-            "error should describe the type mismatch: {error:#}"
+            error.contains("invalid type"),
+            "error should describe the type mismatch: {error}"
         );
     }
 
     #[test]
-    fn load_with_no_config_file_returns_an_empty_configuration() {
+    fn load_with_malformed_ignore_value_returns_error() {
+        let error = load_error("ignore = \"examples/\"\n");
+
+        assert!(
+            error.contains("whisker.toml"),
+            "error should name the offending file: {error}"
+        );
+    }
+
+    #[test]
+    fn load_with_no_config_file_anchors_at_the_repository() {
         let directory = repository();
 
         let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
 
         assert_eq!(config.root(), &resolved(&directory));
-        assert!(config.ignore().is_empty());
+    }
+
+    #[test]
+    fn load_with_no_config_file_returns_no_lints() {
+        let directory = repository();
+
+        let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
+
         assert!(config.lints().is_empty());
+    }
+
+    #[test]
+    fn load_with_no_config_file_returns_no_patterns() {
+        let directory = repository();
+
+        let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
+
+        assert!(config.ignore().is_empty());
     }
 
     #[test]
@@ -896,10 +971,28 @@ mod tests {
         );
     }
 
+    #[test]
+    fn load_without_a_marker_returns_no_lints() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+
+        let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
+
+        assert!(config.lints().is_empty());
+    }
+
+    #[test]
+    fn load_without_a_marker_returns_no_patterns() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+
+        let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
+
+        assert!(config.ignore().is_empty());
+    }
+
     /// Pins that a directory which is no project is still a valid target
     ///
     /// Someone unpacks a tarball and runs whisker on it, and whisker checks
-    /// what it was pointed at rather than refusing. The assertion needs no
+    /// what it was pointed at rather than refusing. The test needs no
     /// configuration file above the temporary directory, which is the same
     /// thing every other test here relies on `.git` to guarantee.
     #[test]
@@ -909,8 +1002,6 @@ mod tests {
         let config = WhiskerConfig::load(directory.path()).expect("configuration should load");
 
         assert_eq!(config.root(), &resolved(&directory));
-        assert!(config.ignore().is_empty());
-        assert!(config.lints().is_empty());
     }
 
     #[test]

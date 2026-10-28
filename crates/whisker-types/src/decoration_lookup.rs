@@ -116,11 +116,13 @@ mod tests {
         map.insert(1, Count(11));
 
         let lookup = map.lookup();
+        let found =
+            [(1, 0), (1, 1), (2, 0), (2, 1)].map(|(node, index)| lookup.get::<Count>(node, index));
 
-        assert_eq!(lookup.get::<Count>(1, 0), Some(&Count(10)));
-        assert_eq!(lookup.get::<Count>(1, 1), Some(&Count(11)));
-        assert_eq!(lookup.get::<Count>(2, 0), Some(&Count(20)));
-        assert!(lookup.get::<Count>(2, 1).is_none());
+        assert_eq!(
+            found,
+            [Some(&Count(10)), Some(&Count(11)), Some(&Count(20)), None]
+        );
     }
 
     #[test]
@@ -130,10 +132,9 @@ mod tests {
         map.insert(1, Count(2));
 
         let lookup = map.lookup();
+        let found = [0, 1, 2].map(|index| lookup.get::<Count>(1, index));
 
-        assert_eq!(lookup.get::<Count>(1, 0), Some(&Count(1)));
-        assert_eq!(lookup.get::<Count>(1, 1), Some(&Count(2)));
-        assert!(lookup.get::<Count>(1, 2).is_none());
+        assert_eq!(found, [Some(&Count(1)), Some(&Count(2)), None]);
     }
 
     #[test]
@@ -172,7 +173,7 @@ mod tests {
     fn an_insertion_after_a_lookup_is_visible() {
         let mut map = DecorationMap::new();
         map.insert(1, Count(1));
-        assert_eq!(map.lookup().get::<Count>(1, 0), Some(&Count(1)));
+        let _ = map.lookup();
 
         map.insert(1, Count(2));
 

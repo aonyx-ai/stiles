@@ -153,23 +153,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn trait_send() {
+    fn trait_send_declared() {
         fn assert_send<T: Send>() {}
         assert_send::<Declared>();
+    }
+
+    #[test]
+    fn trait_send_lint() {
+        fn assert_send<T: Send>() {}
         assert_send::<Lint<'static>>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_sync_declared() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<Declared>();
+    }
+
+    #[test]
+    fn trait_sync_lint() {
+        fn assert_sync<T: Sync>() {}
         assert_sync::<Lint<'static>>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_unpin_declared() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Declared>();
+    }
+
+    #[test]
+    fn trait_unpin_lint() {
+        fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Lint<'static>>();
     }
 }

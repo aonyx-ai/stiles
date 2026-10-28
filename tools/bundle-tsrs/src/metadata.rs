@@ -268,13 +268,38 @@ mod tests {
     }
 
     #[test]
-    fn trait_auto() {
+    fn trait_auto_default_features() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
+        assert_auto::<DefaultFeatures>();
+    }
+
+    #[test]
+    fn trait_auto_dependency() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
+        assert_auto::<Dependency>();
+    }
+
+    #[test]
+    fn trait_auto_metadata() {
         fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<Metadata>();
-        assert_auto::<Package>();
-        assert_auto::<Dependency>();
+    }
+
+    #[test]
+    fn trait_auto_optionality() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<Optionality>();
-        assert_auto::<DefaultFeatures>();
+    }
+
+    #[test]
+    fn trait_auto_package() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
+        assert_auto::<Package>();
+    }
+
+    #[test]
+    fn trait_auto_target() {
+        fn assert_auto<T: Send + Sync + Unpin>() {}
         assert_auto::<Target>();
     }
 }

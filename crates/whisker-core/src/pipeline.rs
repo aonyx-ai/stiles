@@ -325,12 +325,13 @@ mod tests {
             )
             .expect("one covering provider should be enough");
 
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].message(), "covered");
+        let messages: Vec<&str> = diagnostics.iter().map(Diagnostic::message).collect();
+        assert_eq!(messages, ["covered"]);
     }
 
-    #[test]
-    fn run_on_source_with_declining_provider_returns_uncovered_file() {
+    /// Runs a pipeline over `fn main() {}` with the given providers and
+    /// returns the file they left uncovered
+    fn uncovered(providers: &[&dyn DecorationProvider]) -> UncoveredFile {
         let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
         let mut pipeline = Pipeline::builder()
             .language(Language::Rust)
@@ -342,18 +343,32 @@ mod tests {
             .run_on_source(
                 "fn main() {}",
                 Path::new("test.rs"),
-                &[&Declining as &dyn DecorationProvider],
+                providers,
                 &mut Vec::new(),
             )
-            .expect_err("a declining provider should not cover the file");
+            .expect_err("the providers should not cover the file");
 
         let RunPipelineError::Uncovered { source: uncovered } = error else {
             panic!("should be an UncoveredFile, got {error:?}");
         };
+        uncovered
+    }
+
+    #[test]
+    fn run_on_source_with_declining_provider_names_the_file() {
+        let uncovered = uncovered(&[&Declining]);
+
         assert_eq!(uncovered.file(), Path::new("test.rs"));
-        assert_eq!(uncovered.gaps().len(), 1);
-        assert_eq!(uncovered.gaps()[0].0, ProviderName("declining"));
-        assert_eq!(uncovered.gaps()[0].1, CoverageGap::StaleSource);
+    }
+
+    #[test]
+    fn run_on_source_with_declining_provider_returns_its_gap() {
+        let uncovered = uncovered(&[&Declining]);
+
+        assert_eq!(
+            uncovered.gaps(),
+            [(ProviderName("declining"), CoverageGap::StaleSource)]
+        );
     }
 
     #[test]
@@ -423,33 +438,25 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].message(), "found function");
+        let messages: Vec<&str> = diagnostics.iter().map(Diagnostic::message).collect();
+        assert_eq!(messages, ["found function"]);
     }
 
     #[test]
-    fn run_on_source_with_no_providers_returns_uncovered_file() {
-        let ts_lang: tree_sitter::Language = tree_sitter_rust::LANGUAGE.into();
-        let mut pipeline = Pipeline::builder()
-            .language(Language::Rust)
-            .grammar(&ts_lang)
-            .build()
-            .unwrap();
+    fn run_on_source_with_no_providers_reports_no_providers_configured() {
+        let uncovered = uncovered(&[]);
 
-        let error = pipeline
-            .run_on_source("fn main() {}", Path::new("test.rs"), &[], &mut Vec::new())
-            .expect_err("no providers means nothing can be analyzed");
-
-        let RunPipelineError::Uncovered { source: uncovered } = error else {
-            panic!("should be an UncoveredFile, got {error:?}");
-        };
-        assert!(uncovered.gaps().is_empty());
-        assert!(
-            uncovered
-                .to_string()
-                .contains("no decoration providers were configured"),
-            "unexpected message: {uncovered}"
+        assert_eq!(
+            uncovered.to_string(),
+            "no decoration providers were configured, so no file can be analyzed"
         );
+    }
+
+    #[test]
+    fn run_on_source_with_no_providers_returns_no_gaps() {
+        let uncovered = uncovered(&[]);
+
+        assert!(uncovered.gaps().is_empty());
     }
 
     /// A pass that panics ends the file with an error that says where
@@ -504,10 +511,11 @@ mod tests {
         let RunPipelineError::LintsFailed { source } = error else {
             panic!("should be a failed walk, got {error:?}");
         };
-        let message = source.to_string();
-        assert!(message.contains("function_item"), "{message}");
-        assert!(message.contains("byte 0 of test.rs"), "{message}");
-        assert!(message.contains("no functions allowed"), "{message}");
+        assert_eq!(
+            source.to_string(),
+            "a lint pass panicked while checking a function_item at byte 0 of test.rs: no functions \
+             allowed"
+        );
     }
 
     #[test]
@@ -532,8 +540,8 @@ mod tests {
             )
             .expect("both providers cover the file");
 
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].message(), "first");
+        let messages: Vec<&str> = diagnostics.iter().map(Diagnostic::message).collect();
+        assert_eq!(messages, ["first"]);
     }
 
     #[test]

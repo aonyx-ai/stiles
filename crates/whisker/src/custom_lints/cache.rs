@@ -253,30 +253,36 @@ mod tests {
         assert_eq!(first, second);
     }
 
+    /// Returns the checkout directories of one remote at the commits
+    /// `aaa...` and `bbb...`
+    fn checkouts_of_two_commits() -> (PathBuf, PathBuf) {
+        let at = |digit: &str| {
+            checkout_directory_in(
+                Path::new(ROOT),
+                &GitLintSource::builder()
+                    .url(
+                        GitUrl::new("https://example.com/rules")
+                            .expect("the remote should be accepted"),
+                    )
+                    .rev(GitRev::new(digit.repeat(40)).expect("the revision should be accepted"))
+                    .build(),
+            )
+        };
+
+        (at("a"), at("b"))
+    }
+
     #[test]
     fn checkout_directory_in_keeps_one_remote_in_one_place() {
-        let first = checkout_directory_in(
-            Path::new(ROOT),
-            &GitLintSource::builder()
-                .url(
-                    GitUrl::new("https://example.com/rules")
-                        .expect("the remote should be accepted"),
-                )
-                .rev(GitRev::new("a".repeat(40)).expect("the revision should be accepted"))
-                .build(),
-        );
-        let second = checkout_directory_in(
-            Path::new(ROOT),
-            &GitLintSource::builder()
-                .url(
-                    GitUrl::new("https://example.com/rules")
-                        .expect("the remote should be accepted"),
-                )
-                .rev(GitRev::new("b".repeat(40)).expect("the revision should be accepted"))
-                .build(),
-        );
+        let (first, second) = checkouts_of_two_commits();
 
         assert_eq!(first.parent(), second.parent());
+    }
+
+    #[test]
+    fn checkout_directory_in_keeps_two_commits_apart() {
+        let (first, second) = checkouts_of_two_commits();
+
         assert_ne!(first, second);
     }
 
@@ -342,6 +348,15 @@ mod tests {
         let checkout = checkout_directory_in(Path::new(ROOT), &source);
 
         assert!(!prebuilt.starts_with(&checkout), "{prebuilt:?}");
+    }
+
+    #[test]
+    fn prebuilt_directory_in_does_not_hold_the_checkout() {
+        let source = source("https://example.com/rules");
+
+        let prebuilt = prebuilt_directory_in(Path::new(ROOT), &source, &tag(0, TARGET));
+        let checkout = checkout_directory_in(Path::new(ROOT), &source);
+
         assert!(!checkout.starts_with(&prebuilt), "{checkout:?}");
     }
 
@@ -410,11 +425,17 @@ mod tests {
     }
 
     #[test]
+    fn staging_directory_differs_from_the_destination() {
+        let staging = staging_directory(Path::new("/cache/git/rules-0/abc"));
+
+        assert_ne!(staging, PathBuf::from("/cache/git/rules-0/abc"));
+    }
+
+    #[test]
     fn staging_directory_is_a_sibling_of_the_destination() {
         let staging = staging_directory(Path::new("/cache/git/rules-0/abc"));
 
         assert_eq!(staging.parent(), Some(Path::new("/cache/git/rules-0")));
-        assert_ne!(staging, PathBuf::from("/cache/git/rules-0/abc"));
     }
 
     #[test]

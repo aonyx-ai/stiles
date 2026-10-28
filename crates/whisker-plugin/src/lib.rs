@@ -84,14 +84,27 @@ mod tests {
     }
 
     #[test]
-    fn language_fingerprint_covers_every_language() {
-        let rust_alone = stable_fingerprint(&[whisker_rust::LANGUAGE_FINGERPRINT]);
+    fn language_fingerprint_covers_rust() {
         let typescript_alone = stable_fingerprint(&[whisker_typescript::LANGUAGE_FINGERPRINT]);
 
         let joined = LANGUAGE_FINGERPRINT;
 
-        assert_ne!(joined, rust_alone);
         assert_ne!(joined, typescript_alone);
+    }
+
+    #[test]
+    fn language_fingerprint_covers_typescript() {
+        let rust_alone = stable_fingerprint(&[whisker_rust::LANGUAGE_FINGERPRINT]);
+
+        let joined = LANGUAGE_FINGERPRINT;
+
+        assert_ne!(joined, rust_alone);
+    }
+
+    #[test]
+    fn language_fingerprint_is_not_zero() {
+        let joined = LANGUAGE_FINGERPRINT;
+
         assert_ne!(joined, 0);
     }
 }

@@ -824,9 +824,11 @@ mod tests {
         let error = refuse_shared_rules(&lints).expect_err("should refuse");
 
         let message = error.to_string();
-        assert!(message.contains("`lint.b`"), "{message}");
-        assert!(message.contains("first.so"), "{message}");
-        assert!(message.contains("second.so"), "{message}");
+        let missing: Vec<&str> = ["`lint.b`", "first.so", "second.so"]
+            .into_iter()
+            .filter(|part| !message.contains(part))
+            .collect();
+        assert_eq!(missing, Vec::<&str>::new(), "{message}");
     }
 
     #[test]
@@ -856,26 +858,56 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
+    fn trait_send_custom_lints() {
         fn assert_send<T: Send>() {}
         assert_send::<CustomLints>();
+    }
+
+    #[test]
+    fn trait_send_declared_rule() {
+        fn assert_send<T: Send>() {}
         assert_send::<DeclaredRule>();
+    }
+
+    #[test]
+    fn trait_send_loaded_lint() {
+        fn assert_send<T: Send>() {}
         assert_send::<LoadedLint>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_sync_custom_lints() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<CustomLints>();
+    }
+
+    #[test]
+    fn trait_sync_declared_rule() {
+        fn assert_sync<T: Sync>() {}
         assert_sync::<DeclaredRule>();
+    }
+
+    #[test]
+    fn trait_sync_loaded_lint() {
+        fn assert_sync<T: Sync>() {}
         assert_sync::<LoadedLint>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_unpin_custom_lints() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<CustomLints>();
+    }
+
+    #[test]
+    fn trait_unpin_declared_rule() {
+        fn assert_unpin<T: Unpin>() {}
         assert_unpin::<DeclaredRule>();
+    }
+
+    #[test]
+    fn trait_unpin_loaded_lint() {
+        fn assert_unpin<T: Unpin>() {}
         assert_unpin::<LoadedLint>();
     }
 }

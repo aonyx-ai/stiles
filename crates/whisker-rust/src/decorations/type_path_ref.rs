@@ -94,14 +94,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn accessors_return_the_constructed_parts() {
+    fn krate_returns_the_crate() {
         let path = TypePathRef::new("core", &["io", "error"], "Error");
 
-        let (krate, modules, name) = (path.krate(), path.modules(), path.name());
+        assert_eq!(path.krate(), "core");
+    }
 
-        assert_eq!(krate, "core");
-        assert_eq!(modules, &["io", "error"]);
-        assert_eq!(name, "Error");
+    #[test]
+    fn modules_returns_the_modules() {
+        let path = TypePathRef::new("core", &["io", "error"], "Error");
+
+        assert_eq!(path.modules(), &["io", "error"]);
+    }
+
+    #[test]
+    fn name_returns_the_name() {
+        let path = TypePathRef::new("core", &["io", "error"], "Error");
+
+        assert_eq!(path.name(), "Error");
     }
 
     #[test]

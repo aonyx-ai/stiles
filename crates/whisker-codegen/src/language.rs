@@ -118,7 +118,6 @@ mod tests {
         let (code, _) = written("Go", &[GRAMMAR]);
 
         assert!(code.contains("pub trait GoLintPass: Send + Sync {"));
-        assert!(code.contains("fn check_comment("));
     }
 
     #[test]
@@ -127,8 +126,11 @@ mod tests {
 
         let (code, _) = written("Script", &[GRAMMAR, jsx]);
 
-        assert!(code.contains("fn check_comment("));
-        assert!(code.contains("fn check_jsx_element("));
+        let missing: Vec<&str> = ["fn check_comment(", "fn check_jsx_element("]
+            .into_iter()
+            .filter(|method| !code.contains(method))
+            .collect();
+        assert_eq!(missing, Vec::<&str>::new());
     }
 
     #[test]
@@ -142,11 +144,24 @@ mod tests {
     }
 
     #[test]
+    fn write_language_writes_a_fingerprint_constant() {
+        let (_, fingerprint) = written("Go", &[GRAMMAR]);
+
+        assert!(fingerprint.starts_with("pub const VISITOR_FINGERPRINT: u64 = 0x"));
+    }
+
+    #[test]
     fn write_language_writes_a_fingerprint_of_the_code() {
         let (_, one) = written("Go", &[GRAMMAR]);
         let (_, other) = written("Zig", &[GRAMMAR]);
 
-        assert!(one.starts_with("pub const VISITOR_FINGERPRINT: u64 = 0x"));
         assert_ne!(one, other);
+    }
+
+    #[test]
+    fn write_language_writes_a_method_per_node() {
+        let (code, _) = written("Go", &[GRAMMAR]);
+
+        assert!(code.contains("fn check_comment("));
     }
 }

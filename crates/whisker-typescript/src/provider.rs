@@ -422,29 +422,74 @@ mod tests {
     use super::*;
 
     #[test]
-    fn trait_send() {
+    fn trait_send_config_host() {
         fn assert_send<T: Send>() {}
-        assert_send::<TypeScriptDecorationProvider>();
-        assert_send::<Target>();
-        assert_send::<Targets>();
         assert_send::<ConfigHost>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_send_target() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Target>();
+    }
+
+    #[test]
+    fn trait_send_targets() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Targets>();
+    }
+
+    #[test]
+    fn trait_send_typescript_decoration_provider() {
+        fn assert_send<T: Send>() {}
+        assert_send::<TypeScriptDecorationProvider>();
+    }
+
+    #[test]
+    fn trait_sync_config_host() {
         fn assert_sync<T: Sync>() {}
-        assert_sync::<TypeScriptDecorationProvider>();
-        assert_sync::<Target>();
-        assert_sync::<Targets>();
         assert_sync::<ConfigHost>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_sync_target() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Target>();
+    }
+
+    #[test]
+    fn trait_sync_targets() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Targets>();
+    }
+
+    #[test]
+    fn trait_sync_typescript_decoration_provider() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<TypeScriptDecorationProvider>();
+    }
+
+    #[test]
+    fn trait_unpin_config_host() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<ConfigHost>();
+    }
+
+    #[test]
+    fn trait_unpin_target() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Target>();
+    }
+
+    #[test]
+    fn trait_unpin_targets() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Targets>();
+    }
+
+    #[test]
+    fn trait_unpin_typescript_decoration_provider() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<TypeScriptDecorationProvider>();
-        assert_unpin::<Target>();
-        assert_unpin::<Targets>();
-        assert_unpin::<ConfigHost>();
     }
 }

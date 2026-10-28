@@ -119,8 +119,10 @@ mod tests {
 
         let message = gap.to_string();
 
-        assert!(message.contains("/ws"), "unexpected message: {message}");
-        assert!(message.contains("exclude"), "unexpected message: {message}");
+        assert_eq!(
+            message,
+            "the toolchain loaded at /ws was configured to exclude this file"
+        );
     }
 
     #[test]
@@ -141,10 +143,9 @@ mod tests {
 
         let message = gap.to_string();
 
-        assert!(message.contains("/ws"), "unexpected message: {message}");
-        assert!(
-            message.contains("the root the provider loaded"),
-            "unexpected message: {message}"
+        assert_eq!(
+            message,
+            "the file is outside /ws, the root the provider loaded"
         );
     }
 
@@ -163,27 +164,41 @@ mod tests {
 
         let message = gap.to_string();
 
-        assert!(message.contains("/ws"), "unexpected message: {message}");
-        assert!(
-            message.contains("nothing the toolchain loaded reaches it"),
-            "unexpected message: {message}"
+        assert_eq!(
+            message,
+            "the file is inside /ws, but nothing the toolchain loaded reaches it"
         );
     }
 
-    #[test]
-    fn display_writes_a_single_line() {
-        let gaps = [
+    /// Returns one gap of each variant
+    fn every_gap() -> [CoverageGap; 5] {
+        [
             CoverageGap::OutsideRoot { root: root() },
             CoverageGap::Unreachable { root: root() },
             CoverageGap::ExcludedByToolchain { root: root() },
             CoverageGap::StaleSource,
             CoverageGap::NoProject,
-        ];
+        ]
+    }
+
+    #[test]
+    fn display_writes_no_line_break() {
+        let gaps = every_gap();
 
         for gap in &gaps {
             let message = gap.to_string();
 
             assert!(!message.contains('\n'), "gap spans lines: {message}");
+        }
+    }
+
+    #[test]
+    fn display_writes_no_surrounding_whitespace() {
+        let gaps = every_gap();
+
+        for gap in &gaps {
+            let message = gap.to_string();
+
             assert_eq!(message.trim(), message, "gap is padded: {message}");
         }
     }

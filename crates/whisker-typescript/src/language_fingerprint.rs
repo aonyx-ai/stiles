@@ -57,6 +57,12 @@ mod tests {
         let fingerprint = LANGUAGE_FINGERPRINT;
 
         assert_ne!(fingerprint, visitor_alone);
+    }
+
+    #[test]
+    fn language_fingerprint_is_not_zero() {
+        let fingerprint = LANGUAGE_FINGERPRINT;
+
         assert_ne!(fingerprint, 0);
     }
 

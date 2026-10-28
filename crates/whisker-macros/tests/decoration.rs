@@ -46,9 +46,8 @@ fn many_cardinality_reads_back_every_instance_in_order() {
 
     let found = tree.root_node().get::<TraitImpl>();
 
-    assert_eq!(found.len(), 2);
-    assert_eq!(found[0].0.as_str(), "Debug");
-    assert_eq!(found[1].0.as_str(), "Clone");
+    let names: Vec<&str> = found.iter().map(|found| found.0.as_str()).collect();
+    assert_eq!(names, ["Debug", "Clone"]);
 }
 
 #[test]
@@ -81,28 +80,38 @@ fn one_cardinality_when_absent_reads_back_none() {
     assert!(found.is_none());
 }
 
-#[test]
-fn decorations_are_keyed_per_node() {
-    let source = "fn main() {}";
-    let mut tree = parse(source);
+/// Returns a tree whose root, and none of its children, holds a
+/// `ResolvedType`
+fn decorated_root() -> DecoratedTree {
+    let mut tree = parse("fn main() {}");
     let root_id = tree.root_node().id();
     tree.decorations_mut()
         .insert(root_id, ResolvedType(Str::new("root")));
+    tree
+}
+
+#[test]
+fn decorations_are_keyed_per_node() {
+    let tree = decorated_root();
 
     let child = tree
         .root_node()
         .named_child(0)
         .expect("should have a function item");
 
-    assert_eq!(
-        tree.root_node()
-            .get::<ResolvedType>()
-            .expect("root should be decorated")
-            .0
-            .as_str(),
-        "root"
-    );
     assert!(child.get::<ResolvedType>().is_none());
+}
+
+#[test]
+fn decorations_are_read_back_on_their_node() {
+    let tree = decorated_root();
+
+    let found = tree
+        .root_node()
+        .get::<ResolvedType>()
+        .expect("root should be decorated");
+
+    assert_eq!(found.0.as_str(), "root");
 }
 
 #[test]
@@ -117,6 +126,20 @@ fn lookup_can_be_called_through_the_trait() {
     assert_eq!(found.expect("should be present").0.as_str(), "u32");
 }
 
+/// Decorates the root with a type named `Local` that only this function
+/// sees, and returns the value read back
+fn decorate_with_a_local_type(tree: &mut DecoratedTree) -> u64 {
+    #[stabby::stabby]
+    #[derive(Decoration)]
+    #[decoration(cardinality = "one")]
+    struct Local(u64);
+
+    let id = tree.root_node().id();
+    tree.decorations_mut().insert(id, Local(7));
+
+    tree.root_node().get::<Local>().expect("should read back").0
+}
+
 /// Two types of one name in two function bodies must stay apart
 ///
 /// `module_path!` cannot see a function body, so a key built from the
@@ -124,18 +147,6 @@ fn lookup_can_be_called_through_the_trait() {
 /// would hand a lookup of one the other's memory.
 #[test]
 fn same_named_types_in_two_functions_do_not_collide() {
-    fn decorate(tree: &mut DecoratedTree) -> u64 {
-        #[stabby::stabby]
-        #[derive(Decoration)]
-        #[decoration(cardinality = "one")]
-        struct Local(u64);
-
-        let id = tree.root_node().id();
-        tree.decorations_mut().insert(id, Local(7));
-
-        tree.root_node().get::<Local>().expect("should read back").0
-    }
-
     #[stabby::stabby]
     #[derive(Decoration)]
     #[decoration(cardinality = "one")]
@@ -143,8 +154,16 @@ fn same_named_types_in_two_functions_do_not_collide() {
 
     let mut tree = parse("fn main() {}");
 
-    let decorated = decorate(&mut tree);
+    decorate_with_a_local_type(&mut tree);
+
+    assert!(tree.root_node().get::<Local>().is_none());
+}
+
+#[test]
+fn same_named_types_in_two_functions_read_back_their_own_value() {
+    let mut tree = parse("fn main() {}");
+
+    let decorated = decorate_with_a_local_type(&mut tree);
 
     assert_eq!(decorated, 7);
-    assert!(tree.root_node().get::<Local>().is_none());
 }

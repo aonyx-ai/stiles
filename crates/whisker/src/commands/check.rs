@@ -349,10 +349,9 @@ mod tests {
         remedies.record(&first);
         remedies.record(&second);
 
-        assert_eq!(remedies.remedies.len(), 1);
         assert_eq!(
-            remedies.remedies[0],
-            CoverageGap::Unreachable { root: root() }.help()
+            remedies.remedies,
+            [CoverageGap::Unreachable { root: root() }.help()]
         );
     }
 
@@ -372,8 +371,13 @@ mod tests {
 
         remedies.record(&uncovered);
 
-        assert_eq!(remedies.remedies.len(), 2);
-        assert_eq!(remedies.remedies[1], CoverageGap::StaleSource.help());
+        assert_eq!(
+            remedies.remedies,
+            [
+                CoverageGap::Unreachable { root: root() }.help(),
+                CoverageGap::StaleSource.help(),
+            ]
+        );
     }
 
     #[test]

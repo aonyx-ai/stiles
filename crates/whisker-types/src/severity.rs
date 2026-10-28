@@ -42,10 +42,18 @@ mod tests {
     }
 
     #[test]
-    fn ordering_error_is_greatest() {
+    fn ordering_puts_error_above_warn() {
         assert!(Severity::Error > Severity::Warn);
-        assert!(Severity::Warn > Severity::Info);
+    }
+
+    #[test]
+    fn ordering_puts_info_above_help() {
         assert!(Severity::Info > Severity::Help);
+    }
+
+    #[test]
+    fn ordering_puts_warn_above_info() {
+        assert!(Severity::Warn > Severity::Info);
     }
 
     mod prop {

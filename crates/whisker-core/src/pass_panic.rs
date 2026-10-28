@@ -81,17 +81,34 @@ mod tests {
         Panic::catch(|| -> () { panic!("no functions") }).expect_err("should catch")
     }
 
-    #[test]
-    fn accessors_return_each_part() {
-        let error = PassPanic::builder()
+    /// Returns the error of a panic at bytes 3 to 9 of `src/lib.rs`
+    fn pass_panic() -> PassPanic {
+        PassPanic::builder()
             .kind("function_item")
             .span(Span::new("src/lib.rs", 3, 9))
             .panic(panic())
-            .build();
+            .build()
+    }
+
+    #[test]
+    fn kind_returns_the_kind() {
+        let error = pass_panic();
 
         assert_eq!(error.kind(), "function_item");
-        assert_eq!(error.span().start(), 3);
+    }
+
+    #[test]
+    fn panic_returns_the_panic() {
+        let error = pass_panic();
+
         assert_eq!(error.panic().message(), "no functions");
+    }
+
+    #[test]
+    fn span_returns_the_span() {
+        let error = pass_panic();
+
+        assert_eq!(error.span(), &Span::new("src/lib.rs", 3, 9));
     }
 
     #[test]

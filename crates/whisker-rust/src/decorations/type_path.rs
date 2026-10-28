@@ -152,11 +152,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn accessors_return_each_part() {
+    fn krate_returns_the_crate() {
         let path = TypePath::new("syn", ["error"], "Error");
 
         assert_eq!(path.krate(), "syn");
-        assert_eq!(path.modules().collect::<Vec<_>>(), vec!["error"]);
+    }
+
+    #[test]
+    fn modules_returns_each_module_in_order() {
+        let path = TypePath::new("syn", ["error"], "Error");
+
+        let modules: Vec<&str> = path.modules().collect();
+
+        assert_eq!(modules, vec!["error"]);
+    }
+
+    #[test]
+    fn name_returns_the_name() {
+        let path = TypePath::new("syn", ["error"], "Error");
+
         assert_eq!(path.name(), "Error");
     }
 
@@ -226,7 +240,16 @@ mod tests {
         let found = paths.contains(&TypePath::new("syn", ["error"], "Error"));
 
         assert!(found);
-        assert!(!paths.contains(&TypePath::new("syn", [] as [&str; 0], "Error")));
+    }
+
+    #[test]
+    fn hash_with_other_modules_misses() {
+        let mut paths = HashSet::new();
+        paths.insert(TypePath::new("syn", ["error"], "Error"));
+
+        let found = paths.contains(&TypePath::new("syn", [] as [&str; 0], "Error"));
+
+        assert!(!found);
     }
 
     #[test]

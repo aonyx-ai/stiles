@@ -67,12 +67,19 @@ mod tests {
     }
 
     #[test]
-    fn accessors_return_correct_values() {
+    fn message_returns_the_message() {
+        let span = Span::new(PathBuf::from("test.rs"), 0, 10);
+        let location = Location::new(span, "defined here".into());
+
+        assert_eq!(location.message(), "defined here");
+    }
+
+    #[test]
+    fn span_returns_the_span() {
         let span = Span::new(PathBuf::from("test.rs"), 0, 10);
         let location = Location::new(span.clone(), "defined here".into());
 
         assert_eq!(location.span(), &span);
-        assert_eq!(location.message(), "defined here");
     }
 
     mod prop {

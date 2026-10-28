@@ -126,32 +126,59 @@ mod tests {
     }
 
     #[test]
-    fn host_reports_the_baked_in_constants() {
+    fn host_reports_the_baked_in_abi_version() {
         let host = AbiIdentity::host();
 
         assert_eq!(host.abi_version, plugin::ABI_VERSION);
-        assert_eq!(host.types_fingerprint, plugin::TYPES_FINGERPRINT);
+    }
+
+    #[test]
+    fn host_reports_the_baked_in_language_fingerprint() {
+        let host = AbiIdentity::host();
+
         assert_eq!(host.language_fingerprint, plugin::LANGUAGE_FINGERPRINT);
     }
 
     #[test]
-    fn trait_send() {
+    fn host_reports_the_baked_in_types_fingerprint() {
+        let host = AbiIdentity::host();
+
+        assert_eq!(host.types_fingerprint, plugin::TYPES_FINGERPRINT);
+    }
+
+    #[test]
+    fn trait_send_abi_identity() {
         fn assert_send<T: Send>() {}
         assert_send::<AbiIdentity>();
+    }
+
+    #[test]
+    fn trait_send_handshake_mismatch() {
+        fn assert_send<T: Send>() {}
         assert_send::<HandshakeMismatch>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_sync_abi_identity() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<AbiIdentity>();
+    }
+
+    #[test]
+    fn trait_sync_handshake_mismatch() {
+        fn assert_sync<T: Sync>() {}
         assert_sync::<HandshakeMismatch>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_unpin_abi_identity() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<AbiIdentity>();
+    }
+
+    #[test]
+    fn trait_unpin_handshake_mismatch() {
+        fn assert_unpin<T: Unpin>() {}
         assert_unpin::<HandshakeMismatch>();
     }
 
@@ -232,6 +259,15 @@ mod tests {
         let error = validate(&identity(), &plugin).expect_err("should mismatch");
 
         assert_eq!(error, HandshakeMismatch::LanguageFingerprint);
+    }
+
+    #[test]
+    fn validate_with_a_differing_language_fingerprint_names_the_language_crate() {
+        let mut plugin = identity();
+        plugin.language_fingerprint = 0xcc;
+
+        let error = validate(&identity(), &plugin).expect_err("should mismatch");
+
         assert!(error.to_string().contains("whisker-rust"));
     }
 
@@ -243,6 +279,15 @@ mod tests {
         let error = validate(&identity(), &plugin).expect_err("should mismatch");
 
         assert_eq!(error, HandshakeMismatch::TypesFingerprint);
+    }
+
+    #[test]
+    fn validate_with_a_differing_types_fingerprint_names_the_types_crate() {
+        let mut plugin = identity();
+        plugin.types_fingerprint = 0xcc;
+
+        let error = validate(&identity(), &plugin).expect_err("should mismatch");
+
         assert!(error.to_string().contains("whisker-types"));
     }
 }

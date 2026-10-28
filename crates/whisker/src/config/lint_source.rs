@@ -105,11 +105,7 @@ mod tests {
 
         let displayed = source.to_string();
 
-        assert!(
-            displayed.contains("https://example.com/rules"),
-            "{displayed}"
-        );
-        assert!(displayed.contains(REV), "{displayed}");
+        assert_eq!(displayed, format!("https://example.com/rules at {REV}"));
     }
 
     #[test]
@@ -134,23 +130,38 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
+    fn trait_send_git_lint_source() {
         fn assert_send<T: Send>() {}
-        assert_send::<LintSource>();
         assert_send::<GitLintSource>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_send_lint_source() {
+        fn assert_send<T: Send>() {}
+        assert_send::<LintSource>();
+    }
+
+    #[test]
+    fn trait_sync_git_lint_source() {
         fn assert_sync<T: Sync>() {}
-        assert_sync::<LintSource>();
         assert_sync::<GitLintSource>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_sync_lint_source() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<LintSource>();
+    }
+
+    #[test]
+    fn trait_unpin_git_lint_source() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<GitLintSource>();
+    }
+
+    #[test]
+    fn trait_unpin_lint_source() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<LintSource>();
-        assert_unpin::<GitLintSource>();
     }
 }
