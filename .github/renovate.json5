@@ -1,6 +1,10 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: ["github>aonyx-ai/renovate-config"],
+  // `bundle-tsrs` generates crates/stiles-tsrs from the tsrs submodule, and
+  // its manifest copies the exact versions that tsrs pins. Those move with
+  // the submodule, so Renovate leaves the generated crate alone.
+  ignorePaths: ["crates/stiles-tsrs/**"],
   packageRules: [
     {
       // A bump of the tsrs submodule changes the checker, and it fails
