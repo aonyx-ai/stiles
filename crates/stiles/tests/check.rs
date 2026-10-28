@@ -1,0 +1,857 @@
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+use assert_cmd::prelude::*;
+use predicates::prelude::*;
+use tempfile::TempDir;
+
+#[cfg(unix)]
+#[path = "support/unreadable.rs"]
+mod unreadable;
+
+#[cfg(unix)]
+use self::unreadable::make_unreadable;
+
+/// Source that trips none of the lints the CLI runs
+const CLEAN_SOURCE: &str = "pub fn answer() -> u32 {\n    42\n}\n";
+
+/// An ignore file the walker cannot parse
+///
+/// An unclosed alternate group fails the walk on every platform. The other
+/// trigger, an unreadable directory, does not exist on Windows.
+const UNPARSABLE_IGNORE_FILE: &str = "{a,b\n";
+
+/// A manifest for a standalone package with no dependencies
+const MANIFEST: &str = "[package]\nname = \"target\"\nversion = \"0.1.0\"\nedition = \"2024\"\n";
+
+/// Source that trips `custom.no-todo` and nothing else
+///
+/// The rule is syntactic, so it fires without semantic decorations.
+const WARNING_SOURCE: &str = "pub fn later() {\n    todo!()\n}\n";
+
+/// Rust source that is not valid UTF-8
+///
+/// The trailing `0xff` makes `read_to_string` fail on this file.
+const NOT_UTF8: &[u8] = b"fn main() {}\n\xff\n";
+
+/// Creates a minimal Cargo package whose `src/lib.rs` holds `source`
+///
+/// A real package is the only target rust-analyzer can load. A loose `.rs`
+/// file would let a test pass without semantic analysis.
+fn package(source: &str) -> TempDir {
+    let directory = tempfile::tempdir().expect("temporary directory should be created");
+
+    std::fs::write(directory.path().join("Cargo.toml"), MANIFEST)
+        .expect("manifest should be written");
+    std::fs::create_dir(directory.path().join("src")).expect("src should be created");
+    std::fs::write(directory.path().join("src").join("lib.rs"), source)
+        .expect("source should be written");
+
+    directory
+}
+
+/// Configures a package to run the example plugin's rule
+///
+/// Stiles links no rules, so a fixture that expects a diagnostic has to
+/// name one. Pointing at a plugin in this repository rather than at a
+/// purpose-built stub means the test exercises the whole path a real
+/// project takes: stiles builds the package, loads the library, and
+/// completes the handshake before a single file is walked.
+fn with_no_todo(directory: TempDir) -> TempDir {
+    write_lint_config(directory.path(), &example_lint());
+
+    directory
+}
+
+/// Returns the example plugin this repository ships
+fn example_lint() -> PathBuf {
+    let lint = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/custom_lint");
+
+    std::fs::canonicalize(lint).expect("the example plugin should be in this repository")
+}
+
+/// Returns the probe plugin stiles-rust's provider tests share
+///
+/// The probes read decorations, so they are what a fixture needs when the
+/// diagnostic under test has to survive real semantic analysis.
+fn decoration_probes() -> PathBuf {
+    let lint = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../stiles-rust/tests/fixtures/lints/decoration_probes");
+
+    std::fs::canonicalize(lint).expect("the probe plugin should be in this repository")
+}
+
+/// Writes a configuration naming one lint directory by absolute path
+///
+/// A fixture that expects a diagnostic needs one, because stiles links
+/// no rules of its own. A fixture inside this checkout needs one for a
+/// second reason. Its own file makes the fixture the project, so the
+/// search stops there instead of climbing to this repository and running
+/// whatever rules stiles names today.
+///
+/// The path goes through a TOML value rather than into quotes of our own,
+/// so a checkout under a directory holding a quote still writes a
+/// configuration stiles can read.
+fn write_lint_config(directory: &Path, lint: &Path) {
+    let lint = lint.to_str().expect("the lint path should be UTF-8");
+    let lint = toml::Value::from(lint);
+
+    write_config(directory, &format!("[[lints]]\npath = {lint}\n"));
+}
+
+/// Writes `contents` to the configuration file of the project at `directory`
+fn write_config(directory: &Path, contents: &str) {
+    let config = directory.join(".config");
+    std::fs::create_dir_all(&config).expect("the config directory should be created");
+    std::fs::write(config.join("stiles.toml"), contents)
+        .expect("the configuration should be written");
+}
+
+/// Creates a package whose `src` holds Rust files no module declares
+///
+/// An orphan is a file the walk finds but no crate reaches, which is the
+/// shape the coverage errors describe. The orphans live in a temporary
+/// package because a checked-in orphan would make `stiles check .` fail
+/// for everyone.
+fn package_with_orphans(names: &[&str]) -> TempDir {
+    let directory = package(CLEAN_SOURCE);
+
+    for name in names {
+        std::fs::write(
+            directory.path().join("src").join(format!("{name}.rs")),
+            CLEAN_SOURCE,
+        )
+        .expect("orphan source should be written");
+    }
+
+    directory
+}
+
+/// Creates a package whose `src` holds two sources that are not UTF-8
+///
+/// The crate root beside them is valid UTF-8 and trips no lints, so only
+/// the two siblings fail. Two failing files let the error count separate
+/// the two `--keep-going` modes. Discovery sorts, so a stopped run always
+/// names `broken_first.rs`.
+fn package_with_unreadable_sources() -> TempDir {
+    let directory = package(CLEAN_SOURCE);
+
+    for name in ["broken_first", "broken_second"] {
+        std::fs::write(
+            directory.path().join("src").join(format!("{name}.rs")),
+            NOT_UTF8,
+        )
+        .expect("unreadable source should be written");
+    }
+
+    directory
+}
+
+fn stiles() -> Command {
+    Command::cargo_bin("stiles").expect("stiles binary should exist")
+}
+
+/// Returns the fixture workspace that stiles-rust's own tests analyze
+///
+/// The fixture is a real Cargo package with a real crate graph, so stiles
+/// can decorate the files under its `src` directory.
+fn sample_project() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../stiles-rust/tests/fixtures/sample_project")
+}
+
+/// Writes a Cargo project holding one analyzable file and one unreadable one
+///
+/// The fixture carries its own manifest because stiles loads the workspace
+/// around the path it is given. `CARGO_TARGET_TMPDIR` is a scratch
+/// directory, and nothing guarantees that a Cargo project sits above it.
+///
+/// `src/lib.rs` trips `fixture.wildcard-match-arm` and produces a
+/// diagnostic. Stiles cannot read `src/not_utf8.rs`. Discovery sorts, so
+/// `src/lib.rs` comes first, and a run without `--keep-going` collects the
+/// diagnostic before `src/not_utf8.rs` stops the walk.
+///
+/// Each caller passes its own `name`, so two tests that run at once never
+/// write the same directory.
+fn mixed_project(name: &str) -> PathBuf {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    std::fs::create_dir_all(root.join("src")).expect("should create the fixture directories");
+    write_lint_config(&root, &decoration_probes());
+    std::fs::write(
+        root.join("Cargo.toml"),
+        "[workspace]\n\n[package]\nname = \"mixed_project\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .expect("should write the fixture manifest");
+    std::fs::write(
+        root.join("src/lib.rs"),
+        "pub enum Color {\n    Red,\n    Green,\n}\n\npub fn match_on_enum(color: Color) {\n    match color {\n        Color::Red => {}\n        _ => {}\n    }\n}\n",
+    )
+    .expect("should write the fixture crate root");
+    std::fs::write(root.join("src/not_utf8.rs"), [0xff, 0xfe, 0x00])
+        .expect("should write the fixture file that is not UTF-8");
+
+    root
+}
+
+/// Counts the failing files stiles reported on stderr
+///
+/// The count separates the two `--keep-going` modes: an aborted run reports
+/// one failing file, a run that continues reports every one.
+fn error_count(stderr: &str) -> usize {
+    stderr.matches("error: ").count()
+}
+
+/// Counts how many times stiles printed the remedy for an unreachable file
+///
+/// Stiles prints the remedy once per run, not once per file; the count
+/// pins that limit. A remedy is a message, which stiles writes to stdout.
+fn unreachable_help_count(stdout: &str) -> usize {
+    stdout
+        .matches("help: reference the file from a source the toolchain already loads")
+        .count()
+}
+
+#[test]
+fn check_directory_without_sources_fails() {
+    let directory = tempfile::tempdir().expect("temporary directory should be created");
+
+    stiles()
+        .arg("check")
+        .arg(directory.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("analyzed no files"));
+}
+
+/// Pins that a run started inside the project reads the ignore patterns
+/// from the project root
+///
+/// The configuration unit tests pin that the search climbs to the project
+/// root. This pins that the CLI gets the benefit, which is what a person
+/// relies on when they check the directory they happen to be standing in.
+///
+/// The pattern names the only file in the package, so the two outcomes
+/// cannot be confused. A run that reads the configuration excludes the
+/// file and reports that it analyzed nothing. A run that misses the
+/// configuration analyzes the file and succeeds.
+#[test]
+fn check_from_a_subdirectory_applies_the_project_ignore_patterns() {
+    let package = package(CLEAN_SOURCE);
+    write_config(package.path(), "ignore = [\"src/lib.rs\"]\n");
+
+    stiles()
+        .args(["check", "."])
+        .current_dir(package.path().join("src"))
+        .assert()
+        .code(1)
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("analyzed no files"));
+}
+
+/// Pins that a run started inside the project loads the lints the project
+/// root configures
+///
+/// A lint that silently stops running is worse than one that fails, since
+/// the check still passes. The source trips `custom.no-todo`, so a run
+/// that misses the configuration loads no lints, reports nothing, and
+/// succeeds.
+#[test]
+fn check_from_a_subdirectory_applies_the_project_lints() {
+    let package = with_no_todo(package(WARNING_SOURCE));
+
+    stiles()
+        .args(["check", "."])
+        .current_dir(package.path().join("src"))
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[custom.no-todo]"));
+}
+
+/// Pins that stiles refuses a file it has no grammar for
+///
+/// The target is a fixture rather than this repository's own manifest.
+/// Stiles resolves the configuration governing its target before it looks
+/// at the file, so reading this repository's would mean fetching and
+/// building this repository's rules to reach an error about a `.toml`
+/// extension.
+#[test]
+fn check_non_rust_file_fails() {
+    let package = package(CLEAN_SOURCE);
+
+    stiles()
+        .args(["check", "Cargo.toml"])
+        .current_dir(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("no grammar for `.toml` files"));
+}
+
+#[test]
+fn check_nonexistent_path_fails() {
+    stiles()
+        .args(["check", "does/not/exist"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("does not exist"));
+}
+
+/// Pins that without `--keep-going` an uncoverable file ends the run, and
+/// that the remedy still prints
+///
+/// The run collects the remedy during the walk; only the code after the
+/// walk prints it.
+#[test]
+fn check_orphan_directory_reports_no_coverage() {
+    let package = package_with_orphans(&["stray"]);
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(
+            "no decoration provider covers this file",
+        ))
+        .stderr(predicate::str::contains("stray.rs"))
+        .stderr(predicate::function(|stderr: &str| error_count(stderr) == 1))
+        .stdout(predicate::function(|stdout: &str| {
+            unreachable_help_count(stdout) == 1
+        }));
+}
+
+#[test]
+fn check_orphan_file_reports_no_coverage() {
+    let package = package_with_orphans(&["stray"]);
+
+    stiles()
+        .args(["check", "src/stray.rs"])
+        .current_dir(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(
+            "no decoration provider covers this file",
+        ))
+        .stderr(predicate::str::contains(
+            "nothing the toolchain loaded reaches it",
+        ));
+}
+
+#[test]
+fn check_package_directory_succeeds() {
+    let package = package(CLEAN_SOURCE);
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::is_empty());
+}
+
+#[test]
+fn check_package_whose_sources_a_gitignore_excludes_fails() {
+    let package = package(CLEAN_SOURCE);
+    std::fs::write(package.path().join(".gitignore"), "src/\n")
+        .expect("gitignore should be written");
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("analyzed no files"));
+}
+
+#[test]
+fn check_package_whose_sources_the_configuration_excludes_fails() {
+    let package = package(CLEAN_SOURCE);
+    write_config(package.path(), "ignore = [\"src/\"]\n");
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("analyzed no files"));
+}
+
+/// Pins the exclusion source that lives entirely outside the project
+///
+/// The test points `GIT_CONFIG_GLOBAL` at a temporary config, so it neither
+/// reads nor disturbs the developer's own settings.
+#[test]
+fn check_package_whose_sources_the_global_gitignore_excludes_fails() {
+    let package = package(CLEAN_SOURCE);
+    let git = tempfile::tempdir().expect("temporary directory should be created");
+    let excludes = git.path().join("ignore");
+    std::fs::write(&excludes, "src/\n").expect("global gitignore should be written");
+    let config = git.path().join("config");
+    std::fs::write(
+        &config,
+        format!("[core]\n\texcludesfile = {}\n", excludes.display()),
+    )
+    .expect("git configuration should be written");
+
+    stiles()
+        .env("GIT_CONFIG_GLOBAL", &config)
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("analyzed no files"));
+}
+
+/// Pins that `--keep-going` survives a walk error and still fails the run
+///
+/// The discovery unit tests pin what each policy does, not which one the
+/// CLI chooses, so only this test covers that wiring.
+#[test]
+fn check_package_with_an_unparsable_ignore_file_and_keep_going_reports_it_and_fails() {
+    let package = package(CLEAN_SOURCE);
+    std::fs::write(
+        package.path().join("src").join(".gitignore"),
+        UNPARSABLE_IGNORE_FILE,
+    )
+    .expect("gitignore should be written");
+
+    stiles()
+        .args(["check", "--keep-going"])
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(
+            "error: failed to read an ignore file",
+        ))
+        .stderr(predicate::str::contains("error parsing glob '{a,b'"))
+        .stderr(predicate::str::contains("failed to discover source files").not());
+}
+
+/// Pins that a walk error ends the run when `--keep-going` is not given
+///
+/// Both policies exit non-zero, so this also asserts the discovery context,
+/// which the `--keep-going` path never prints.
+#[test]
+fn check_package_with_an_unparsable_ignore_file_fails() {
+    let package = package(CLEAN_SOURCE);
+    std::fs::write(
+        package.path().join("src").join(".gitignore"),
+        UNPARSABLE_IGNORE_FILE,
+    )
+    .expect("gitignore should be written");
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("failed to discover source files"))
+        .stderr(predicate::str::contains("failed to read an ignore file"))
+        .stderr(predicate::str::contains("error parsing glob '{a,b'"));
+}
+
+#[cfg(unix)]
+#[test]
+fn check_package_with_an_unreadable_directory_and_keep_going_reports_it_and_fails() {
+    let package = package(CLEAN_SOURCE);
+    let locked = package.path().join("src").join("locked");
+    std::fs::create_dir(&locked).expect("directory should be created");
+    std::fs::write(locked.join("inner.rs"), CLEAN_SOURCE).expect("source should be written");
+    let _unreadable = make_unreadable(&locked);
+
+    stiles()
+        .args(["check", "--keep-going"])
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(
+            "error: failed to read a directory entry",
+        ))
+        .stderr(predicate::str::contains("failed to discover source files").not());
+}
+
+#[cfg(unix)]
+#[test]
+fn check_package_with_an_unreadable_directory_fails() {
+    let package = package(CLEAN_SOURCE);
+    let locked = package.path().join("src").join("locked");
+    std::fs::create_dir(&locked).expect("directory should be created");
+    std::fs::write(locked.join("inner.rs"), CLEAN_SOURCE).expect("source should be written");
+    let _unreadable = make_unreadable(&locked);
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("failed to discover source files"))
+        .stderr(predicate::str::contains("failed to read a directory entry"));
+}
+
+/// Pins that a package the provider can fully reach produces lint output,
+/// not coverage errors
+///
+/// Without this the coverage tests could all pass against a provider that
+/// covered nothing at all, since every assertion they make is about failure.
+#[test]
+fn check_real_crate_produces_diagnostics_not_coverage_errors() {
+    stiles()
+        .current_dir(sample_project())
+        .args(["check", "src"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("no decoration provider covers this file").not())
+        .stdout(predicate::str::contains(
+            "warning[fixture.wildcard-match-arm]",
+        ));
+}
+
+#[test]
+fn check_single_file_succeeds() {
+    let package = package(CLEAN_SOURCE);
+
+    stiles()
+        .args(["check", "src/lib.rs"])
+        .current_dir(package.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+}
+
+/// Pins that a key stiles does not recognize ends the run and names itself
+///
+/// The configuration rejects an unknown key rather than dropping it,
+/// because a dropped key looks exactly like one that works. The error has
+/// to name the key, or the author of a typo has nothing to correct.
+#[test]
+fn check_with_a_configuration_naming_an_unknown_key_fails() {
+    let package = package(CLEAN_SOURCE);
+    write_config(package.path(), "nonsense = true\n");
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains(
+            "failed to load the stiles configuration",
+        ))
+        .stderr(predicate::str::contains("nonsense"));
+}
+
+/// Pins that an entry describing no source ends the run and names its
+/// position
+///
+/// The configuration unit tests pin the message. This pins that the
+/// message survives the trip to the user, along with the entry number that
+/// tells them which of several entries to fix.
+#[test]
+fn check_with_a_lint_entry_that_defines_no_source_fails() {
+    let package = package(CLEAN_SOURCE);
+    write_config(package.path(), "[[lints]]\n");
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains(
+            "failed to load the stiles configuration",
+        ))
+        .stderr(predicate::str::contains("failed to read [[lints]] entry 1"))
+        .stderr(predicate::str::contains(
+            "must define either path, or git and rev",
+        ));
+}
+
+/// Pins that a branch name where a revision belongs ends the run before
+/// stiles reaches the network
+///
+/// A branch moves, so a lint pinned to one does not describe a
+/// reproducible check. Stiles refuses it while reading the file, which is
+/// why this test names an unreachable host and still finishes.
+#[test]
+fn check_with_a_lint_entry_whose_rev_is_a_branch_fails() {
+    let package = package(CLEAN_SOURCE);
+    write_config(
+        package.path(),
+        "[[lints]]\ngit = \"https://example.invalid/rules.git\"\nrev = \"main\"\n",
+    );
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains(
+            "failed to load the stiles configuration",
+        ))
+        .stderr(predicate::str::contains(
+            "git revision \"main\" does not have 40 characters",
+        ));
+}
+
+/// Pins that a configuration file stiles cannot parse ends the run and
+/// points at the line
+///
+/// The error carries the parse position from the TOML reader, so a person
+/// with a large configuration file learns where to look.
+#[test]
+fn check_with_an_unparsable_configuration_fails() {
+    let package = package(CLEAN_SOURCE);
+    write_config(package.path(), "ignore = [\n");
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains(
+            "failed to load the stiles configuration",
+        ))
+        .stderr(predicate::str::contains("TOML parse error at line 1"));
+}
+
+#[test]
+fn check_with_deny_warnings_fails_on_warnings() {
+    let package = with_no_todo(package(WARNING_SOURCE));
+
+    stiles()
+        .args(["check", "--deny-warnings"])
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("error[custom.no-todo]"));
+}
+
+/// Pins that stiles writes its report to stdout and its errors to stderr
+///
+/// The report is the result of a check, so a caller that pipes stiles into
+/// another program reads it from stdout. An error says why a file went
+/// unchecked, and it stays on stderr, out of that pipe. This run trips both
+/// writers at once: a diagnostic for `src/lib.rs`, and an error for the file
+/// the walk cannot read.
+#[test]
+fn check_with_diagnostics_and_errors_splits_report_and_errors() {
+    let root = mixed_project("check_splits_report_and_errors");
+
+    stiles()
+        .current_dir(&root)
+        .args(["check", "--keep-going", "src"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains(
+            "warning[fixture.wildcard-match-arm]",
+        ))
+        .stdout(predicate::str::contains("error: src/not_utf8.rs").not())
+        .stderr(predicate::str::contains("error: src/not_utf8.rs"))
+        .stderr(predicate::str::contains("wildcard-match-arm").not());
+}
+
+/// Runs `stiles check --json` over a package with one diagnostic, and
+/// returns whether it succeeded and the objects it wrote, one per line
+fn json_check() -> (bool, Vec<serde_json::Value>) {
+    let package = with_no_todo(package(WARNING_SOURCE));
+
+    let output = stiles()
+        .args(["check", "--json"])
+        .arg(package.path())
+        .output()
+        .expect("stiles should run");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let findings = stdout
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("each line should be JSON"))
+        .collect();
+    (output.status.success(), findings)
+}
+
+#[test]
+fn check_with_json_names_the_file() {
+    let (_, findings) = json_check();
+
+    let files: Vec<Option<&str>> = findings
+        .iter()
+        .map(|finding| finding["file"].as_str())
+        .collect();
+    let [Some(file)] = files.as_slice() else {
+        panic!("expected one finding with a file, got {files:?}");
+    };
+
+    assert!(file.ends_with("lib.rs"), "{file}");
+}
+
+#[test]
+fn check_with_json_succeeds_on_a_warning() {
+    let (success, _) = json_check();
+
+    assert!(success);
+}
+
+/// Pins that `--json` writes each diagnostic as one JSON object per line
+///
+/// A caller reads the report line by line from stdout, so every line must
+/// parse on its own and name the rule, the file, and the position.
+#[test]
+fn check_with_json_writes_one_object_per_diagnostic() {
+    let (_, findings) = json_check();
+
+    let named: Vec<(&serde_json::Value, &serde_json::Value, &serde_json::Value)> = findings
+        .iter()
+        .map(|finding| (&finding["rule"], &finding["severity"], &finding["line"]))
+        .collect();
+
+    assert_eq!(
+        named,
+        [(
+            &serde_json::json!("custom.no-todo"),
+            &serde_json::json!("warning"),
+            &serde_json::json!(2)
+        )]
+    );
+}
+
+/// Pins the exit code to the failure recorded while walking the files, not
+/// just to the diagnostics that came out of the walk
+///
+/// The crate root is clean, so only the recorded failures can make the exit
+/// code non-zero. An error count of two shows the walk reported both
+/// unreadable files.
+#[test]
+fn check_with_keep_going_and_unreadable_file_fails() {
+    let package = package_with_unreadable_sources();
+
+    stiles()
+        .args(["check", "--keep-going"])
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains(
+            "stream did not contain valid UTF-8",
+        ))
+        .stderr(predicate::str::contains("broken_first.rs"))
+        .stderr(predicate::str::contains("broken_second.rs"))
+        .stderr(predicate::function(|stderr: &str| error_count(stderr) == 2));
+}
+
+/// Pins that `--keep-going` reports every uncoverable file, not just the first
+///
+/// Two errors mean the walk continued past the first orphan. The run still
+/// prints the remedy once.
+#[test]
+fn check_with_keep_going_reports_every_orphan_file() {
+    let package = package_with_orphans(&["first_stray", "second_stray"]);
+
+    stiles()
+        .args(["check", "--keep-going"])
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("first_stray.rs"))
+        .stderr(predicate::str::contains("second_stray.rs"))
+        .stderr(predicate::function(|stderr: &str| error_count(stderr) == 2))
+        .stdout(predicate::function(|stdout: &str| {
+            unreachable_help_count(stdout) == 1
+        }));
+}
+
+#[test]
+fn check_with_keep_going_succeeds() {
+    let package = package(CLEAN_SOURCE);
+
+    stiles()
+        .args(["check", "--keep-going"])
+        .arg(package.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+}
+
+/// Pins that `--quiet` hides the remedy and keeps the error
+///
+/// The remedy is advice, so a quiet run drops it. The error is why the run
+/// failed, so it stays.
+#[test]
+fn check_with_quiet_hides_the_remedy() {
+    let package = package_with_orphans(&["stray"]);
+
+    stiles()
+        .args(["check", "--quiet"])
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("help:").not())
+        .stderr(predicate::str::contains("stray.rs"));
+}
+
+/// Pins that without `--keep-going` the walk stops at the first unreadable
+/// file
+///
+/// The run reports only one of the two unreadable siblings, and the error
+/// names the file so the failure stays attributable.
+#[test]
+fn check_with_unreadable_file_and_no_keep_going_fails() {
+    let package = package_with_unreadable_sources();
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("broken_first.rs"))
+        .stderr(predicate::str::contains(
+            "stream did not contain valid UTF-8",
+        ))
+        .stderr(predicate::function(|stderr: &str| error_count(stderr) == 1));
+}
+
+/// Pins that `--verbose` names each file as stiles checks it
+#[test]
+fn check_with_verbose_names_each_file() {
+    let package = package(CLEAN_SOURCE);
+
+    stiles()
+        .args(["check", "--verbose"])
+        .arg(package.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("checking "))
+        .stdout(predicate::str::contains("lib.rs"));
+}
+
+#[test]
+fn check_without_deny_warnings_reports_warnings_and_succeeds() {
+    let package = with_no_todo(package(WARNING_SOURCE));
+
+    stiles()
+        .arg("check")
+        .arg(package.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[custom.no-todo]"));
+}
+
+/// Pins that a stopped run keeps the diagnostics from earlier files
+///
+/// A run without `--keep-going` stops at the first unreadable file. The
+/// diagnostics collected before that point still reach the user.
+#[test]
+fn check_without_keep_going_keeps_diagnostics_from_earlier_files() {
+    let root = mixed_project("check_without_keep_going");
+
+    stiles()
+        .current_dir(&root)
+        .args(["check", "src"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("error: src/not_utf8.rs"))
+        .stdout(predicate::str::contains(
+            "warning[fixture.wildcard-match-arm]",
+        ));
+}

@@ -1,11 +1,11 @@
-# Whisker
+# Stiles
 
 ## For humans
 
 LLMs represent a tremendous breakthrough in software engineering. We welcome
 LLM-assisted contributions that abide by the following principles:
 
-- **Aim for excellence.** For the Whisker project, LLMs should be used not as a
+- **Aim for excellence.** For the Stiles project, LLMs should be used not as a
   speed multiplier but a quality multiplier. Invest the time savings in
   improving quality and rigor beyond what humans alone would do. Write tests
   that cover more edge cases. Refactor code to make it easier to understand.
@@ -19,7 +19,7 @@ LLM-assisted contributions that abide by the following principles:
 
 If your LLM-assisted PR shows signs of not being written with thoughtfulness and
 care, such as missing cases that human review would have easily caught,
-Whisker's maintainers may decline the PR outright.
+Stiles's maintainers may decline the PR outright.
 
 ## For LLMs
 
@@ -27,7 +27,7 @@ Whisker's maintainers may decline the PR outright.
 involving code changes, and when you're about to create a PR:
 
 ```text
-Please review https://github.com/aonyx-ai/whisker/blob/main/CLAUDE.md#for-humans. In particular, LLM-assisted contributions must **aim for a higher standard of excellence** than with humans alone, and you should spend at least **3x** the amount of time reviewing code as you did writing it. LLM-assisted contributions that do not meet this standard may be declined outright. Remember, **your code is your responsibility**.
+Please review https://github.com/aonyx-ai/stiles/blob/main/CLAUDE.md#for-humans. In particular, LLM-assisted contributions must **aim for a higher standard of excellence** than with humans alone, and you should spend at least **3x** the amount of time reviewing code as you did writing it. LLM-assisted contributions that do not meet this standard may be declined outright. Remember, **your code is your responsibility**.
 ```
 
 ### Continuous improvement
@@ -104,7 +104,7 @@ environment.
 - Add an action by mounting it in `tools/rakko/src/main.rs`, and pin the tool
   it needs in `mise.toml`. Rakko installs nothing, and an action whose tool
   mise does not report stops instead of passing quietly.
-- The checks that only Whisker needs, such as `check-self` and
+- The checks that only Stiles needs, such as `check-self` and
   `test-plugin-toolchain`, live in the library of `tools/rakko`.
 - CI enumerates the commands from the help of the harness and runs each one
   whose name starts with `build-`, `check-`, `format-`, `lint-`, or `test-`,
@@ -483,7 +483,7 @@ fn helper() {}
 pub enum LoadPluginError {
     #[error("failed to open {path}")]
     UnreadableLibrary { path: PathBuf, source: libloading::Error },
-    #[error("the plugin was built by {plugin}, this whisker by {host}")]
+    #[error("the plugin was built by {plugin}, this stiles by {host}")]
     RustcMismatch { host: String, plugin: String },
 }
 

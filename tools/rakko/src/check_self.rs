@@ -5,13 +5,13 @@ use crate::{HarnessError, step};
 
 /// The action that checks this repository with the rules it configures
 ///
-/// This is the end-to-end run: whisker resolves every lint source that
-/// `.config/whisker.toml` names, builds it, completes the handshake, and
+/// This is the end-to-end run: stiles resolves every lint source that
+/// `.config/stiles.toml` names, builds it, completes the handshake, and
 /// reports on its own sources. It was once an integration test, but a test
 /// that reaches the network belongs in an action that a person can choose to
 /// run, not in `cargo test`.
 ///
-/// The run builds whisker in release mode, as a user installs it, and then
+/// The run builds stiles in release mode, as a user installs it, and then
 /// runs the binary at the project root.
 #[derive(Copy, Clone, Debug, Default)]
 pub struct CheckSelf;
@@ -37,27 +37,24 @@ impl Action for CheckSelf {
 /// # Errors
 ///
 /// Returns the error of the step that could not finish: the resolution of
-/// cargo, its run, or the run of whisker.
+/// cargo, its run, or the run of stiles.
 async fn drive(context: &Context) -> Result<Outcome, HarnessError> {
     let cargo = step::cargo(context).await?;
 
-    let build = step::run(cargo.args(["build", "--release", "-p", "whisker"])).await?;
+    let build = step::run(cargo.args(["build", "--release", "-p", "stiles"])).await?;
     if !build.status().success() {
-        return Ok(step::failed("building whisker", &build));
+        return Ok(step::failed("building stiles", &build));
     }
 
-    let whisker = context.root().get().join("target/release/whisker");
+    let stiles = context.root().get().join("target/release/stiles");
     let check = step::run(
-        Invocation::new(whisker)
+        Invocation::new(stiles)
             .args(["check", "."])
             .in_directory(context.root().get()),
     )
     .await?;
     if !check.status().success() {
-        return Ok(step::failed(
-            "checking this repository with whisker",
-            &check,
-        ));
+        return Ok(step::failed("checking this repository with stiles", &check));
     }
 
     Ok(Outcome::Passed { summary: None })

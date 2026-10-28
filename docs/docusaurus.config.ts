@@ -3,14 +3,14 @@ import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
-  title: "Whisker",
+  title: "Stiles",
   tagline: "A linting platform built on tree-sitter",
 
   url: "https://aonyx-ai.github.io",
-  baseUrl: "/whisker/",
+  baseUrl: "/stiles/",
 
   organizationName: "aonyx-ai",
-  projectName: "whisker",
+  projectName: "stiles",
 
   onBrokenLinks: "throw",
 
@@ -33,7 +33,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: "./sidebars.ts",
-          editUrl: "https://github.com/aonyx-ai/whisker/tree/main/docs/",
+          editUrl: "https://github.com/aonyx-ai/stiles/tree/main/docs/",
         },
         blog: false,
         theme: {
@@ -54,7 +54,7 @@ const config: Config = {
         path: "authoring",
         routeBasePath: "authoring",
         sidebarPath: "./sidebarsAuthoring.ts",
-        editUrl: "https://github.com/aonyx-ai/whisker/tree/main/docs/",
+        editUrl: "https://github.com/aonyx-ai/stiles/tree/main/docs/",
       },
     ],
   ],
@@ -64,7 +64,7 @@ const config: Config = {
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: "Whisker",
+      title: "Stiles",
       items: [
         {
           type: "docSidebar",
@@ -80,7 +80,7 @@ const config: Config = {
           label: "Writing rules",
         },
         {
-          href: "https://github.com/aonyx-ai/whisker",
+          href: "https://github.com/aonyx-ai/stiles",
           label: "GitHub",
           position: "right",
         },
@@ -111,15 +111,15 @@ const config: Config = {
           items: [
             {
               label: "GitHub",
-              href: "https://github.com/aonyx-ai/whisker",
+              href: "https://github.com/aonyx-ai/stiles",
             },
             {
               label: "Releases",
-              href: "https://github.com/aonyx-ai/whisker/releases",
+              href: "https://github.com/aonyx-ai/stiles/releases",
             },
             {
               label: "Aonyx's rules",
-              href: "https://github.com/aonyx-ai/whisker-aonyx-rules",
+              href: "https://github.com/aonyx-ai/stiles-aonyx-rules",
             },
           ],
         },

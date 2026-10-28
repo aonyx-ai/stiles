@@ -1,15 +1,15 @@
 #!/bin/sh
 #
-# Installs the latest release of whisker.
+# Installs the latest release of stiles.
 #
-#   curl -LsSf https://aonyx-ai.github.io/whisker/install.sh | sh
+#   curl -LsSf https://aonyx-ai.github.io/stiles/install.sh | sh
 #
 # The line above runs this in whichever /bin/sh the machine has, which is
 # not always bash, so the script is POSIX shell.
 
 set -eu
 
-REPOSITORY="aonyx-ai/whisker"
+REPOSITORY="aonyx-ai/stiles"
 
 # Every transfer goes through here. `--proto =https` covers redirects as
 # well, so no hop can fall back to http and swap the archive and its digest
@@ -25,7 +25,7 @@ download() {
 # `TMPDIR` instead of widening what gets deleted.
 cleanup() {
     rm -f "${work}/${name}" "${work}/${name}.sha256" \
-        "${work}/${stem}/whisker" "${staged}"
+        "${work}/${stem}/stiles" "${staged}"
     rmdir "${work}/${stem}" "${work}" 2> /dev/null || true
 }
 
@@ -45,7 +45,7 @@ main() {
         Linux-aarch64) target="aarch64-unknown-linux-gnu" ;;
         Darwin-arm64) target="aarch64-apple-darwin" ;;
         *)
-            echo "whisker publishes no binary for ${os} on ${architecture}" >&2
+            echo "stiles publishes no binary for ${os} on ${architecture}" >&2
             exit 1
             ;;
     esac
@@ -53,7 +53,7 @@ main() {
     # The Linux binary links against glibc. On musl it installs, then fails
     # with "not found", because the interpreter it names is missing.
     if [ "${os}" = "Linux" ] && ldd --version 2>&1 | grep -qi musl; then
-        echo "whisker publishes no binary for musl systems such as Alpine" >&2
+        echo "stiles publishes no binary for musl systems such as Alpine" >&2
         exit 1
     fi
 
@@ -80,19 +80,19 @@ main() {
     # Archive names carry the version without its leading `v`, as
     # `Cargo.toml` holds it. The same name is the directory the archive
     # unpacks to.
-    stem="whisker-${version#v}-${target}"
+    stem="stiles-${version#v}-${target}"
     name="${stem}.tar.gz"
     base="https://github.com/${REPOSITORY}/releases/download/${version}"
 
     # The staged copy sits in the destination directory, not beside the
     # download, so the rename below stays within one filesystem.
-    directory="${WHISKER_INSTALL_DIR:-${HOME}/.local/bin}"
+    directory="${STILES_INSTALL_DIR:-${HOME}/.local/bin}"
     mkdir -p "${directory}"
-    work="$(mktemp -d "${TMPDIR:-/tmp}/whisker-install.XXXXXX")"
-    staged="${directory}/whisker.$$.tmp"
+    work="$(mktemp -d "${TMPDIR:-/tmp}/stiles-install.XXXXXX")"
+    staged="${directory}/stiles.$$.tmp"
     trap cleanup EXIT
 
-    echo "Downloading whisker ${version} for ${target}"
+    echo "Downloading stiles ${version} for ${target}"
     download -o "${work}/${name}" "${base}/${name}"
     download -o "${work}/${name}.sha256" "${base}/${name}.sha256"
 
@@ -104,15 +104,15 @@ main() {
         (cd "${work}" && shasum -a 256 -c "${name}.sha256") > /dev/null
     fi
 
-    tar -xzf "${work}/${name}" -C "${work}" "${stem}/whisker"
+    tar -xzf "${work}/${name}" -C "${work}" "${stem}/stiles"
 
-    # A rename replaces a running whisker. Linux refuses a copy onto one
+    # A rename replaces a running stiles. Linux refuses a copy onto one
     # with ETXTBSY.
-    cp "${work}/${stem}/whisker" "${staged}"
+    cp "${work}/${stem}/stiles" "${staged}"
     chmod 755 "${staged}"
-    mv "${staged}" "${directory}/whisker"
+    mv "${staged}" "${directory}/stiles"
 
-    echo "Installed ${directory}/whisker"
+    echo "Installed ${directory}/stiles"
 }
 
 # The body is one function that the last line calls, so a half-downloaded

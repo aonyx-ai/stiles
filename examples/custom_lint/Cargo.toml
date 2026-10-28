@@ -1,16 +1,16 @@
-# A custom lint plugin: whisker compiles this package at check time and
+# A custom lint plugin: stiles compiles this package at check time and
 # loads the produced dynamic library, so the crate type must be cdylib.
-# The whisker dependencies must match the revision the whisker binary was
+# The stiles dependencies must match the revision the stiles binary was
 # built from; a project outside this repository uses git dependencies
 # pinned to that revision instead of path dependencies. The lockfile beside
-# this manifest is part of that: whisker's handshake compares its own
-# source, not the versions a plugin resolves for what whisker itself
+# this manifest is part of that: stiles's handshake compares its own
+# source, not the versions a plugin resolves for what stiles itself
 # depends on. The provider feature stays off, because a lint needs the
 # trait and the decoration types, not the rust-analyzer stack behind the
 # decoration provider.
 #
 # The empty workspace table keeps this package standalone inside the
-# whisker repository; a plugin in your own project does not need it.
+# stiles repository; a plugin in your own project does not need it.
 [workspace]
 
 [package]
@@ -24,9 +24,9 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-whisker-plugin = { path = "../../crates/whisker-plugin" }
-whisker-rust = { path = "../../crates/whisker-rust", default-features = false }
-whisker-types = { path = "../../crates/whisker-types" }
+stiles-plugin = { path = "../../crates/stiles-plugin" }
+stiles-rust = { path = "../../crates/stiles-rust", default-features = false }
+stiles-types = { path = "../../crates/stiles-types" }
 
 [dev-dependencies]
-whisker-testing = { path = "../../crates/whisker-testing" }
+stiles-testing = { path = "../../crates/stiles-testing" }

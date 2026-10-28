@@ -17,7 +17,7 @@ not one anyone can act on.
 -->
 
 A branch moves when someone pushes to it, so the rules on a branch can change
-while your project stays the same. Whisker requires a `rev` for every `git`
+while your project stays the same. Stiles requires a `rev` for every `git`
 entry.
 
 ## Why the full hash
@@ -28,7 +28,7 @@ gains objects.
 -->
 
 An abbreviated hash is unique when you copy it, and can become ambiguous as the
-repository gains objects. Whisker requires the full 40-character hash.
+repository gains objects. Stiles requires the full 40-character hash.
 
 ## A pin is a cache key
 
@@ -37,9 +37,9 @@ a pin is a cache key: what else does the commit buy. an immutable tree, so no
 refresh and no second question to the remote.
 -->
 
-A commit names a tree that never changes. Whisker stores a checkout under the
+A commit names a tree that never changes. Stiles stores a checkout under the
 commit hash and never refreshes it, so a second run sends no request to the
-remote. [Cache layout](/docs/reference/cache-layout) shows where Whisker stores
+remote. [Cache layout](/docs/reference/cache-layout) shows where Stiles stores
 it.
 
 ## What the digest proves
@@ -50,7 +50,7 @@ writes the archive and the digest.
 -->
 
 That the download arrived whole. The `.sha256` beside a prebuilt archive comes
-from the same publisher as the archive. Whisker compares the download against it
+from the same publisher as the archive. Stiles compares the download against it
 before unpacking anything, so a truncated or corrupted download never reaches
 the disk as files. The digest does not tell you who built the archive, or what
 is in it.
@@ -59,11 +59,11 @@ is in it.
 
 <!--
 what the handshake proves: does loading successfully mean safe. no. only that
-both sides were built against the same whisker source, and the compiler is not
+both sides were built against the same stiles source, and the compiler is not
 part of it.
 -->
 
-That the library was built against the same Whisker source as the Whisker that
+That the library was built against the same Stiles source as the Stiles that
 loads it. The handshake checks nothing about the source either side was compiled
 from, the compiler, or the dependencies.
 
@@ -85,10 +85,10 @@ repository runs unsandboxed in-process, and opening its library runs some of its
 code before the handshake reads anything.
 -->
 
-Your configuration. Whisker fetches the repository that a `[[lints]]` entry
-names, compiles it, and loads it into its own process with no sandbox. Whisker
+Your configuration. Stiles fetches the repository that a `[[lints]]` entry
+names, compiles it, and loads it into its own process with no sandbox. Stiles
 has to open the library before it can run the handshake, and opening a library
-already runs some of its code. The handshake result determines whether Whisker
+already runs some of its code. The handshake result determines whether Stiles
 calls into the rules. Their code runs either way.
 
 ## The instruction

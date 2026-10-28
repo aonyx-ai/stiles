@@ -95,7 +95,7 @@ jobs:
           # the suffix says. The comparison therefore drops the suffix, while
           # the archive keeps the whole tag in its name.
           release="${version%%-*}"
-          pinned="$(cargo pkgid -p whisker)"
+          pinned="$(cargo pkgid -p stiles)"
           pinned="${pinned##*#}"
           pinned="${pinned##*@}"
           if [ "${release}" != "${pinned}" ]; then
@@ -103,24 +103,24 @@ jobs:
               exit 1
           fi
 
-          cargo build --release --locked -p whisker --target "${target}"
-          whisker="target/${target}/release/whisker"
-          "${whisker}" --version
+          cargo build --release --locked -p stiles --target "${target}"
+          stiles="target/${target}/release/stiles"
+          "${stiles}" --version
 
           # The archive's name promises a platform, and the binary decides which
           # prebuilt lints it asks a publisher for. A disagreement would send
           # everyone who unpacks this archive looking for artifacts that were
           # never published under that name, so the two are compared here.
-          tag="$("${whisker}" abi)"
+          tag="$("${stiles}" abi)"
           if [ "${tag#*-}" != "${target}" ]; then
               echo "the binary is built for ${tag#*-}, but the archive names ${target}" >&2
               exit 1
           fi
 
-          name="whisker-${version}-${target}"
+          name="stiles-${version}-${target}"
           rm -rf "dist/${name}"
           mkdir -p "dist/${name}"
-          cp "target/${target}/release/whisker" "dist/${name}/"
+          cp "target/${target}/release/stiles" "dist/${name}/"
           cp LICENSE-APACHE LICENSE-MIT README.md "dist/${name}/"
 
           # Short flags, because macOS ships bsdtar and its support for the

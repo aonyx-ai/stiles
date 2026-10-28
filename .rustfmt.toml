@@ -3,4 +3,4 @@
 group_imports = "StdExternalCrate"
 # The bundle is tsrs's code as upstream formats it, and a fresh run of
 # `mise run rakko -- bundle-tsrs` must reproduce it byte for byte.
-ignore = ["crates/whisker-tsrs", "vendor"]
+ignore = ["crates/stiles-tsrs", "vendor"]

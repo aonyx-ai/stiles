@@ -1,12 +1,12 @@
 //! The maintenance commands of this repository
 //!
-//! This binary is the harness of the Whisker repository: the one place that
+//! This binary is the harness of the Stiles repository: the one place that
 //! states which maintenance actions run here. It mounts the bundles that this
 //! repository uses, and the command line that it builds turns each of them
 //! into a command. A bundle carries a set of actions that projects adopt
 //! together, so the harness names the bundle instead of each action in it.
 //!
-//! Some checks of Whisker reach past what a bundle of Rakko covers, so the
+//! Some checks of Stiles reach past what a bundle of Rakko covers, so the
 //! library of this package defines them, and the harness mounts them next to
 //! the bundles.
 //!
@@ -37,18 +37,18 @@ use rakko_pre_commit::PreCommit;
 use rakko_test_rust::TestRust;
 use rakko_test_rust_docs::TestRustDocs;
 
-/// The lint plugin that the tests of whisker-rust load
+/// The lint plugin that the tests of stiles-rust load
 ///
 /// The root workspace excludes the package, so the Rust actions of Rakko do
 /// not reach it, and the harness runs them on its directory instead.
-const DECORATION_PROBES: &str = "crates/whisker-rust/tests/fixtures/lints/decoration_probes";
+const DECORATION_PROBES: &str = "crates/stiles-rust/tests/fixtures/lints/decoration_probes";
 
 /// Builds the command line of this repository and runs it
 ///
 /// The call ends the process itself, so a harness stays a `main` that names
 /// what the repository mounts and returns nothing.
 ///
-/// Whisker publishes binaries and no crate, so the harness mounts the binary
+/// Stiles publishes binaries and no crate, so the harness mounts the binary
 /// bundle and not the library bundle. The binary bundle leaves out the tests
 /// of the documentation examples, which the crates of this repository carry,
 /// so the harness mounts that action on its own.
@@ -58,13 +58,13 @@ fn main() {
     rakko_cli::builder()
         .mount(rakko_baseline::bundle())
         .mount(rakko_rust_binary::bundle())
-        .mount(whisker())
+        .mount(stiles())
         .mount_commands([Box::new(pre_commit) as Box<dyn ErasedCommand>])
         .run();
 }
 
 /// Returns the actions that only this repository mounts
-fn whisker() -> Vec<Box<dyn ErasedAction>> {
+fn stiles() -> Vec<Box<dyn ErasedAction>> {
     vec![
         Box::new(BundleTsrs),
         Box::new(CheckAbi),
@@ -116,7 +116,7 @@ fn actions_that_write() -> Vec<Box<dyn ErasedAction>> {
 ///
 /// The list is shorter than the list that the harness mounts. An action such
 /// as `check-latest-deps`, which resolves the dependencies of the project
-/// again, belongs in CI and not in front of every commit. The run of whisker
+/// again, belongs in CI and not in front of every commit. The run of stiles
 /// on this repository comes last, as it did before the harness existed.
 fn actions_that_read() -> Vec<Box<dyn ErasedAction>> {
     vec![

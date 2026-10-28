@@ -58,7 +58,7 @@ create table if not exists docs (
 
 def default_db():
     state = os.environ.get("XDG_STATE_HOME") or pathlib.Path.home() / ".local/state"
-    return pathlib.Path(state) / "whisker-docs-desk" / "desk.db"
+    return pathlib.Path(state) / "stiles-docs-desk" / "desk.db"
 
 
 def connect(path):

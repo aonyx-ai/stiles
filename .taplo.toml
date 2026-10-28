@@ -1,6 +1,6 @@
 exclude = [
   ".claude/worktrees/**",
-  "crates/whisker-tsrs/**",
+  "crates/stiles-tsrs/**",
   "docs/node_modules/**",
   "vendor/**",
   # Cargo writes its build output to the target directory of each workspace.

@@ -1,0 +1,35 @@
+[package]
+name = "stiles-typescript"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+# The tsrs checker behind the decoration provider dwarfs everything else
+# in this crate. Lint plugins depend on this crate only for the generated
+# trait, the adapter, and the decoration types, so the provider is a
+# default feature they can switch off rather than an unconditional cost.
+[features]
+default = ["provider"]
+provider = ["dep:thiserror", "dep:stiles-tsrs"]
+
+[dependencies]
+bon.workspace = true
+stabby.workspace = true
+thiserror = { workspace = true, optional = true }
+tree-sitter.workspace = true
+tree-sitter-typescript.workspace = true
+stiles-macros.workspace = true
+stiles-tsrs = { workspace = true, optional = true }
+stiles-types.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile.workspace = true
+stiles-core.workspace = true
+
+[build-dependencies]
+stiles-codegen.workspace = true
+
+[lints]
+workspace = true

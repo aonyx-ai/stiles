@@ -1,0 +1,45 @@
+[package]
+name = "stiles"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/aonyx-ai/stiles.git"
+publish = false
+
+[[bin]]
+name = "stiles"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1"
+bon.workspace = true
+clawless = "0.8.0"
+etcetera.workspace = true
+flate2.workspace = true
+gix.workspace = true
+hex.workspace = true
+ignore.workspace = true
+kawauso-project.workspace = true
+libloading.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tar.workspace = true
+stiles-core = { path = "../stiles-core" }
+stiles-reporting = { path = "../stiles-reporting" }
+stiles-plugin = { path = "../stiles-plugin" }
+stiles-rust = { path = "../stiles-rust" }
+stiles-typescript = { path = "../stiles-typescript" }
+stiles-types = { path = "../stiles-types" }
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile.workspace = true
+tiny_http.workspace = true
+toml.workspace = true
+trycmd = "1.0"

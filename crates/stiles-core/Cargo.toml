@@ -1,0 +1,21 @@
+[package]
+name = "stiles-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+bon.workspace = true
+thiserror.workspace = true
+tree-sitter.workspace = true
+stiles-types.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+stabby.workspace = true
+tree-sitter-rust.workspace = true
+tree-sitter-typescript.workspace = true
+
+[lints]
+workspace = true

@@ -17,11 +17,11 @@ cargo-binstall = "1.26.1"
 node = "24.22.1"
 
 # The first toolchain is the default for builds, Clippy, and the tests, and it
-# builds the whisker binary that a release ships. The second is a nightly
+# builds the stiles binary that a release ships. The second is a nightly
 # toolchain, which rustfmt needs for the unstable options in `.rustfmt.toml`,
 # and which cargo-udeps needs for the unstable option that records the crates a
 # target loaded. `test-plugin-toolchain` also builds a plugin with it, to prove
-# that a plugin loads into a whisker that another compiler built. The pin names
+# that a plugin loads into a stiles that another compiler built. The pin names
 # the nightly by its date, so every machine and every job format with the same
 # nightly. A pin of the bare channel cannot promise that. Mise links each Rust
 # toolchain that it installs to the directory of rustup, and it takes such a

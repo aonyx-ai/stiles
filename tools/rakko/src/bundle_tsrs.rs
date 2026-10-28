@@ -7,15 +7,15 @@ use crate::{HarnessError, step};
 const SOURCE: &str = "vendor/tsrs";
 
 /// The directory of the generated crate, which a run replaces
-const BUNDLE: &str = "crates/whisker-tsrs";
+const BUNDLE: &str = "crates/stiles-tsrs";
 
 /// The name of the generated crate
-const NAME: &str = "whisker-tsrs";
+const NAME: &str = "stiles-tsrs";
 
-/// The tsrs crates that whisker imports
+/// The tsrs crates that stiles imports
 ///
 /// The generator adds every tsrs crate that these depend on, so the list
-/// names only the crates that whisker-typescript names in its code.
+/// names only the crates that stiles-typescript names in its code.
 const ROOTS: [&str; 8] = [
     "tsrs_ast",
     "tsrs_astnav",
@@ -27,16 +27,16 @@ const ROOTS: [&str; 8] = [
     "tsrs_vfs",
 ];
 
-/// The action that generates `crates/whisker-tsrs` from the tsrs submodule
+/// The action that generates `crates/stiles-tsrs` from the tsrs submodule
 ///
 /// tsrs publishes no crates, and crates.io refuses a crate that depends on a
-/// repository. The generator turns each tsrs crate that whisker uses into a
+/// repository. The generator turns each tsrs crate that stiles uses into a
 /// module of one crate, which can publish. A bump of tsrs moves the
 /// submodule and runs this action.
 #[derive(Copy, Clone, Debug, Default)]
 pub struct BundleTsrs;
 
-/// The action that checks `crates/whisker-tsrs` against a fresh run
+/// The action that checks `crates/stiles-tsrs` against a fresh run
 ///
 /// A hand edit to the bundle would vanish at the next bump, so the check
 /// fails on any byte that a fresh run does not produce. A file that the run

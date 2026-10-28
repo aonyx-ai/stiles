@@ -1,23 +1,23 @@
 # GitHub Actions
 
 <!--
-goal: get a whisker check running in a workflow without paying a build on every
+goal: get a stiles check running in a workflow without paying a build on every
 run.
 non-goal: teaching Actions. every snippet assumes the reader writes workflows.
 -->
 
-This page explains how to get Whisker running automatically in Github Actions.
+This page explains how to get Stiles running automatically in Github Actions.
 
 ## Install step
 
-We publish a Github Action to install Whisker directly from the Whisker
+We publish a Github Action to install Stiles directly from the Stiles
 repository:
 
 ```yaml
-- uses: aonyx-ai/whisker@v0.1.0-rc.5
+- uses: aonyx-ai/stiles@v0.1.0-rc.5
   with:
     version: v0.1.0-rc.5
-- run: whisker check .
+- run: stiles check .
 ```
 
 ## Caching rules
@@ -35,10 +35,10 @@ Github token and add it as a secret to a job.
 The default token that is configured with Github (`GITHUB_TOKEN`) is only able
 to grant access to the active repository. [Github
 recommends][gh-additional-permissions] using a Github App or a personal access
-token. For a PAT, add it to your Github Secrets and pass it to Whisker like so:
+token. For a PAT, add it to your Github Secrets and pass it to Stiles like so:
 
 ```yaml
-- run: whisker check .
+- run: stiles check .
   env:
     GH_TOKEN: ${{ secrets.RULES_TOKEN }}
 ```

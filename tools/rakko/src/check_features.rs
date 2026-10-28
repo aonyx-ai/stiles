@@ -3,7 +3,7 @@ use rakko_action::{Access, Action, Context, Name, Outcome, action_name};
 use crate::{HarnessError, step};
 
 /// The language crates that a lint plugin depends on without their provider
-const LANGUAGE_CRATES: [&str; 2] = ["whisker-rust", "whisker-typescript"];
+const LANGUAGE_CRATES: [&str; 2] = ["stiles-rust", "stiles-typescript"];
 
 /// The action that checks each language crate without its default features
 ///

@@ -1,5 +1,5 @@
-use whisker_rust::RustLintPass;
-use whisker_types::{DecoratedNode, Diagnostic, RuleId, Severity};
+use stiles_rust::RustLintPass;
+use stiles_types::{DecoratedNode, Diagnostic, RuleId, Severity};
 
 /// Flags every `todo!` left in the code
 ///
@@ -40,19 +40,19 @@ impl RustLintPass for NoTodo {
     }
 }
 
-impl whisker_plugin::DeclaresRules for NoTodo {
+impl stiles_plugin::DeclaresRules for NoTodo {
     fn rules(&self) -> Vec<RuleId> {
         vec![RuleId::new("custom.no-todo")]
     }
 }
 
-whisker_plugin::export_lints![rust: [NoTodo]];
+stiles_plugin::export_lints![rust: [NoTodo]];
 
 #[cfg(test)]
 mod tests {
-    use whisker_rust::RustLintPassAdapter;
-    use whisker_testing::{assert_diagnostic, assert_no_diagnostics, execute, parse};
-    use whisker_types::{Language, LintPass, Severity};
+    use stiles_rust::RustLintPassAdapter;
+    use stiles_testing::{assert_diagnostic, assert_no_diagnostics, execute, parse};
+    use stiles_types::{Language, LintPass, Severity};
 
     use super::*;
 

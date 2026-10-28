@@ -1,0 +1,356 @@
+use std::fmt;
+use std::hash::{Hash, Hasher};
+
+use bon::bon;
+use stabby::{string, vec};
+
+use crate::decorations::TypePathRef;
+
+/// Where a type is defined, as a path from its crate root
+///
+/// Rust-analyzer can render `syn::Error`, `std::io::Error`, and
+/// `anyhow::Error` all as `Error`. A rule that must distinguish them needs
+/// the definition, not the rendered name.
+///
+/// The path names the item's definition, not a re-export, so `syn::Error`
+/// appears here as `syn::error::Error`.
+///
+/// A rule reads the path out of a decoration the host recorded, so stabby
+/// lays it out. Its segments are stabby's `String`s.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_rust::decorations::TypePath;
+///
+/// let path = TypePath::builder().krate("syn").modules(["error"]).name("Error").build();
+///
+/// assert_eq!(path.to_string(), "syn::error::Error");
+/// ```
+#[stabby::stabby]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct TypePath {
+    krate: string::String,
+    modules: vec::Vec<string::String>,
+    name: string::String,
+}
+
+#[bon]
+impl TypePath {
+    /// Creates a path from a crate name, its module segments, and an item name
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::TypePath;
+    ///
+    /// let path = TypePath::builder()
+    ///     .krate("anyhow")
+    ///     .modules([] as [&str; 0])
+    ///     .name("Error")
+    ///     .build();
+    ///
+    /// assert_eq!(path.to_string(), "anyhow::Error");
+    /// ```
+    #[builder]
+    pub fn new<M>(krate: &str, modules: M, name: &str) -> Self
+    where
+        M: IntoIterator,
+        M::Item: AsRef<str>,
+    {
+        Self {
+            krate: string::String::from(krate),
+            modules: modules
+                .into_iter()
+                .map(|segment| string::String::from(segment.as_ref()))
+                .collect(),
+            name: string::String::from(name),
+        }
+    }
+
+    /// Returns the name of the crate that defines the type
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::TypePath;
+    ///
+    /// let path = TypePath::builder().krate("syn").modules(["error"]).name("Error").build();
+    ///
+    /// assert_eq!(path.krate(), "syn");
+    /// ```
+    pub fn krate(&self) -> &str {
+        &self.krate
+    }
+
+    /// Returns the module segments between the crate root and the definition
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::TypePath;
+    ///
+    /// let path = TypePath::builder().krate("syn").modules(["error"]).name("Error").build();
+    ///
+    /// assert_eq!(path.modules().collect::<Vec<_>>(), vec!["error"]);
+    /// ```
+    pub fn modules(&self) -> impl Iterator<Item = &str> {
+        self.modules.iter().map(string::String::as_str)
+    }
+
+    /// Returns the item's own name
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::TypePath;
+    ///
+    /// let path = TypePath::builder().krate("syn").modules(["error"]).name("Error").build();
+    ///
+    /// assert_eq!(path.name(), "Error");
+    /// ```
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+/// Renders the crate, the module segments, and the name, joined by `::`
+///
+/// To test identity, compare the path against a [`TypePathRef`].
+///
+/// [`TypePathRef`]: crate::decorations::TypePathRef
+impl fmt::Display for TypePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.krate)?;
+        for segment in self.modules() {
+            write!(f, "::{segment}")?;
+        }
+        write!(f, "::{}", self.name)
+    }
+}
+
+impl Hash for TypePath {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.krate.hash(state);
+        self.modules.as_slice().hash(state);
+        self.name.hash(state);
+    }
+}
+
+impl PartialEq<TypePathRef<'_>> for TypePath {
+    fn eq(&self, other: &TypePathRef<'_>) -> bool {
+        self.krate() == other.krate()
+            && self.name() == other.name()
+            && self.modules.len() == other.modules().len()
+            && self
+                .modules()
+                .zip(other.modules())
+                .all(|(lhs, rhs)| lhs == *rhs)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn display_joins_segments_with_double_colons() {
+        let path = TypePath::builder()
+            .krate("syn")
+            .modules(["error"])
+            .name("Error")
+            .build();
+
+        let rendered = path.to_string();
+
+        assert_eq!(rendered, "syn::error::Error");
+    }
+
+    #[test]
+    fn display_with_no_modules_renders_crate_and_name() {
+        let path = TypePath::builder()
+            .krate("anyhow")
+            .modules([] as [&str; 0])
+            .name("Error")
+            .build();
+
+        let rendered = path.to_string();
+
+        assert_eq!(rendered, "anyhow::Error");
+    }
+
+    #[test]
+    fn eq_with_different_crate_is_false() {
+        let path = TypePath::builder()
+            .krate("thiserror")
+            .modules([] as [&str; 0])
+            .name("Error")
+            .build();
+
+        let matches = path
+            == TypePathRef::builder()
+                .krate("anyhow")
+                .modules(&[])
+                .name("Error")
+                .build();
+
+        assert!(!matches);
+    }
+
+    /// Pins the explicit length check in the module comparison
+    ///
+    /// `zip` stops at the shorter list, so without the check a path whose
+    /// modules are a prefix of another's compares equal.
+    #[test]
+    fn eq_with_different_module_depth_is_false() {
+        let path = TypePath::builder()
+            .krate("core")
+            .modules(["io", "error"])
+            .name("Error")
+            .build();
+
+        let matches = path
+            == TypePathRef::builder()
+                .krate("core")
+                .modules(&["io"])
+                .name("Error")
+                .build();
+
+        assert!(!matches);
+    }
+
+    #[test]
+    fn eq_with_different_name_is_false() {
+        let path = TypePath::builder()
+            .krate("anyhow")
+            .modules([] as [&str; 0])
+            .name("Chain")
+            .build();
+
+        let matches = path
+            == TypePathRef::builder()
+                .krate("anyhow")
+                .modules(&[])
+                .name("Error")
+                .build();
+
+        assert!(!matches);
+    }
+
+    #[test]
+    fn eq_with_matching_type_path_ref_is_true() {
+        let path = TypePath::builder()
+            .krate("syn")
+            .modules(["error"])
+            .name("Error")
+            .build();
+
+        let matches = path
+            == TypePathRef::builder()
+                .krate("syn")
+                .modules(&["error"])
+                .name("Error")
+                .build();
+
+        assert!(matches);
+    }
+
+    #[test]
+    fn hash_agrees_with_eq() {
+        let mut paths = HashSet::new();
+        paths.insert(
+            TypePath::builder()
+                .krate("syn")
+                .modules(["error"])
+                .name("Error")
+                .build(),
+        );
+
+        let found = paths.contains(
+            &TypePath::builder()
+                .krate("syn")
+                .modules(["error"])
+                .name("Error")
+                .build(),
+        );
+
+        assert!(found);
+    }
+
+    #[test]
+    fn hash_with_other_modules_misses() {
+        let mut paths = HashSet::new();
+        paths.insert(
+            TypePath::builder()
+                .krate("syn")
+                .modules(["error"])
+                .name("Error")
+                .build(),
+        );
+
+        let found = paths.contains(
+            &TypePath::builder()
+                .krate("syn")
+                .modules([] as [&str; 0])
+                .name("Error")
+                .build(),
+        );
+
+        assert!(!found);
+    }
+
+    #[test]
+    fn krate_returns_the_crate() {
+        let path = TypePath::builder()
+            .krate("syn")
+            .modules(["error"])
+            .name("Error")
+            .build();
+
+        assert_eq!(path.krate(), "syn");
+    }
+
+    #[test]
+    fn modules_returns_each_module_in_order() {
+        let path = TypePath::builder()
+            .krate("syn")
+            .modules(["error"])
+            .name("Error")
+            .build();
+
+        let modules: Vec<&str> = path.modules().collect();
+
+        assert_eq!(modules, vec!["error"]);
+    }
+
+    #[test]
+    fn name_returns_the_name() {
+        let path = TypePath::builder()
+            .krate("syn")
+            .modules(["error"])
+            .name("Error")
+            .build();
+
+        assert_eq!(path.name(), "Error");
+    }
+
+    #[test]
+    fn trait_send_type_path() {
+        fn assert_send<T: Send>() {}
+        assert_send::<TypePath>();
+    }
+
+    #[test]
+    fn trait_sync_type_path() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<TypePath>();
+    }
+
+    #[test]
+    fn trait_unpin_type_path() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<TypePath>();
+    }
+}

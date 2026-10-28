@@ -1,6 +1,6 @@
 # Harness
 
-This package is the harness of the Whisker repository: the one place that
+This package is the harness of the Stiles repository: the one place that
 states which maintenance actions run here. It mounts the bundles that this
 repository uses, and the command line that it builds turns each of them into a
 command. A bundle carries a set of actions that projects adopt together, so the
@@ -28,7 +28,7 @@ The harness mounts two bundles:
 - [`rakko-rust-binary`][rakko-rust-binary] carries everything that a Rust
   project runs.
 
-Whisker publishes binaries and no crate, so the harness mounts the binary
+Stiles publishes binaries and no crate, so the harness mounts the binary
 bundle and not `rakko-rust-library`. The crates still carry examples in their
 documentation, so the harness mounts `test-rust-docs` on its own.
 
@@ -40,14 +40,14 @@ The library of this package defines the checks that no bundle covers:
   `main`, and fails when a fingerprint moved and `ABI_VERSION` did not rise.
 - `check-features` checks each language crate without its default features,
   the way a lint plugin depends on it.
-- `check-self` builds whisker in release mode and checks this repository with
-  the rules that `.config/whisker.toml` configures.
+- `check-self` builds stiles in release mode and checks this repository with
+  the rules that `.config/stiles.toml` configures.
 - `format-fixture-lint` and `test-fixture-lint` run `format-rust` and
-  `test-rust` on the lint plugin that the tests of whisker-rust load. The root
-  workspace excludes the plugin, because whisker-rust depends on it by path,
+  `test-rust` on the lint plugin that the tests of stiles-rust load. The root
+  workspace excludes the plugin, because stiles-rust depends on it by path,
   so the Rust actions of the bundles do not reach it.
 - `test-plugin-toolchain` builds the example plugin with the nightly toolchain
-  and loads it into a whisker that the stable toolchain built.
+  and loads it into a stiles that the stable toolchain built.
 
 The two plugins in `examples` declare a workspace of their own, so the Rust
 actions of the bundles reach them without help.

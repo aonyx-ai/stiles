@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parse every Whisker docs page into editable sections.
+"""Parse every Stiles docs page into editable sections.
 
 Emits JSON on stdout as {"files": [...], "sections": [...]}, keyed by stable
 ids, so the desk can be seeded from it and the result written back by
@@ -28,7 +28,7 @@ FILES = [
     "docs/reference/environment-variables.md",
     "docs/reference/cache-layout.md",
     "docs/reference/platforms.md",
-    "docs/explanation/how-whisker-works.md",
+    "docs/explanation/how-stiles-works.md",
     "docs/explanation/package-and-abi-versioning.md",
     "docs/explanation/pinning-and-trust.md",
     "authoring/how-to/write-a-rule.md",

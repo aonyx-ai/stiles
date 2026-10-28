@@ -30,9 +30,9 @@ feature-depth = 1
 # MPL-2.0 is the one copyleft license here. It arrives through `option-ext`,
 # under the `dirs` that kawauso-config reads a user's configuration directory
 # with. MPL's copyleft is per-file and binds whoever modifies the covered
-# files: whisker depends on the crate rather than vendoring it, so it
-# modifies nothing and the clause never reaches whisker's own source. The
-# same reasoning covers gitoxide's pack caches, which whisker leaves off for
+# files: stiles depends on the crate rather than vendoring it, so it
+# modifies nothing and the clause never reaches stiles's own source. The
+# same reasoning covers gitoxide's pack caches, which stiles leaves off for
 # reasons of its own.
 #
 # BSL-1.0 and Unicode-DFS-2016 arrive with tsrs, the TypeScript checker behind

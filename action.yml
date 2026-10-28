@@ -1,6 +1,6 @@
 ---
-name: Set up whisker
-description: Downloads a released whisker and puts it on the PATH
+name: Set up stiles
+description: Downloads a released stiles and puts it on the PATH
 
 inputs:
   version:
@@ -10,7 +10,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Download and verify whisker
+    - name: Download and verify stiles
       shell: bash
       env:
         VERSION: ${{ inputs.version }}
@@ -34,18 +34,18 @@ runs:
           Linux-ARM64) target=aarch64-unknown-linux-gnu ;;
           macOS-ARM64) target=aarch64-apple-darwin ;;
           *)
-            echo "whisker publishes no binary for this runner" >&2
+            echo "stiles publishes no binary for this runner" >&2
             exit 1
             ;;
         esac
 
-        name="whisker-${version}-${target}.tar.gz"
-        base="https://github.com/aonyx-ai/whisker/releases/download"
+        name="stiles-${version}-${target}.tar.gz"
+        base="https://github.com/aonyx-ai/stiles/releases/download"
 
         # The download host serves a public repository without a token,
-        # and it spends none of the API rate limit that whisker needs
+        # and it spends none of the API rate limit that stiles needs
         # later to look for prebuilt lints.
-        directory="${RUNNER_TEMP}/whisker"
+        directory="${RUNNER_TEMP}/stiles"
         mkdir -p "${directory}"
         cd "${directory}"
         curl --fail --location --silent --show-error \
@@ -56,4 +56,4 @@ runs:
 
         tar -xzf "${name}"
 
-        echo "${directory}/whisker-${version}-${target}" >> "${GITHUB_PATH}"
+        echo "${directory}/stiles-${version}-${target}" >> "${GITHUB_PATH}"

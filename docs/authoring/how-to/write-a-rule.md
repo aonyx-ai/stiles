@@ -17,12 +17,12 @@ comments.
 -->
 
 Copy
-[`examples/doc_summary_break`](https://github.com/aonyx-ai/whisker/tree/main/examples/doc_summary_break)
-from the Whisker repository into your project, for example to
+[`examples/doc_summary_break`](https://github.com/aonyx-ai/stiles/tree/main/examples/doc_summary_break)
+from the Stiles repository into your project, for example to
 `lints/doc_summary_break`. It is a complete rule crate with tests, and the rest
 of this guide explains it.
 
-[`examples/custom_lint`](https://github.com/aonyx-ai/whisker/tree/main/examples/custom_lint)
+[`examples/custom_lint`](https://github.com/aonyx-ai/stiles/tree/main/examples/custom_lint)
 has the same files and structure, with more comments. Start there if you prefer
 comments to code.
 
@@ -102,18 +102,18 @@ fn a_second_line_against_the_summary_is_flagged() {
 
 ## run it
 
-```toml title=".config/whisker.toml"
+```toml title=".config/stiles.toml"
 [[lints]]
 path = "lints/doc_summary_break"
 ```
 
 ```bash
-whisker check .
+stiles check .
 ```
 
 ## give the rule options
 
-```toml title=".config/whisker.toml"
+```toml title=".config/stiles.toml"
 [rules.options."lint.repeated-primitive-params"]
 boundary-attributes = ["shard", "procedure"]
 ```

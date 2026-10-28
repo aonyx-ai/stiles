@@ -1,0 +1,159 @@
+use crate::RustLintPass;
+
+stiles_types::lint_pass_adapter!(RustLintPassAdapter, RustLintPass, crate::dispatch, Rust);
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use stiles_types::{
+        DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic, RuleId, RuleOptions,
+        Severity,
+    };
+
+    use super::*;
+
+    fn parse_rust(source: &str) -> DecoratedTree {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&crate::language()).unwrap();
+        let tree = parser.parse(source, None).unwrap();
+        DecoratedTree::builder()
+            .tree(tree)
+            .language(Language::Rust)
+            .source(source.to_string())
+            .file(PathBuf::from("test.rs"))
+            .build()
+    }
+
+    #[test]
+    fn adapter_collects_diagnostics_through_pipeline() {
+        struct WarnOnFn;
+        impl RustLintPass for WarnOnFn {
+            fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
+                vec![
+                    Diagnostic::builder()
+                        .rule_id(RuleId::new("test.warn"))
+                        .severity(Severity::Warn)
+                        .message("function found")
+                        .span(node.span())
+                        .build(),
+                ]
+            }
+        }
+
+        let tree = parse_rust("fn a() {} fn b() {}");
+        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(RustLintPassAdapter::new(WarnOnFn))];
+
+        let diagnostics = stiles_core::walk(&tree, &mut passes).expect("should walk");
+        assert_eq!(diagnostics.len(), 2);
+    }
+
+    #[test]
+    fn adapter_delegates_to_dispatch() {
+        struct FnFinder {
+            found: bool,
+        }
+        impl RustLintPass for FnFinder {
+            fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
+                self.found = true;
+                vec![
+                    Diagnostic::builder()
+                        .rule_id(RuleId::new("test.fn"))
+                        .severity(Severity::Warn)
+                        .message("found")
+                        .span(node.span())
+                        .build(),
+                ]
+            }
+        }
+
+        let tree = parse_rust("fn main() {}");
+        let fn_node = tree.root_node().named_child(0).unwrap();
+        let mut adapter = RustLintPassAdapter::new(FnFinder { found: false });
+
+        let checked: Result<_, Panic> = adapter.check_node(&fn_node).into();
+
+        let diagnostics = checked.expect("the rule should not panic");
+        let rules: Vec<RuleId> = diagnostics.iter().map(|found| found.rule_id()).collect();
+        assert_eq!(rules, [RuleId::new("test.fn")]);
+    }
+
+    #[test]
+    fn adapter_works_with_pipeline() {
+        struct NoOp;
+        impl RustLintPass for NoOp {}
+
+        let tree = parse_rust("fn main() {}");
+        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(RustLintPassAdapter::new(NoOp))];
+
+        let diagnostics = stiles_core::walk(&tree, &mut passes).expect("should walk");
+        assert!(diagnostics.is_empty());
+    }
+
+    /// A rule that panics hands the panic back rather than unwinding
+    ///
+    /// The adapter is where a plugin's edge is, so this is the one place
+    /// that proves a panic becomes a value with the message intact.
+    #[test]
+    fn check_node_with_a_panicking_rule_returns_the_panic() {
+        struct Exploding;
+        impl RustLintPass for Exploding {
+            fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
+                panic!("cannot check {}", node.kind());
+            }
+        }
+
+        let tree = parse_rust("fn main() {}");
+        let fn_node = tree.root_node().named_child(0).unwrap();
+        let mut adapter = RustLintPassAdapter::new(Exploding);
+
+        let checked: Result<_, Panic> = adapter.check_node(&fn_node).into();
+
+        let panic = checked.expect_err("the rule should panic");
+        assert_eq!(panic.message(), "cannot check function_item");
+    }
+
+    #[test]
+    fn configure_with_a_panicking_rule_returns_the_panic() {
+        struct Picky;
+        impl RustLintPass for Picky {
+            fn configure(&mut self, _options: &RuleOptions) {
+                panic!("no options accepted");
+            }
+        }
+
+        let mut adapter = RustLintPassAdapter::new(Picky);
+
+        let configured: Result<(), Panic> = adapter.configure(&RuleOptions::default()).into();
+
+        let panic = configured.expect_err("the rule should panic");
+        assert_eq!(panic.message(), "no options accepted");
+    }
+
+    #[test]
+    fn trait_send() {
+        struct Dummy;
+        impl RustLintPass for Dummy {}
+
+        fn assert_send<T: Send>() {}
+        assert_send::<RustLintPassAdapter<Dummy>>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        struct Dummy;
+        impl RustLintPass for Dummy {}
+
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<RustLintPassAdapter<Dummy>>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        struct Dummy;
+        impl RustLintPass for Dummy {}
+
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<RustLintPassAdapter<Dummy>>();
+    }
+}

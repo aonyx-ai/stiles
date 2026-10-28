@@ -48,10 +48,10 @@ dependencies = [
 name = "custom_lint"
 version = "0.1.0"
 dependencies = [
- "whisker-plugin",
- "whisker-rust",
- "whisker-testing",
- "whisker-types",
+ "stiles-plugin",
+ "stiles-rust",
+ "stiles-testing",
+ "stiles-types",
 ]
 
 [[package]]
@@ -312,6 +312,90 @@ dependencies = [
 ]
 
 [[package]]
+name = "stiles-codegen"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "stiles-core"
+version = "0.1.0"
+dependencies = [
+ "bon",
+ "stiles-types",
+ "thiserror",
+ "tree-sitter",
+]
+
+[[package]]
+name = "stiles-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
+]
+
+[[package]]
+name = "stiles-plugin"
+version = "0.1.0"
+dependencies = [
+ "stabby",
+ "stiles-rust",
+ "stiles-types",
+ "stiles-typescript",
+]
+
+[[package]]
+name = "stiles-rust"
+version = "0.1.0"
+dependencies = [
+ "bon",
+ "stabby",
+ "stiles-codegen",
+ "stiles-macros",
+ "stiles-types",
+ "tree-sitter",
+ "tree-sitter-rust",
+]
+
+[[package]]
+name = "stiles-testing"
+version = "0.1.0"
+dependencies = [
+ "stiles-core",
+ "stiles-types",
+ "tree-sitter",
+ "tree-sitter-rust",
+ "tree-sitter-typescript",
+]
+
+[[package]]
+name = "stiles-types"
+version = "0.1.0"
+dependencies = [
+ "bon",
+ "stabby",
+ "thiserror",
+ "tree-sitter",
+]
+
+[[package]]
+name = "stiles-typescript"
+version = "0.1.0"
+dependencies = [
+ "bon",
+ "stabby",
+ "stiles-codegen",
+ "stiles-macros",
+ "stiles-types",
+ "tree-sitter",
+ "tree-sitter-typescript",
+]
+
+[[package]]
 name = "streaming-iterator"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -439,90 +523,6 @@ name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
-
-[[package]]
-name = "whisker-codegen"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "whisker-core"
-version = "0.1.0"
-dependencies = [
- "bon",
- "thiserror",
- "tree-sitter",
- "whisker-types",
-]
-
-[[package]]
-name = "whisker-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.3",
-]
-
-[[package]]
-name = "whisker-plugin"
-version = "0.1.0"
-dependencies = [
- "stabby",
- "whisker-rust",
- "whisker-types",
- "whisker-typescript",
-]
-
-[[package]]
-name = "whisker-rust"
-version = "0.1.0"
-dependencies = [
- "bon",
- "stabby",
- "tree-sitter",
- "tree-sitter-rust",
- "whisker-codegen",
- "whisker-macros",
- "whisker-types",
-]
-
-[[package]]
-name = "whisker-testing"
-version = "0.1.0"
-dependencies = [
- "tree-sitter",
- "tree-sitter-rust",
- "tree-sitter-typescript",
- "whisker-core",
- "whisker-types",
-]
-
-[[package]]
-name = "whisker-types"
-version = "0.1.0"
-dependencies = [
- "bon",
- "stabby",
- "thiserror",
- "tree-sitter",
-]
-
-[[package]]
-name = "whisker-typescript"
-version = "0.1.0"
-dependencies = [
- "bon",
- "stabby",
- "tree-sitter",
- "tree-sitter-typescript",
- "whisker-codegen",
- "whisker-macros",
- "whisker-types",
-]
 
 [[package]]
 name = "winnow"
