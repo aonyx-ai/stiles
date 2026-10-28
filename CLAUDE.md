@@ -136,22 +136,6 @@ mise run rakko -- lint-rust
 cargo build --all-targets --all-features
 ```
 
-### Helpful git commands
-
-```bash
-# Get commits since last release
-git log <previous-tag>..main --oneline
-
-# Check if contributor is first-time
-git log --all --author="Name" --oneline | wc -l
-
-# Get PR author username
-gh pr view <number> --json author --jq '.author.login'
-
-# View commit details
-git show <commit> --stat
-```
-
 ---
 
 ## Rust
@@ -743,6 +727,21 @@ We write commit messages inspired by [tbaggery][tbaggery]:
 Create pull requests using `gh pr create --fill --assignee @me` to derive the
 title and body from the commit message and assign the PR to yourself.
 
+### Changesets
+
+A pull request that makes a change users notice adds a changeset to
+`.changeset/`, and `.changeset/README.md` describes the format. [Otto][otto]
+turns the changesets into a section of `CHANGELOG.md` when it releases, so do
+not edit the changelog by hand.
+
+### Releases
+
+`otto release` runs a release from the terminal, and `otto status` shows where
+one stands. Install Otto with `cargo install otto`. A release tag is
+`stiles@<version>`, and publishing its GitHub release builds the binaries. A
+pre-release such as `0.1.0-rc.6` is always an override of the next version
+that Otto proposes.
+
 ---
 
 ## Acknowledgments
@@ -754,4 +753,5 @@ Apache-2.0 or MIT license.
 [mise]: https://mise.jdx.dev
 [rakko]: https://github.com/aonyx-ai/rakko
 [nextest-agents]: https://github.com/nextest-rs/nextest/blob/main/AGENTS.md
+[otto]: https://github.com/aonyx-ai/otto
 [tbaggery]: https://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html

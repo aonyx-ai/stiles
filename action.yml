@@ -4,7 +4,7 @@ description: Downloads a released stiles and puts it on the PATH
 
 inputs:
   version:
-    description: The release to install, such as v0.1.0-rc.2
+    description: The release to install, such as stiles@0.1.0-rc.6
     required: true
 
 runs:
@@ -20,14 +20,15 @@ runs:
         # A caller chooses the version, and this writes a path derived
         # from it into an environment file. Anything but a release name
         # is refused, so a caller cannot write a second line of its own.
-        if ! printf '%s' "${VERSION}" | grep -Eq '^v[0-9A-Za-z.+-]+$'; then
-          echo "the version must look like v0.1.0-rc.2" >&2
+        if ! printf '%s' "${VERSION}" |
+          grep -Eq '^stiles@[0-9A-Za-z.+-]+$'; then
+          echo "the version must look like stiles@0.1.0-rc.6" >&2
           exit 1
         fi
 
-        # The archive names carry the version without its leading `v`,
-        # because that is what `Cargo.toml` holds.
-        version="${VERSION#v}"
+        # The archive names carry the version without the `stiles@` of the
+        # tag, because that is what `Cargo.toml` holds.
+        version="${VERSION#stiles@}"
 
         case "${RUNNER_OS}-${RUNNER_ARCH}" in
           Linux-X64) target=x86_64-unknown-linux-gnu ;;
