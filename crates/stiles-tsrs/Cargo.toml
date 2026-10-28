@@ -38,7 +38,7 @@ rustc-hash = "2"
 simdutf8 = "0.1.5"
 smallbitvec = "2.6.1"
 smallvec = { version = "1.16", features = ["union"] }
-unicode-id-start = "=1.5.0"
+unicode-id-start = "=1.1.2"
 xxhash-rust = { version = "0.8", features = ["const_xxh3", "xxh3"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
