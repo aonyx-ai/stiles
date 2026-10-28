@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write edited sections back into the Whisker docs pages.
+"""Write edited sections back into the Stiles docs pages.
 
 Reads the shape parse_docs.py emits, on stdin or from a path, and rewrites
 each file whose sections carry edits. A section nobody touched is emitted from

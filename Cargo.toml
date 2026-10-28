@@ -1,16 +1,16 @@
 [workspace]
 members = ["crates/*", "tools/bundle-tsrs"]
-# A lint plugin is never a member, because whisker builds and loads it the way
+# A lint plugin is never a member, because stiles builds and loads it the way
 # it loads a plugin from outside this repository. The two plugins in `examples`
 # declare a workspace of their own, so they need no entry here. The lint
-# plugin of the tests cannot, because whisker-rust depends on it by path. The
+# plugin of the tests cannot, because stiles-rust depends on it by path. The
 # sample projects are the code that the tests check, not code of this
 # repository. `tools/rakko` is a workspace of its own, so the members name the
 # generator of the tsrs bundle and not the whole directory. `vendor` holds the
 # tsrs submodule, which `tools/bundle-tsrs` reads and nothing builds.
 exclude = [
-  "crates/whisker-rust/tests/fixtures/lints/decoration_probes",
-  "crates/whisker-rust/tests/fixtures/sample_project",
+  "crates/stiles-rust/tests/fixtures/lints/decoration_probes",
+  "crates/stiles-rust/tests/fixtures/sample_project",
   "examples/sample_project",
   "vendor",
 ]
@@ -24,7 +24,7 @@ version = "0.1.0"
 edition = "2024"
 
 license = "Apache-2.0 OR MIT"
-repository = "https://github.com/aonyx-ai/whisker.git"
+repository = "https://github.com/aonyx-ai/stiles.git"
 
 [workspace.lints.clippy]
 # Every `unsafe` block states the reason it is sound, next to the block.
@@ -46,13 +46,13 @@ anyhow = "1"
 # constructors that take their arguments by position.
 bon = "3"
 codespan-reporting = "0.13"
-# Finds the directory whisker keeps fetched lint sources in. etcetera rather
-# than `dirs` or `directories`, because whisker wants the XDG layout on every
+# Finds the directory stiles keeps fetched lint sources in. etcetera rather
+# than `dirs` or `directories`, because stiles wants the XDG layout on every
 # platform: a cache under `~/Library/Caches` on macOS would sit apart from the
 # one a container or a continuous integration job restores.
 etcetera = "0.11"
 # Fetches git-sourced lint plugins. Gitoxide rather than the git CLI so that
-# whisker's own behavior does not depend on which git a machine has, or on
+# stiles's own behavior does not depend on which git a machine has, or on
 # whether it has one; the fetch asks the remote for the single pinned commit
 # and nothing else.
 #
@@ -63,7 +63,7 @@ etcetera = "0.11"
 # commit — so the feature is named directly instead.
 #
 # `gix::url` also reads the remote a lint entry names, so the configuration and
-# the fetch agree on what a remote is. Whisker took that parser from `gix-url`
+# the fetch agree on what a remote is. Stiles took that parser from `gix-url`
 # directly until gitoxide 0.87 moved the two crates apart, and a remote parsed
 # by one version cannot be handed to a fetch built on the other.
 gix = { version = "0.90", default-features = false, features = [
@@ -81,14 +81,14 @@ flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
 # Reads and writes the SHA-256 digest that travels beside an archive of
 # prebuilt lints.
 hex = "0.4"
-# The walker behind ripgrep. Whisker uses it instead of a plain directory walk
+# The walker behind ripgrep. Stiles uses it instead of a plain directory walk
 # so that `.gitignore` and friends are honored: a linter that reports on
 # generated output such as `target/` is worse than no linter at all.
 ignore = "0.4"
-# Finds the project a `whisker check` run targets, and reads the
-# configuration file at the top of it. Whisker used to walk the directory
+# Finds the project a `stiles check` run targets, and reads the
+# configuration file at the top of it. Stiles used to walk the directory
 # tree itself. The crate does the same walk, but it is the walk every Aonyx
-# tool does, so `.config/whisker.toml` sits where a user already expects a
+# tool does, so `.config/stiles.toml` sits where a user already expects a
 # tool's configuration to sit, and a broken file is reported in the same
 # words with the same line and column.
 kawauso-project = "0.3.0"
@@ -116,7 +116,7 @@ serde_json = "1"
 # put beside it, which catches a truncated or corrupted download.
 sha2 = "0.11"
 # Lays out the types that cross the plugin boundary so that a plugin one
-# rustc built loads into a whisker another built. Its strings, lists, and
+# rustc built loads into a stiles another built. Its strings, lists, and
 # reference counts free memory through the allocator that made them.
 stabby = "72.1"
 syn = { version = "3", features = ["full", "extra-traits"] }
@@ -128,7 +128,7 @@ tempfile = "3"
 # can match on what went wrong.
 thiserror = "2"
 # Serves a release API to the tests that cover the download, so those
-# tests exercise the HTTP client whisker ships rather than a stand-in.
+# tests exercise the HTTP client stiles ships rather than a stand-in.
 tiny_http = "0.12"
 toml = "1"
 tree-sitter = "0.27"
@@ -137,17 +137,17 @@ tree-sitter-rust = "0.24"
 # TypeScript grammar and `.tsx` files with the TSX grammar, whose JSX
 # syntax conflicts with TypeScript's angle-bracket type assertions.
 tree-sitter-typescript = "0.23"
-whisker-core = { path = "crates/whisker-core", version = "=0.1.0" }
-whisker-macros = { path = "crates/whisker-macros", version = "=0.1.0" }
-whisker-codegen = { path = "crates/whisker-codegen", version = "=0.1.0" }
-whisker-reporting = { path = "crates/whisker-reporting", version = "=0.1.0" }
-whisker-rust = { path = "crates/whisker-rust", version = "=0.1.0" }
-whisker-types = { path = "crates/whisker-types", version = "=0.1.0" }
-whisker-testing = { path = "crates/whisker-testing", version = "=0.1.0" }
+stiles-core = { path = "crates/stiles-core", version = "=0.1.0" }
+stiles-macros = { path = "crates/stiles-macros", version = "=0.1.0" }
+stiles-codegen = { path = "crates/stiles-codegen", version = "=0.1.0" }
+stiles-reporting = { path = "crates/stiles-reporting", version = "=0.1.0" }
+stiles-rust = { path = "crates/stiles-rust", version = "=0.1.0" }
+stiles-types = { path = "crates/stiles-types", version = "=0.1.0" }
+stiles-testing = { path = "crates/stiles-testing", version = "=0.1.0" }
 # The TypeScript provider type-checks with tsrs, a Rust port of the
-# TypeScript 7 checker, so analysis runs in whisker's process with no
+# TypeScript 7 checker, so analysis runs in stiles's process with no
 # Node.js or Go toolchain. tsrs publishes no crates, and crates.io refuses a
 # dependency on a repository, so `mise run rakko -- bundle-tsrs` repackages the tsrs crates
-# that whisker uses as one crate. The `vendor/tsrs` submodule pins the commit;
+# that stiles uses as one crate. The `vendor/tsrs` submodule pins the commit;
 # a bump is a deliberate change to the checker.
-whisker-tsrs = { path = "crates/whisker-tsrs", version = "=0.1.0" }
+stiles-tsrs = { path = "crates/stiles-tsrs", version = "=0.1.0" }

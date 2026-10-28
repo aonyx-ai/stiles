@@ -1,6 +1,6 @@
 import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
 
-// Whisker has two audiences. A project configures and runs Whisker; a rule
+// Stiles has two audiences. A project configures and runs Stiles; a rule
 // author writes the lints it runs. This is the first of them. The second
 // lives under `authoring/`, in its own plugin instance, and `sidebarsAuthoring`
 // describes it. Both are split the same way: tutorials to learn from, how-to
@@ -53,7 +53,7 @@ const sidebars: SidebarsConfig = {
       label: "Explanation",
       collapsed: true,
       items: [
-        "explanation/how-whisker-works",
+        "explanation/how-stiles-works",
         "explanation/package-and-abi-versioning",
         "explanation/pinning-and-trust",
       ],

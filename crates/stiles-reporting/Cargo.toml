@@ -1,0 +1,17 @@
+[package]
+name = "stiles-reporting"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+codespan-reporting.workspace = true
+thiserror.workspace = true
+stiles-types.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

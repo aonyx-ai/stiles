@@ -1,0 +1,55 @@
+[package]
+name = "stiles-rust"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+# The rust-analyzer stack behind the decoration provider dwarfs everything
+# else in this crate. Custom lint plugins depend on this crate only for the
+# generated trait, the adapter, and the decoration types, so the provider is
+# a default feature they can switch off rather than an unconditional cost.
+[features]
+default = ["provider"]
+provider = [
+  "dep:anyhow",
+  "dep:ra_ap_hir",
+  "dep:ra_ap_ide_db",
+  "dep:ra_ap_load-cargo",
+  "dep:ra_ap_project_model",
+  "dep:ra_ap_syntax",
+  "dep:ra_ap_vfs",
+  "dep:thiserror",
+]
+
+[dependencies]
+anyhow = { workspace = true, optional = true }
+bon.workspace = true
+ra_ap_hir = { workspace = true, optional = true }
+ra_ap_ide_db = { workspace = true, optional = true }
+ra_ap_load-cargo = { workspace = true, optional = true }
+ra_ap_project_model = { workspace = true, optional = true }
+ra_ap_syntax = { workspace = true, optional = true }
+ra_ap_vfs = { workspace = true, optional = true }
+stabby.workspace = true
+thiserror = { workspace = true, optional = true }
+tree-sitter.workspace = true
+tree-sitter-rust.workspace = true
+stiles-macros.workspace = true
+stiles-types.workspace = true
+
+[dev-dependencies]
+# A lint crate depends on this one, so this entry closes a cycle. Cargo
+# permits that for dev-dependencies. The cycle lets the integration tests
+# assert on diagnostics a lint draws from real decorations, rather than on
+# the decorations alone: a provider can record a decoration that is present,
+# well-formed, and still says the wrong thing.
+decoration_probes = { path = "tests/fixtures/lints/decoration_probes", default-features = false }
+proptest.workspace = true
+stiles-core.workspace = true
+
+[build-dependencies]
+stiles-codegen.workspace = true
+
+[lints]
+workspace = true

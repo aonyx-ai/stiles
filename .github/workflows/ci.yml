@@ -133,14 +133,14 @@ jobs:
           key: cargo-release-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', 'mise.toml') }}
           restore-keys: cargo-release-${{ runner.os }}-
 
-      # Whisker builds the pinned rules once and keeps them here. No stale
+      # Stiles builds the pinned rules once and keeps them here. No stale
       # revision is worth restoring, so the key has no prefix to fall back to.
       - name: Restore the built lint sources
         if: matrix.command == 'check-self'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.cache/whisker
-          key: lints-${{ runner.os }}-${{ hashFiles('.config/whisker.toml', 'mise.toml') }}
+          path: ~/.cache/stiles
+          key: lints-${{ runner.os }}-${{ hashFiles('.config/stiles.toml', 'mise.toml') }}
 
       # The task hands every argument to the harness untouched, and the harness
       # is what a contributor runs as well, so a job of CI and a machine of a
@@ -186,8 +186,8 @@ jobs:
         if: github.event_name == 'push' && matrix.command == 'check-self'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.cache/whisker
-          key: lints-${{ runner.os }}-${{ hashFiles('.config/whisker.toml', 'mise.toml') }}
+          path: ~/.cache/stiles
+          key: lints-${{ runner.os }}-${{ hashFiles('.config/stiles.toml', 'mise.toml') }}
 
   success:
     name: All checks succeeded

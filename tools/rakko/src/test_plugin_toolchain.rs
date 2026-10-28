@@ -10,7 +10,7 @@ use crate::{HarnessError, step};
 
 /// The channel that builds the plugin
 ///
-/// Mise pins a stable toolchain as the default, which builds whisker, and a
+/// Mise pins a stable toolchain as the default, which builds stiles, and a
 /// dated nightly beside it. The nightly is the other compiler that the run
 /// needs.
 const NIGHTLY: &str = "nightly";
@@ -22,8 +22,8 @@ const RULE: &str = "custom.no-todo";
 ///
 /// This is the proof behind the plugin boundary: every type that crosses it
 /// is laid out by stabby, so the compiler that built a plugin does not
-/// matter. The run builds whisker with the default toolchain of the project,
-/// and then runs it with the pinned nightly selected. Whisker passes its
+/// matter. The run builds stiles with the default toolchain of the project,
+/// and then runs it with the pinned nightly selected. Stiles passes its
 /// environment to the cargo that it starts, so the nightly builds the example
 /// plugin. The handshake either loads the library or ends the run, and the
 /// diagnostic that the rule of the example reports on a scratch project
@@ -61,7 +61,7 @@ struct Scratch {
 impl Scratch {
     /// Writes a project whose only function calls `todo!`
     ///
-    /// The configuration of whisker in the project names the example plugin
+    /// The configuration of stiles in the project names the example plugin
     /// of this repository as its only lint source.
     ///
     /// # Errors
@@ -73,7 +73,7 @@ impl Scratch {
     fn create(plugin: &Path) -> Result<Self, HarnessError> {
         let scratch = Self {
             directory: std::env::temp_dir()
-                .join(format!("whisker-plugin-toolchain-{}", process::id())),
+                .join(format!("stiles-plugin-toolchain-{}", process::id())),
         };
 
         let files = [
@@ -87,7 +87,7 @@ impl Scratch {
                 "pub fn pending() {\n    todo!()\n}\n".to_owned(),
             ),
             (
-                ".config/whisker.toml",
+                ".config/stiles.toml",
                 format!("[[lints]]\npath = \"{}\"\n", plugin.display()),
             ),
         ];
@@ -116,24 +116,24 @@ impl Drop for Scratch {
 /// # Errors
 ///
 /// Returns the error of the step that could not finish: the resolution of
-/// cargo or the nightly toolchain, the build of whisker, the scratch
-/// project, or the run of whisker.
+/// cargo or the nightly toolchain, the build of stiles, the scratch
+/// project, or the run of stiles.
 async fn drive(context: &Context) -> Result<Outcome, HarnessError> {
     let cargo = step::cargo(context).await?;
     let nightly = Toolchain::resolve(Channel::new(NIGHTLY), context.root())
         .await
         .map_err(|source| HarnessError::UnresolvedToolchain { source })?;
 
-    let build = step::run(cargo.args(["build", "-p", "whisker"])).await?;
+    let build = step::run(cargo.args(["build", "-p", "stiles"])).await?;
     if !build.status().success() {
-        return Ok(step::failed("building whisker", &build));
+        return Ok(step::failed("building stiles", &build));
     }
 
     let root = context.root().get();
     let scratch = Scratch::create(&root.join("examples/custom_lint"))?;
 
     let check = step::run(
-        Invocation::new(root.join("target/debug/whisker"))
+        Invocation::new(root.join("target/debug/stiles"))
             .arg("check")
             .arg(scratch.directory.as_path())
             .env("RUSTUP_TOOLCHAIN", nightly.get())

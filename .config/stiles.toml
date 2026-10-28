@@ -1,0 +1,30 @@
+# Stiles reads this file when `stiles check` runs against this repository.
+# The patterns below anchor at the repository root, not at `.config`.
+# `/examples/` and the fixtures hold code that breaks stiles's own lints on
+# purpose. `/docs/` is the documentation site: its TypeScript configuration
+# extends a package that exists only after `npm install`, and the site's own
+# build checks that code. `/tools/rakko/` holds the harness of the
+# maintenance commands, a workspace of its own that follows the conventions of
+# Rakko. `/crates/stiles-tsrs/` and `/vendor/` hold tsrs, which follows its
+# own rules.
+ignore = [
+  "/crates/stiles-tsrs/",
+  "/docs/",
+  "/examples/",
+  "/tools/rakko/",
+  "/vendor/",
+  "crates/stiles-rust/tests/fixtures/",
+]
+
+# Every lint builds against the stiles in this directory, not against the
+# stiles its own manifest names. The rules repository pins a stiles commit
+# so that it can build on its own, and this overrides that pin, so a check
+# here runs the rules against the working tree.
+stiles-source = "."
+
+# Stiles's rules live in their own repository, pinned to one commit. Bumping
+# this is how stiles adopts a new rule or a changed one; until it moves, a
+# check here runs exactly the rules it ran yesterday.
+[[lints]]
+git = "https://github.com/aonyx-ai/stiles-aonyx-rules"
+rev = "8f39356148f98f0516ba356cd596af8631db4d2b"

@@ -2,9 +2,9 @@ docs/.docusaurus/
 docs/build/
 docs/node_modules/
 # Vendored from tree-sitter-typescript, byte for byte: a test compares them
-# with the grammar crate whisker links, and formatting would break that.
-crates/whisker-typescript/src/tsx-node-types.json
-crates/whisker-typescript/src/typescript-node-types.json
+# with the grammar crate stiles links, and formatting would break that.
+crates/stiles-typescript/src/tsx-node-types.json
+crates/stiles-typescript/src/typescript-node-types.json
 # Generated from the tsrs submodule, and checked against a fresh run.
-crates/whisker-tsrs/
+crates/stiles-tsrs/
 vendor/

@@ -18,24 +18,24 @@ and this project adheres to
 
 - `Diagnostic`, `Span`, `Location`, `Suggestion`, `RuleOption`,
   `DecoratedTree`, `DecoratedNode`, and the `TypePath`, `PublicPath`, and
-  `FnSignature` of `whisker-rust` each have a builder, `builder()`. A
+  `FnSignature` of `stiles-rust` each have a builder, `builder()`. A
   builder names every field at the call site.
 
 - `TypePathRef` has a builder, `builder()`, that runs in a `const`.
 
-- `--json` writes each diagnostic of `whisker check` as one JSON object per
+- `--json` writes each diagnostic of `stiles check` as one JSON object per
   line, with the rule, severity, message, file, byte offsets, line, and
-  column. `whisker abi --json` writes the tag as a JSON string. `--verbose`
-  names each file as whisker checks it, and `--quiet` hides the `help:`
+  column. `stiles abi --json` writes the tag as a JSON string. `--verbose`
+  names each file as stiles checks it, and `--quiet` hides the `help:`
   lines. All three flags were in the help before, and none of them did
   anything.
 
-- `whisker rules` lists the rules the configured lints declare, the languages
+- `stiles rules` lists the rules the configured lints declare, the languages
   each runs on, and whether the project's `[rules]` turn it off. With
   `--json` it writes one object per rule.
 
 - A pull request that moves a plugin boundary fingerprint without raising
-  `ABI_VERSION` fails CI. `crates/whisker-plugin/abi-surface.toml` records
+  `ABI_VERSION` fails CI. `crates/stiles-plugin/abi-surface.toml` records
   the boundary, and `rakko check-abi` compares it with the record on `main`.
 
 - The TypeScript provider records more than the type text. `ResolvedType`
@@ -61,10 +61,10 @@ and this project adheres to
   `named_children` returns no longer clones borrowed data. The
   plugin ABI tag does not move, so every published archive still loads.
 
-- Whisker says when a git source publishes no prebuilt lints it can load, and
+- Stiles says when a git source publishes no prebuilt lints it can load, and
   names the archive it looked for. The compile that follows costs minutes on
   every machine, and silence read exactly like a warm cache. A repository
-  whisker cannot see, which is what a private one looks like without a token,
+  stiles cannot see, which is what a private one looks like without a token,
   stays quiet: nobody reading that can act on it.
 - A `[rules]` table names the rules a project runs. `enable` runs only those
   named, `disable` runs everything else, and a name that no configured lint
@@ -74,34 +74,40 @@ and this project adheres to
   value is a list of names, and a rule reads its own entry in `configure`.
   Plugins built for an earlier protocol no longer load, because the method is
   new on `LintPass`.
-- Whisker asks a git source's releases for prebuilt lints before it compiles
+- Stiles asks a git source's releases for prebuilt lints before it compiles
   anything. It verifies the published SHA-256, and every library still
   completes the plugin handshake.
-- An action installs a released whisker on a GitHub Actions runner. It picks
+- An action installs a released stiles on a GitHub Actions runner. It picks
   the archive for the runner, checks it against the digest published beside
-  it, and puts whisker on the `PATH`.
-- `whisker abi` prints the tag that says which prebuilt lints this binary
+  it, and puts stiles on the `PATH`.
+- `stiles abi` prints the tag that says which prebuilt lints this binary
   loads. Publishers put it in each archive's name.
-- Every release carries whisker binaries for Linux on x86-64 and arm64 and for
+- Every release carries stiles binaries for Linux on x86-64 and arm64 and for
   macOS on Apple silicon, each with a SHA-256 beside it. Prereleases too.
-- A `[[lints]]` entry can name a repository and a commit, which whisker caches.
+- A `[[lints]]` entry can name a repository and a commit, which stiles caches.
   A directory may also hold a cargo workspace.
 
 ### Changed
 
+- Whisker is now Stiles. The binary, the crates, the commands, the
+  environment variables and the configuration file all carry the new name. A
+  project renames `.config/whisker.toml` to `.config/stiles.toml`, and a
+  plugin depends on the `stiles-*` crates. The renamed type paths move both
+  fingerprints, so the plugin ABI moves to 0.6. Rebuild every plugin.
+
 - The library crates return typed errors instead of `anyhow::Error`.
   `DecorationProvider::decorate` returns `DecorateTreeError`, so a provider
-  outside whisker changes the error type of its `decorate`.
-  `RuleOptions::validate`, the pipeline and walk of `whisker-core`, both
-  providers, and the renderers of `whisker-reporting` each return an error
+  outside stiles changes the error type of its `decorate`.
+  `RuleOptions::validate`, the pipeline and walk of `stiles-core`, both
+  providers, and the renderers of `stiles-reporting` each return an error
   enum a caller can match on.
 
-- `whisker check` and `whisker rules` write their errors and notes to stderr
-  after the report, not while they run. A file whisker could not check, a
+- `stiles check` and `stiles rules` write their errors and notes to stderr
+  after the report, not while they run. A file stiles could not check, a
   walk error, and a note or warning about prebuilt lints all come last, and
   a run that stops on an error still writes the ones it collected first.
 
-- `whisker_codegen::build_language` takes the writer for the directives it
+- `stiles_codegen::build_language` takes the writer for the directives it
   gives cargo. A build script passes its standard output.
 
 - The decorations of the TypeScript provider, `ResolvedType`, `Parameter`,
@@ -109,20 +115,20 @@ and this project adheres to
   gone.
 
 - A TypeScript file with no `tsconfig.json` at or above it no longer stops the
-  whole check. It reports a coverage gap of its own, like any file whisker
+  whole check. It reports a coverage gap of its own, like any file stiles
   cannot analyze, and the run goes on under `--keep-going`.
 
-- `whisker check` writes its diagnostics and `help:` lines to stdout. Errors
+- `stiles check` writes its diagnostics and `help:` lines to stdout. Errors
   stay on stderr. A script that read the report from stderr reads stdout
   now, and with `--json` stdout holds nothing but JSON.
 
 - A plugin declares the rules of each lint it exports, not of the whole
   library, and the plugin ABI moves to 0.3. Rebuild every plugin. Each pass
-  now reads only the options of its own rules. Whisker refuses two lints
+  now reads only the options of its own rules. Stiles refuses two lints
   that declare one rule for one language, a lint that declares no rules,
   and a diagnostic under a rule its pass did not declare.
 
-- The values a plugin exchanges with whisker are laid out by [stabby][stabby]:
+- The values a plugin exchanges with stiles are laid out by [stabby][stabby]:
   `Diagnostic`, `Span`, `FilePath`, `Location`, `Suggestion`, `RuleId`,
   `Severity`, `RuleOptions`, and `RuleOption`. Their layout no longer depends
   on the compiler, which is the first step toward loading a plugin that
@@ -134,15 +140,15 @@ and this project adheres to
   `Decoration` must now be `IStable`, so a decoration std would lay out is a
   compile error rather than a plugin that reads the wrong bytes.
 - A node crosses the boundary laid out by stabby, and it reads decorations
-  through a call into whisker rather than by walking whisker's map. The
+  through a call into stiles rather than by walking stiles's map. The
   boundary fingerprint now names only the types a pass receives and
   returns.
 - A pass's methods are `extern "C"` and hand back a value, so a call into a
   pass no longer depends on the calling convention of the compiler that
-  built it. A panic inside a rule comes back as a value too, and whisker
+  built it. A panic inside a rule comes back as a value too, and stiles
   reports the file and node it was checking instead of the process dying.
   The protocol is 5, and a plugin built for an earlier one no longer loads.
-- A plugin hands its lint factories and its rules to whisker through
+- A plugin hands its lint factories and its rules to stiles through
   `extern "C"` functions that return values stabby lays out, and each pass
   crosses the boundary in a stabby box behind a stabby vtable. The
   registrar is gone. Every allocation that crosses now carries the function
@@ -150,32 +156,32 @@ and this project adheres to
   protocol is 6.
 - `TYPES_FINGERPRINT` is built from stabby's identities alone. The hash of
   sizes, alignments, and field offsets that preceded it is gone.
-- Whisker loads a plugin regardless of which rustc built it. The handshake no
+- Stiles loads a plugin regardless of which rustc built it. The handshake no
   longer compares compiler versions: every type that crosses the boundary is
   laid out by stabby, so the two fingerprints are the whole handshake.
-  Building a plugin against the whisker revision that loads it is the sure
+  Building a plugin against the stiles revision that loads it is the sure
   way to match them. The tag that names a prebuilt archive no longer carries
   a compiler.
-- The plugin protocol is a major and a minor, and whisker ships at 0.1.
+- The plugin protocol is a major and a minor, and stiles ships at 0.1.
   `MIN_ABI_VERSION` is gone: the floor follows from the version. Before 1.0
-  a plugin loads only on the whisker it was built for, so the boundary is
+  a plugin loads only on the stiles it was built for, so the boundary is
   free to move. From 1.0 a plugin built for any minor of a major loads on
   every later minor of it, and only a major asks for a rebuild.
 - A plugin declares the rules it reports, which is what a `[rules]` name is
   checked against.
-- A lint pass names the language it inspects, and whisker hands it only the
+- A lint pass names the language it inspects, and stiles hands it only the
   trees of that language. `Language` crosses the boundary, so it is laid out
   by stabby and gains a `TypeScript` variant, and a `DecoratedTree` records
   the language it was parsed as. The protocol is 0.2, and a plugin built for
   0.1 no longer loads.
-- A plugin exports its lints with `whisker_plugin::export_lints!`, grouped by
+- A plugin exports its lints with `stiles_plugin::export_lints!`, grouped by
   language: `export_lints![rust: [NoTodo]]`. `DeclaresRules` moved to
-  whisker-plugin too, and one type may appear in several groups while its
+  stiles-plugin too, and one type may appear in several groups while its
   rules are declared once. The declaration's language fingerprint joins
   every language crate's, so a plugin that names one language still matches
-  the whisker that supports several. `whisker-source` patches whisker-plugin
+  the stiles that supports several. `stiles-source` patches stiles-plugin
   along with the other crates a lint package names.
-- whisker-typescript brings TypeScript rules: `TypeScriptLintPass` has one
+- stiles-typescript brings TypeScript rules: `TypeScriptLintPass` has one
   method per node kind of the TypeScript and TSX grammars together, so one
   rule runs on `.ts` and `.tsx` files alike. A plugin exports such rules in
   a `typescript` group of `export_lints!`.
@@ -184,45 +190,45 @@ and this project adheres to
   Node.js. It loads the `tsconfig.json` nearest the checked path and records
   the checker's type of every identifier as a `TypeText` decoration. A file
   the project leaves out is declined with the gap that names its remedy.
-- `whisker check` checks TypeScript: `.ts`, `.mts`, `.cts`, and `.tsx` files.
+- `stiles check` checks TypeScript: `.ts`, `.mts`, `.cts`, and `.tsx` files.
   A run loads a language's project only when it finds a file in that language,
   so a Rust repository needs no `tsconfig.json` and a TypeScript one needs no
   `Cargo.toml`. A TypeScript file belongs to the project of the
   `tsconfig.json` nearest it, so a repository can hold several, and each file
   reaches only its own project's provider.
 - A language crate builds its lint pass trait with
-  `whisker_codegen::build_language` and defines its adapter with
-  `whisker_types::lint_pass_adapter!`, so the Rust and TypeScript crates share
+  `stiles_codegen::build_language` and defines its adapter with
+  `stiles_types::lint_pass_adapter!`, so the Rust and TypeScript crates share
   that code and a new language writes it once. ARCHITECTURE.md lists what a
   new language adds.
 
 - The Linux binaries are built on Ubuntu 22.04, so they need glibc 2.35 rather
   than 2.39. The 2.39 floor refused Ubuntu 22.04 LTS and Debian 12.
-- Whisker's own rules moved to [whisker-aonyx-rules][rules]. A project that ran
+- Stiles's own rules moved to [stiles-aonyx-rules][rules]. A project that ran
   them from `lints/` now names that repository and a commit.
-- Whisker finds its project with [kawauso-project][kawauso], and a broken
+- Stiles finds its project with [kawauso-project][kawauso], and a broken
   configuration file reports the line and column to fix.
-- Whisker lists its subcommands in a stable order.
+- Stiles lists its subcommands in a stable order.
 
 ### Removed
 
 - The positional `new` of `Diagnostic`, `Span`, `Location`, `Suggestion`,
   `RuleOption`, `DecoratedTree`, `DecoratedNode`, and the `TypePath`,
-  `PublicPath`, `TypePathRef`, and `FnSignature` of `whisker-rust` is gone.
+  `PublicPath`, `TypePathRef`, and `FnSignature` of `stiles-rust` is gone.
   Build each one with `builder()`. A plugin that calls `new` no longer
-  compiles against this whisker source. The layouts do not change, so the
+  compiles against this stiles source. The layouts do not change, so the
   plugin ABI stays at 0.5.
 
-- `whisker check` no longer accepts trailing arguments. It discarded them,
+- `stiles check` no longer accepts trailing arguments. It discarded them,
   and the help called them arguments for the analysis pipeline, which
   takes none.
 
-- Whisker no longer reads `.whisker.toml`. Move it to `.config/whisker.toml`.
-  Whisker says nothing about the old name, so a project that misses this runs
+- Stiles no longer reads `.stiles.toml`. Move it to `.config/stiles.toml`.
+  Stiles says nothing about the old name, so a project that misses this runs
   with no patterns and no custom lints.
 - The crates.io publish workflow is gone. Releases carry binaries.
 
 [kawauso]: https://crates.io/crates/kawauso-project
-[rules]: https://github.com/aonyx-ai/whisker-aonyx-rules
+[rules]: https://github.com/aonyx-ai/stiles-aonyx-rules
 [stabby]: https://crates.io/crates/stabby
 [tsrs]: https://github.com/oxc-project/tsrs

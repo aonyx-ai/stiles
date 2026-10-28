@@ -1,5 +1,5 @@
-# Generates `crates/whisker-tsrs` from the tsrs submodule. It has no version
-# of its own, so a release leaves it out, and nothing that whisker ships
+# Generates `crates/stiles-tsrs` from the tsrs submodule. It has no version
+# of its own, so a release leaves it out, and nothing that stiles ships
 # depends on it.
 [package]
 name = "bundle-tsrs"

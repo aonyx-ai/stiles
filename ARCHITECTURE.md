@@ -1,8 +1,8 @@
 # Architecture
 
-Whisker is a linting platform built on [tree-sitter][ts]. It lints Rust
-today. Whisker ships no rules of its own. Aonyx's rules live in
-[whisker-aonyx-rules][rules] and cover what Clippy does not, like derive
+Stiles is a linting platform built on [tree-sitter][ts]. It lints Rust
+today. Stiles ships no rules of its own. Aonyx's rules live in
+[stiles-aonyx-rules][rules] and cover what Clippy does not, like derive
 ordering and wildcard match arms.
 
 This document describes the shape of the platform. Each crate documents
@@ -17,7 +17,7 @@ syntax tree cannot supply. Is this match scrutinee an enum? Does this
 function return `Result`? Semantics is expensive, because it needs a real
 toolchain with knowledge of the whole project.
 
-Whisker keeps the two apart. The platform parses files with tree-sitter
+Stiles keeps the two apart. The platform parses files with tree-sitter
 and walks the syntax tree through lint rules. Semantic information enters
 as **decorations**: typed values that a language provider computes up
 front and attaches to individual syntax nodes. Rules read decorations off
@@ -61,7 +61,7 @@ for every file, because passes hold state.
 
 ### Coverage
 
-A file that no provider covers is an error. Whisker runs no rule on it,
+A file that no provider covers is an error. Stiles runs no rule on it,
 syntactic rules included, because a clean result would hide code that no
 rule inspected. A provider declines a file for one of four reasons. The
 file sits outside the root the provider loaded, no crate reaches it, the
@@ -78,14 +78,14 @@ documentation describes those rules.
 ## Language support
 
 A language plugs into the platform at two points: a lint pass trait that
-whisker generates, and a decoration provider that talks to the toolchain.
+stiles generates, and a decoration provider that talks to the toolchain.
 
 ### The lint pass trait
 
 A tree-sitter grammar ships a machine-readable description of its node
 types. Each language crate keeps a copy of its grammars' descriptions, such
-as `crates/whisker-rust/src/node-types.json`. Its build script calls
-`whisker_codegen::build_language`, which generates a trait with one method
+as `crates/stiles-rust/src/node-types.json`. Its build script calls
+`stiles_codegen::build_language`, which generates a trait with one method
 per named node kind, plus the dispatch that routes a node to its method.
 Rules hook the constructs they care about by name. Grammars also group node
 kinds into supertypes, so a rule can hook every expression at once.
@@ -98,8 +98,8 @@ One rule then runs on either kind of file.
 A copy tracks its grammar until someone refreshes it. A renamed node then
 breaks compilation at every rule that hooked it. Until the refresh, the
 parser and the trait describe different grammars, and a rule that hooked
-the old name stops firing. whisker-typescript has a test that fails when its
-copies differ from the grammar crate it links. whisker-rust still tracks its
+the old name stops firing. stiles-typescript has a test that fails when its
+copies differ from the grammar crate it links. stiles-rust still tracks its
 copy by hand.
 
 ### The decoration provider
@@ -107,7 +107,7 @@ copy by hand.
 Rust's provider uses [rust-analyzer][ra] as a library. The command loads
 it once per run. The load discovers the Cargo manifest nearest the checked
 path, resolves that workspace, runs its build scripts, and builds the
-analysis database. A `whisker check` therefore needs a Cargo project, and it
+analysis database. A `stiles check` therefore needs a Cargo project, and it
 executes that project's build scripts before it lints anything. The load
 enables the `test` cfg, so code under `#[cfg(test)]` resolves like any
 other code. It runs no proc-macro server, so code that a proc macro
@@ -121,7 +121,7 @@ ADT flags, import sources, and re-exports. The re-exports of an imported
 path are the public paths to the same item through the other crates the
 current crate depends on, which rust-analyzer's import maps prove. The set
 belongs to the provider, and a rule that needs a decoration on another node
-kind needs a change to whisker-rust.
+kind needs a change to stiles-rust.
 
 TypeScript's provider uses [tsrs][tsrs], a Rust port of the TypeScript 7
 checker, as a library. A TypeScript file belongs to the project of the
@@ -139,7 +139,7 @@ Rust.
 
 tsrs publishes no crates, and crates.io refuses a crate that depends on a
 repository. `mise run rakko -- bundle-tsrs` therefore copies the tsrs crates
-the provider needs into `whisker-tsrs`, one module for each crate, and
+the provider needs into `stiles-tsrs`, one module for each crate, and
 rewrites only the paths that name a crate. A bump moves the `vendor/tsrs`
 submodule and runs the tool again. `mise run rakko -- check-bundle-tsrs`
 fails when the committed crate differs from a fresh run, so no fix to tsrs
@@ -153,16 +153,16 @@ with the text the pipeline parsed, and declines the file when they differ.
 
 The platform does not change for a new language. These places do:
 
-- `whisker_types::Language` gains a variant, and `from_extension` maps the
+- `stiles_types::Language` gains a variant, and `from_extension` maps the
   language's extensions to it.
 - A new language crate keeps its grammars' `node-types.json`, calls
-  `whisker_codegen::build_language` from its build script, and defines its
-  adapter with `whisker_types::lint_pass_adapter!`. Its
+  `stiles_codegen::build_language` from its build script, and defines its
+  adapter with `stiles_types::lint_pass_adapter!`. Its
   `LANGUAGE_FINGERPRINT` joins the visitor fingerprint with the identity of
   each decoration type it defines.
 - A decoration provider behind the crate's default `provider` feature, so a
   plugin can build without it.
-- whisker-plugin's `export_lints!` gains a group for the language, and its
+- stiles-plugin's `export_lints!` gains a group for the language, and its
   `LANGUAGE_FINGERPRINT` joins the new crate's.
 - The check command picks the grammar per file and loads the provider when
   discovery finds a file in the language.
@@ -190,36 +190,36 @@ is one.
 ## Lint rules
 
 A rule implements the generated trait and emits diagnostics with a stable
-rule ID and a severity. Rules ship in lint crates. whisker-plugin's
+rule ID and a severity. Rules ship in lint crates. stiles-plugin's
 `export_lints!` takes a list per language, so one crate can carry several
 rules, and Aonyx keeps one rule per crate. A pass names its language, and
-the walker hands it only the trees of that language. Whisker links no rules
+the walker hands it only the trees of that language. Stiles links no rules
 itself. A check runs exactly the rules its configured sources export, and
 the `rules` table decides which of those reach the report.
 
 Rules that depend on decorations **fail open**. A decoration is only ever
 evidence. Where a decoration is the reason to report, a missing one keeps
 the rule silent. Where a decoration would exempt the code, a missing one
-leaves the diagnostic standing. Whisker prefers a missed finding to a
+leaves the diagnostic standing. Stiles prefers a missed finding to a
 finding it cannot justify.
 
 ## Custom lints
 
-A project names its lint crates in `.config/whisker.toml`. Whisker finds
+A project names its lint crates in `.config/stiles.toml`. Stiles finds
 that file by climbing from the checked path to the file or to a `.git`
 directory. The file has three keys: `ignore`, `lints`, and `rules`. Each
 `lints` entry names a directory, or a repository pinned to one commit.
 
-`whisker check` resolves every entry before it compiles any of them, so a
+`stiles check` resolves every entry before it compiles any of them, so a
 typo in the second entry surfaces before the first entry's build. Every
-network request whisker makes itself happens in that stage. Cargo may
+network request stiles makes itself happens in that stage. Cargo may
 still reach the network during a build, for a dependency the machine has
 not downloaded before.
 
 A git entry becomes a directory in the cache and is then a directory like
-any other. The cache is `WHISKER_CACHE_DIR` when it is set. Otherwise it is
-the XDG cache directory plus `whisker`, which is `~/.cache/whisker` on
-every platform. A checkout lives at `<cache>/git/<remote>/<rev>/`. Whisker
+any other. The cache is `STILES_CACHE_DIR` when it is set. Otherwise it is
+the XDG cache directory plus `stiles`, which is `~/.cache/stiles` on
+every platform. A checkout lives at `<cache>/git/<remote>/<rev>/`. Stiles
 assembles it in a sibling directory and renames it into place, so a
 checkout that exists is whole.
 
@@ -229,16 +229,16 @@ machine's git configuration still applies, and a private remote fetches
 with the credentials the home directory carries. The fetch ignores the
 `GIT_*` environment, so a run inside a git hook cannot be redirected onto
 the repository being committed. A commit hash names an immutable tree, so
-whisker never refreshes a checkout that exists and never asks the remote
+stiles never refreshes a checkout that exists and never asks the remote
 about it again.
 
-Whisker runs `cargo build --release` in the directory, with the cargo that
+Stiles runs `cargo build --release` in the directory, with the cargo that
 `CARGO` names or the one on `PATH`. Only a git entry builds with
 `--locked`, because the pinned commit fixes the rules only when the
 lockfile fixes their dependencies. Cargo's target directory sits inside
 the checkout, so a second run over the same pin is a warm build.
 
-A directory may hold one package or a workspace of them. Whisker loads
+A directory may hold one package or a workspace of them. Stiles loads
 every dynamic library the build produced, and each one completes its own
 handshake. That is what lets a repository of rules arrive through a single
 entry.
@@ -249,45 +249,45 @@ report. `[rules.options."<rule>"]` holds the options that rule reads, each
 a list of names.
 
 A plugin declares the rules of each lint it exports, with the language
-the lint runs on. Whisker therefore hands each pass only the options of
+the lint runs on. Stiles therefore hands each pass only the options of
 its own rules. An option name is never checked, because nothing declares
 the options a rule reads. A rule name is checked, against the same
 declared set that `enable` and `disable` are checked against.
 
-The declaration is also a promise that whisker holds a pass to. Two lints
+The declaration is also a promise that stiles holds a pass to. Two lints
 that declare one rule for one language are refused at load, across every
 plugin. A pass that reports a rule it did not declare ends the run, the
 way a panic does, because that diagnostic would slip past every switch
-and option a project sets by rule id. `whisker rules` lists what the
+and option a project sets by rule id. `stiles rules` lists what the
 loaded plugins declare.
 
 ## Prebuilt lints
 
-A git entry can arrive as libraries that its publisher compiled. Whisker
+A git entry can arrive as libraries that its publisher compiled. Stiles
 takes the cheapest answer the machine already holds. Prebuilt libraries it
 unpacked before come first. A checkout it already holds comes next. Only a
 machine with neither asks the remote's releases, and only when that
-answers with nothing does whisker fetch the source. A project with a warm
+answers with nothing does stiles fetch the source. A project with a warm
 checkout therefore keeps compiling it after its rules start to publish
 archives. Someone moves the pin or clears the cache to pick them up.
 
 A compile costs a toolchain and several minutes, on every machine and
-every build agent that pins the same commit. A released whisker binary
+every build agent that pins the same commit. A released stiles binary
 also lands on machines that have no toolchain at all, and a library built
 elsewhere loads there just the same.
 
-Whisker asks the remote's releases for an archive named
-`<rev>-<tag>.tar.gz`, where the tag is the one `whisker abi` prints. The
+Stiles asks the remote's releases for an archive named
+`<rev>-<tag>.tar.gz`, where the tag is the one `stiles abi` prints. The
 tag is a digest of every value the handshake compares, followed by the
 target triple the build script baked in. An archive published under a
-whisker's tag passes that whisker's handshake. A prebuilt library that
+stiles's tag passes that stiles's handshake. A prebuilt library that
 fails the handshake ends the run and names the directory to delete. The
 publisher named that archive with a tag that does not describe it.
 
-Whisker checks the archive against the `.sha256` published beside it, then
+Stiles checks the archive against the `.sha256` published beside it, then
 unpacks it into `<cache>/prebuilt/<remote>/<rev>/<tag>/`, staged and
 renamed the way a checkout is. Both layouts derive `<remote>` from the
-same function. Whisker unpacks only regular files at the archive's root.
+same function. Stiles unpacks only regular files at the archive's root.
 That one rule keeps every entry inside the directory, and it passes over a
 symbolic link, which is no regular file.
 
@@ -295,35 +295,35 @@ The digest proves that the download arrived intact. The same publisher
 writes the archive and the digest, so it establishes nothing about trust.
 Neither does the handshake, which proves compatibility. Trust comes from
 the configuration: a configured repository of lints runs its code in
-whisker's process, prebuilt or compiled.
+stiles's process, prebuilt or compiled.
 
-A missing archive never fails the lookup. Whisker says nothing when the
+A missing archive never fails the lookup. Stiles says nothing when the
 remote is not on GitHub, when the API answers 404, and when no release
-names an archive for this whisker. That is the ordinary case for a project
-whose rules nobody publishes prebuilt. Whisker then compiles the source,
+names an archive for this stiles. That is the ordinary case for a project
+whose rules nobody publishes prebuilt. Stiles then compiles the source,
 and on a machine without a Rust toolchain that build fails. Every
 other failure prints one line on stderr before the source build:
 
-- an API whisker cannot reach, or one that answers with an error
+- an API stiles cannot reach, or one that answers with an error
 - a digest that does not match
 - an archive that will not unpack
-- a cache directory whisker cannot write
+- a cache directory stiles cannot write
 
 The exchange with the API runs on a thread of its own. The HTTP client
 owns an asynchronous runtime, the check command is itself asynchronous,
 and a runtime dropped inside another panics.
 
-Whisker reads `GH_TOKEN`, then `GITHUB_TOKEN`, for a private repository,
-and sends the token only to the API host. `WHISKER_GITHUB_API_URL` points
+Stiles reads `GH_TOKEN`, then `GITHUB_TOKEN`, for a private repository,
+and sends the token only to the API host. `STILES_GITHUB_API_URL` points
 it at a GitHub Enterprise installation. Every request has a timeout, and
-every body whisker reads has a size limit.
+every body stiles reads has a size limit.
 
 ## The plugin boundary
 
 Rust has no stable ABI of its own, so every type that crosses between
-whisker and a plugin is laid out by stabby, whose layouts hold under any
-compiler. A loaded library is coherent with the whisker binary when both
-lay the boundary out the same way, which is a property of the whisker
+stiles and a plugin is laid out by stabby, whose layouts hold under any
+compiler. A loaded library is coherent with the stiles binary when both
+lay the boundary out the same way, which is a property of the stiles
 source each was built from and not of the rustc that built it. The loader
 establishes that before it calls anything the plugin defines. A `dlopen`
 runs the library's initializers, so the handshake is a compatibility
@@ -333,7 +333,7 @@ says.
 The plugin exports a declaration. The loader reads its leading protocol
 version through a raw pointer, and only a matching version licenses a
 reference to the whole struct. It then compares two fingerprints: one for
-whisker-types and one that whisker-plugin joins from every language crate.
+stiles-types and one that stiles-plugin joins from every language crate.
 The first mismatch refuses the library with an error that says what to
 rebuild. Only then does the loader ask the plugin for its lints: a factory,
 a language, and the declared rules of each.
@@ -349,7 +349,7 @@ type of every field, so a field that moved or changed type is refused.
 Each language crate's fingerprint also hashes its generated lint pass
 trait as text, because a trait has no layout a const can read. Doc comments and
 private helpers move nothing, so a plugin stays loadable across most of
-whisker's own churn.
+stiles's own churn.
 
 A node reaches the host's decorations through a call rather than a
 reference to the map, so no std collection crosses the boundary. The host
@@ -367,20 +367,20 @@ contributor to bump it.
 `ABI_VERSION` is a major and a minor, and the two say different things.
 Two kinds of change reach the declaration, and they cost differently. A
 field appended to it is readable by version, because the struct is
-`#[repr(C)]` and whisker knows where each version's fields end. A plugin
+`#[repr(C)]` and stiles knows where each version's fields end. A plugin
 that stops sooner offers less rather than being refused, so such a change
 raises the minor. A method added to the pass trait is not readable that
-way, because whisker cannot measure a vtable, so such a change raises the
+way, because stiles cannot measure a vtable, so such a change raises the
 major and every older plugin stops loading. An optional capability
 therefore belongs in the declaration rather than on the trait.
 
-Major 0 is the exception, and whisker is in it. Nothing is promised
-before 1.0: a plugin loads only on the whisker it was built for, and
+Major 0 is the exception, and stiles is in it. Nothing is promised
+before 1.0: a plugin loads only on the stiles it was built for, and
 every change to the boundary costs one minor. From 1.0 the major carries
 the promise, and a plugin built for any minor of it keeps loading.
 
-`crates/whisker-plugin/abi-surface.toml` records the version and both
-fingerprints, and a test in whisker-plugin fails when the record and the
+`crates/stiles-plugin/abi-surface.toml` records the version and both
+fingerprints, and a test in stiles-plugin fails when the record and the
 code differ. A change to the boundary therefore changes the record, and
 `rakko check-abi` compares the record with the one on `main`. A moved
 fingerprint with the same version fails the check. From 1.0, a moved
@@ -388,13 +388,13 @@ fingerprint with the same major fails it too, because a fingerprinted type
 that changed refuses every older plugin.
 
 The tag a publisher names an archive with carries the floor of that
-range rather than the version, for the same reason. Two whiskers that
+range rather than the version, for the same reason. Two stiles builds that
 read the same protocols accept each other's archives, so from 1.0 a
 protocol that only appends a field does not strand what a publisher
 already built. Before 1.0 the floor is the version itself, so each
 release asks for archives of its own.
 
-The fingerprints stop at whisker's own layout. A contributor maintains
+The fingerprints stop at stiles's own layout. A contributor maintains
 each list of types by hand. A fieldless enum keeps its size and alignment
 when its variants reorder, so the fingerprint does not see that change. A
 decoration's key hashes its definition text, so an edit to that text
@@ -418,39 +418,39 @@ library's image.
 The platform lives in `crates/`. Rules live in their own repository. Two
 plugin packages stay here for the tests that need one.
 `examples/custom_lint` is the template a rule is written from.
-`crates/whisker-rust/tests/fixtures/lints/decoration_probes` reads
+`crates/stiles-rust/tests/fixtures/lints/decoration_probes` reads
 decorations, so the provider's output stays under test. Both sit outside
 the workspace and keep their own lockfiles, the way a plugin written
 elsewhere does. The workspace test run builds and loads them through the
 CLI. `rakko test-rust` runs the tests of the two examples beside those of the
 workspace, and `rakko test-fixture-lint` runs the tests of the probes.
 
-| Crate                | Role                                                                                     |
-| -------------------- | ---------------------------------------------------------------------------------------- |
-| `whisker-types`      | Shared vocabulary: trees, decorations, diagnostics, coverage, and the plugin declaration |
-| `whisker-core`       | The pipeline and tree walker                                                             |
-| `whisker-codegen`    | Generates a lint pass trait from `node-types.json`                                       |
-| `whisker-rust`       | Rust support: the generated trait, the decorations, and the provider                     |
-| `whisker-typescript` | TypeScript support: the trait from both grammars, the decorations, and the tsrs provider |
-| `whisker-tsrs`       | The tsrs crates as modules of one crate, generated from the `vendor/tsrs` submodule      |
-| `whisker-plugin`     | What a plugin exports: `export_lints!`, `DeclaresRules`, and the language fingerprint    |
-| `whisker-macros`     | The derive macro for decoration types                                                    |
-| `whisker-reporting`  | Diagnostic rendering                                                                     |
-| `whisker-testing`    | Test harness for lint rules                                                              |
-| `whisker`            | The CLI, custom lint loading, and the plugin handshake                                   |
+| Crate               | Role                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `stiles-types`      | Shared vocabulary: trees, decorations, diagnostics, coverage, and the plugin declaration |
+| `stiles-core`       | The pipeline and tree walker                                                             |
+| `stiles-codegen`    | Generates a lint pass trait from `node-types.json`                                       |
+| `stiles-rust`       | Rust support: the generated trait, the decorations, and the provider                     |
+| `stiles-typescript` | TypeScript support: the trait from both grammars, the decorations, and the tsrs provider |
+| `stiles-tsrs`       | The tsrs crates as modules of one crate, generated from the `vendor/tsrs` submodule      |
+| `stiles-plugin`     | What a plugin exports: `export_lints!`, `DeclaresRules`, and the language fingerprint    |
+| `stiles-macros`     | The derive macro for decoration types                                                    |
+| `stiles-reporting`  | Diagnostic rendering                                                                     |
+| `stiles-testing`    | Test harness for lint rules                                                              |
+| `stiles`            | The CLI, custom lint loading, and the plugin handshake                                   |
 
-Dependencies flow one way. `whisker-types`, `whisker-codegen`, and
-`whisker-macros` depend on no other whisker crate. `whisker-core` and
-`whisker-reporting` rest on `whisker-types`. `whisker-rust` rests on
-`whisker-types` and `whisker-macros`, and uses `whisker-codegen` at build
-time. `whisker-typescript` rests on `whisker-types` and uses
-`whisker-codegen` the same way. `whisker-plugin` rests on `whisker-types`
-and the language crates, without their providers. `whisker-testing` rests
-on `whisker-core`. The CLI ties the platform, the languages, and the
+Dependencies flow one way. `stiles-types`, `stiles-codegen`, and
+`stiles-macros` depend on no other stiles crate. `stiles-core` and
+`stiles-reporting` rest on `stiles-types`. `stiles-rust` rests on
+`stiles-types` and `stiles-macros`, and uses `stiles-codegen` at build
+time. `stiles-typescript` rests on `stiles-types` and uses
+`stiles-codegen` the same way. `stiles-plugin` rests on `stiles-types`
+and the language crates, without their providers. `stiles-testing` rests
+on `stiles-core`. The CLI ties the platform, the languages, and the
 loaded lints together.
 
-[discovery]: https://aonyx-ai.github.io/whisker/docs/reference/file-discovery
+[discovery]: https://aonyx-ai.github.io/stiles/docs/reference/file-discovery
 [ra]: https://rust-analyzer.github.io/
 [tsrs]: https://github.com/oxc-project/tsrs
-[rules]: https://github.com/aonyx-ai/whisker-aonyx-rules
+[rules]: https://github.com/aonyx-ai/stiles-aonyx-rules
 [ts]: https://tree-sitter.github.io/tree-sitter/

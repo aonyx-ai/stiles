@@ -1,6 +1,6 @@
 # Documentation
 
-The public website and documentation for Whisker is built using [Docusaurus].
+The public website and documentation for Stiles is built using [Docusaurus].
 
 [Mise] provides Node.js at the version that `mise.toml` in the project root
 pins. With mise active in your shell, start the development server from this

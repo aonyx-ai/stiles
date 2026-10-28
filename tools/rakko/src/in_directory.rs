@@ -8,7 +8,7 @@ use rakko_action::{
 ///
 /// The Rust actions of Rakko check each workspace that cargo discovers, and
 /// they leave out a package that a workspace excludes. The lint plugin that
-/// the tests of whisker-rust load is such a package: whisker-rust depends on
+/// the tests of stiles-rust load is such a package: stiles-rust depends on
 /// it by path, so it cannot declare a workspace of its own, and the root
 /// workspace excludes it so that it builds the way any plugin does. This
 /// action points the inner action at the directory of that package instead,

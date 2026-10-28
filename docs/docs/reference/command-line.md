@@ -3,20 +3,20 @@
 <!--
 goal: let a reader look up a flag, an exit code, or what a run does when
 something fails.
-non-goal: the design reasoning behind the strictness. how-whisker-works carries
+non-goal: the design reasoning behind the strictness. how-stiles-works carries
 that.
 -->
 
-The main way users interact with Whisker is through our CLI. We describe the
+The main way users interact with Stiles is through our CLI. We describe the
 various options here.
 
 ## check
 
-Normally you'll invoke Whisker through `whisker check .`. There's some more
+Normally you'll invoke Stiles through `stiles check .`. There's some more
 options you can pass though:
 
 ```bash
-whisker check [OPTIONS] [PATH]
+stiles check [OPTIONS] [PATH]
 ```
 
 | Argument          | Meaning                                                        |
@@ -32,21 +32,21 @@ line names a rule, the languages it runs on, and `off` when the project's
 `[rules]` turn it off.
 
 ```bash
-whisker rules [PATH]
+stiles rules [PATH]
 ```
 
 ## abi
 
-To find the ABI version of a Whisker binary, you can run this command. It takes
+To find the ABI version of a Stiles binary, you can run this command. It takes
 no options.
 
 ```bash
-whisker abi
+stiles abi
 ```
 
 ## Global options
 
-With every Whisker command, you can use the following parameters to modify its
+With every Stiles command, you can use the following parameters to modify its
 output or behavior:
 
 | Option            | Meaning                                       |
@@ -54,22 +54,22 @@ output or behavior:
 | `-h`, `--help`    | Print help                                    |
 | `-V`, `--version` | Print the version                             |
 | `-q`, `--quiet`   | Hide the `help:` lines                        |
-| `-v`, `--verbose` | Name each file as Whisker checks it           |
+| `-v`, `--verbose` | Name each file as Stiles checks it            |
 | `--json`          | Write each result as one JSON object per line |
 
 ## What ends a run early
 
-| Cause                                 | Default      | With `--keep-going`     |
-| ------------------------------------- | ------------ | ----------------------- |
-| A directory Whisker cannot read       | Ends the run | Reported, run continues |
-| An ignore file Whisker cannot parse   | Ends the run | Reported, run continues |
-| A file Whisker cannot read or analyze | Ends the run | Reported, run continues |
-| A rule that panics                    | Ends the run | Reported, run continues |
-| A run that finds nothing to check     | Ends the run | Ends the run            |
+| Cause                                | Default      | With `--keep-going`     |
+| ------------------------------------ | ------------ | ----------------------- |
+| A directory Stiles cannot read       | Ends the run | Reported, run continues |
+| An ignore file Stiles cannot parse   | Ends the run | Reported, run continues |
+| A file Stiles cannot read or analyze | Ends the run | Reported, run continues |
+| A rule that panics                   | Ends the run | Reported, run continues |
+| A run that finds nothing to check    | Ends the run | Ends the run            |
 
 ## Exit status
 
-Whisker exits with one of two statuses:
+Stiles exits with one of two statuses:
 
 | Status | Meaning                                                                         |
 | ------ | ------------------------------------------------------------------------------- |
@@ -98,21 +98,21 @@ check, the tag of abi. errors and notes go to stderr. help lines and the
 then holds only JSON.
 -->
 
-| Command         | stdout                                     | stderr           |
-| --------------- | ------------------------------------------ | ---------------- |
-| `whisker check` | Diagnostics, `help:` lines, and file names | Errors and notes |
-| `whisker abi`   | The tag                                    | Errors only      |
+| Command        | stdout                                     | stderr           |
+| -------------- | ------------------------------------------ | ---------------- |
+| `stiles check` | Diagnostics, `help:` lines, and file names | Errors and notes |
+| `stiles abi`   | The tag                                    | Errors only      |
 
 With `--json`, stdout holds only the JSON. The `help:` lines and the file
-names of `--verbose` move to stderr. A clean `whisker check` prints nothing
+names of `--verbose` move to stderr. A clean `stiles check` prints nothing
 to stdout in either mode.
 
-Because `whisker abi` writes its tag to stdout, you can use it in a shell
-substitution, for example `tag=$(whisker abi)`.
+Because `stiles abi` writes its tag to stdout, you can use it in a shell
+substitution, for example `tag=$(stiles abi)`.
 
 ## JSON output
 
-`whisker check --json` writes one object per diagnostic:
+`stiles check --json` writes one object per diagnostic:
 
 ```json
 {
@@ -132,10 +132,10 @@ substitution, for example `tag=$(whisker abi)`.
 | `rule`     | The rule id                                          |
 | `severity` | `error`, `warning`, `note`, or `help`                |
 | `message`  | The text of the diagnostic                           |
-| `file`     | The file, as Whisker found it                        |
+| `file`     | The file, as Stiles found it                         |
 | `start`    | The byte offset where the diagnostic starts          |
 | `end`      | The byte offset where the diagnostic ends            |
 | `line`     | The line of `start`, counting from 1                 |
 | `column`   | The column of `start` in characters, counting from 1 |
 
-`whisker abi --json` writes the tag as one JSON string.
+`stiles abi --json` writes the tag as one JSON string.

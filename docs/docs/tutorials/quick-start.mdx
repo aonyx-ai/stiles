@@ -7,21 +7,21 @@ import FilteredCodeBlock from "@site/src/components/FilteredCodeBlock";
 
 This page takes you from nothing to a checked project.
 
-## Install Whisker
+## Install Stiles
 
 ```bash
-curl -LsSf https://aonyx-ai.github.io/whisker/install.sh | sh
+curl -LsSf https://aonyx-ai.github.io/stiles/install.sh | sh
 ```
 
 The script installs to `~/.local/bin`. Put that on your `PATH` if it is not
 there already.
 
-[Installation][installation] covers the other ways to install Whisker,
+[Installation][installation] covers the other ways to install Stiles,
 and which one to choose.
 
 ## Building your first rule
 
-Writing a rule in Whisker can be very simple, but we intend for it to be able to
+Writing a rule in Stiles can be very simple, but we intend for it to be able to
 scale to much more complex lints. Every lint is packaged as a Rust crate, and
 each lint can register multiple rules. Every rule has four important components:
 
@@ -46,11 +46,11 @@ line.
 
 ## Adding the rule
 
-Whisker lints are configured through a configuration file inside your repository
-at `.config/whisker.toml`. The most basic configuration for your lint looks like
+Stiles lints are configured through a configuration file inside your repository
+at `.config/stiles.toml`. The most basic configuration for your lint looks like
 this:
 
-```toml title=".config/whisker.toml"
+```toml title=".config/stiles.toml"
 [[lints]]
 path = "lints/doc_summary_break"
 ```
@@ -62,7 +62,7 @@ Check out the [configuration][configuration] page for more options.
 Now simply run this:
 
 ```bash
-whisker check .
+stiles check .
 ```
 
 This'll take a while as it has to compile a lot of code, so sit tight! It should
@@ -72,7 +72,7 @@ to speed this up across machines.
 ## Next steps
 
 - [Write a rule][custom-lints]: hook a node kind, test it, and give it options.
-- [Configuration][configuration]: the rest of `.config/whisker.toml`.
+- [Configuration][configuration]: the rest of `.config/stiles.toml`.
 - [Command line][checking-a-project]: what ends a run, and what fails it.
 
 [installation]: /docs/how-to/install

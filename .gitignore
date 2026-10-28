@@ -3,7 +3,7 @@ debug/
 target/
 # tsrs_core has a module named `debug`, which the pattern above would leave
 # out of the bundle and out of the crate that Cargo packages.
-!/crates/whisker-tsrs/**/debug/
+!/crates/stiles-tsrs/**/debug/
 
 # Release archives that the release workflow assembles
 dist/

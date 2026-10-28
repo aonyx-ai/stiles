@@ -1,13 +1,13 @@
 //! Generates one publishable crate from the crates of tsrs
 //!
 //! tsrs publishes no crates, and a crate that depends on code outside the
-//! registry cannot publish. This tool copies the tsrs crates that whisker
+//! registry cannot publish. This tool copies the tsrs crates that stiles
 //! needs into one crate, where each of them becomes a module. It changes
 //! only the paths that name a crate, so every file reads as upstream wrote
 //! it. A new tsrs commit is then a new run of this tool, never a merge.
 //!
 //! Run it through `mise run rakko -- bundle-tsrs`, which names the submodule,
-//! the output directory, and the crates whisker uses.
+//! the output directory, and the crates stiles uses.
 
 mod manifest;
 mod metadata;
@@ -243,7 +243,7 @@ fn readme(name: &CrateName, revision: &Revision, crates: &BTreeSet<CrateName>) -
          The TypeScript checker of [tsrs], repackaged as one crate.\n\
          \n\
          tsrs publishes no crates. This crate holds the tsrs crates that\n\
-         whisker uses, each as a module of the same name, from commit\n\
+         stiles uses, each as a module of the same name, from commit\n\
          `{revision}`:\n\
          \n\
          {}\n\

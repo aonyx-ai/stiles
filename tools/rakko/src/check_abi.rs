@@ -8,7 +8,7 @@ use rakko_tool::Invocation;
 use crate::{HarnessError, step};
 
 /// The record of the plugin boundary, relative to the project root
-const RECORD: &str = "crates/whisker-plugin/abi-surface.toml";
+const RECORD: &str = "crates/stiles-plugin/abi-surface.toml";
 
 /// The branch whose record a run compares with
 const BASE: &str = "main";
@@ -18,8 +18,8 @@ const FINGERPRINTS: [&str; 2] = ["types-fingerprint", "language-fingerprint"];
 
 /// The action that fails when the plugin boundary moved and its version did not
 ///
-/// `crates/whisker-plugin/abi-surface.toml` records the boundary, and a test
-/// in whisker-plugin keeps it equal to the code. A pull request that changes
+/// `crates/stiles-plugin/abi-surface.toml` records the boundary, and a test
+/// in stiles-plugin keeps it equal to the code. A pull request that changes
 /// the boundary therefore changes the record too, so the record alone proves
 /// nothing. The run compares it with the record on `main` instead: a moved
 /// fingerprint needs a raised version, and from 1.0 a raised major, because
@@ -162,7 +162,7 @@ fn verdict(before: &str, after: &str) -> Verdict {
         return Verdict::Refused {
             reason: format!(
                 "the plugin boundary moved, but ABI_VERSION did not rise above {}.{}. Raise \
-                 ABI_VERSION in crates/whisker-types/src/plugin.rs.",
+                 ABI_VERSION in crates/stiles-types/src/plugin.rs.",
                 old.major, old.minor
             ),
         };

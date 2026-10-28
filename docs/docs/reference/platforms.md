@@ -5,7 +5,7 @@ goal: tell a reader whether their machine has a prebuilt archive.
 non-goal: install instructions. install.md owns those.
 -->
 
-Whisker supports the following platforms:
+Stiles supports the following platforms:
 
 | Platform               | Target                      |
 | ---------------------- | --------------------------- |
