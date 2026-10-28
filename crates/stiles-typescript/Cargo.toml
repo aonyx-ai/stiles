@@ -3,7 +3,8 @@ name = "stiles-typescript"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish = false
+description = "TypeScript support for Stiles: the lint pass trait, decorations, and provider"
+repository.workspace = true
 
 # The tsrs checker behind the decoration provider dwarfs everything else
 # in this crate. Lint plugins depend on this crate only for the generated

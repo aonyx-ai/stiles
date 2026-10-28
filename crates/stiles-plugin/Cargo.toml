@@ -3,16 +3,17 @@ name = "stiles-plugin"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish = false
+description = "What a Stiles lint plugin needs to declare and export its rules"
+repository.workspace = true
 
 # A plugin depends on this crate for the export macro and the handshake
 # constants. The language crates come without their decoration providers,
 # whose analysis stacks a plugin never runs.
 [dependencies]
 stabby.workspace = true
-stiles-rust = { path = "../stiles-rust", default-features = false }
+stiles-rust = { path = "../stiles-rust", version = "=0.1.0", default-features = false }
 stiles-types.workspace = true
-stiles-typescript = { path = "../stiles-typescript", default-features = false }
+stiles-typescript = { path = "../stiles-typescript", version = "=0.1.0", default-features = false }
 
 [dev-dependencies]
 tree-sitter.workspace = true

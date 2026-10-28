@@ -3,7 +3,8 @@ name = "stiles-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish = false
+description = "The pipeline of Stiles: parse, decorate, and walk lint passes over a file"
+repository.workspace = true
 
 [dependencies]
 bon.workspace = true

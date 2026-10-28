@@ -3,7 +3,8 @@ name = "stiles-types"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish = false
+description = "The types that cross the Stiles plugin boundary"
+repository.workspace = true
 
 [dependencies]
 bon.workspace = true

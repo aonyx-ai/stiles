@@ -2,6 +2,7 @@
 
 ```console
 $ stiles --help
+Write your own lint rules for the style conventions of your project
 
 Usage: stiles [OPTIONS] [COMMAND]
 
