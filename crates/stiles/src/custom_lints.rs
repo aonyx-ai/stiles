@@ -858,6 +858,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_send_contents() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Contents>();
+    }
+
+    #[test]
     fn trait_send_custom_lints() {
         fn assert_send<T: Send>() {}
         assert_send::<CustomLints>();
@@ -870,9 +876,33 @@ mod tests {
     }
 
     #[test]
+    fn trait_send_loaded() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Loaded>();
+    }
+
+    #[test]
     fn trait_send_loaded_lint() {
         fn assert_send<T: Send>() {}
         assert_send::<LoadedLint>();
+    }
+
+    #[test]
+    fn trait_send_locking() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Locking>();
+    }
+
+    #[test]
+    fn trait_send_resolved() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Resolved>();
+    }
+
+    #[test]
+    fn trait_sync_contents() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Contents>();
     }
 
     #[test]
@@ -888,9 +918,33 @@ mod tests {
     }
 
     #[test]
+    fn trait_sync_loaded() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Loaded>();
+    }
+
+    #[test]
     fn trait_sync_loaded_lint() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<LoadedLint>();
+    }
+
+    #[test]
+    fn trait_sync_locking() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Locking>();
+    }
+
+    #[test]
+    fn trait_sync_resolved() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Resolved>();
+    }
+
+    #[test]
+    fn trait_unpin_contents() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Contents>();
     }
 
     #[test]
@@ -906,8 +960,26 @@ mod tests {
     }
 
     #[test]
+    fn trait_unpin_loaded() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Loaded>();
+    }
+
+    #[test]
     fn trait_unpin_loaded_lint() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<LoadedLint>();
+    }
+
+    #[test]
+    fn trait_unpin_locking() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Locking>();
+    }
+
+    #[test]
+    fn trait_unpin_resolved() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Resolved>();
     }
 }

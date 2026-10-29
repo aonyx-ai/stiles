@@ -305,4 +305,40 @@ mod tests {
             "unexpected: {error:#}"
         );
     }
+
+    #[test]
+    fn trait_send_build_message() {
+        fn assert_send<T: Send>() {}
+        assert_send::<BuildMessage>();
+    }
+
+    #[test]
+    fn trait_send_target() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Target>();
+    }
+
+    #[test]
+    fn trait_sync_build_message() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<BuildMessage>();
+    }
+
+    #[test]
+    fn trait_sync_target() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Target>();
+    }
+
+    #[test]
+    fn trait_unpin_build_message() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<BuildMessage>();
+    }
+
+    #[test]
+    fn trait_unpin_target() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Target>();
+    }
 }

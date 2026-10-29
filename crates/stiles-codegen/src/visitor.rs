@@ -524,4 +524,40 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn trait_send_node_type() {
+        fn assert_send<T: Send>() {}
+        assert_send::<NodeType>();
+    }
+
+    #[test]
+    fn trait_send_subtype_ref() {
+        fn assert_send<T: Send>() {}
+        assert_send::<SubtypeRef>();
+    }
+
+    #[test]
+    fn trait_sync_node_type() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<NodeType>();
+    }
+
+    #[test]
+    fn trait_sync_subtype_ref() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<SubtypeRef>();
+    }
+
+    #[test]
+    fn trait_unpin_node_type() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<NodeType>();
+    }
+
+    #[test]
+    fn trait_unpin_subtype_ref() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<SubtypeRef>();
+    }
 }

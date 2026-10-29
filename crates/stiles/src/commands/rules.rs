@@ -162,20 +162,38 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
+    fn trait_send_listed_rule() {
         fn assert_send<T: Send>() {}
         assert_send::<ListedRule>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_send_rules_args() {
+        fn assert_send<T: Send>() {}
+        assert_send::<RulesArgs>();
+    }
+
+    #[test]
+    fn trait_sync_listed_rule() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<ListedRule>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_sync_rules_args() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<RulesArgs>();
+    }
+
+    #[test]
+    fn trait_unpin_listed_rule() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<ListedRule>();
+    }
+
+    #[test]
+    fn trait_unpin_rules_args() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<RulesArgs>();
     }
 }

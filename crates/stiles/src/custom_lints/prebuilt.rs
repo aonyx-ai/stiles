@@ -423,4 +423,22 @@ mod tests {
 
         assert!(libraries.is_empty(), "{libraries:?}");
     }
+
+    #[test]
+    fn trait_send_installed() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Installed>();
+    }
+
+    #[test]
+    fn trait_sync_installed() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Installed>();
+    }
+
+    #[test]
+    fn trait_unpin_installed() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Installed>();
+    }
 }

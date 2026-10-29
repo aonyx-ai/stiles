@@ -1019,19 +1019,73 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
+    fn trait_send_config_table() {
+        fn assert_send<T: Send>() {}
+        assert_send::<ConfigTable>();
+    }
+
+    #[test]
+    fn trait_send_lint_entry() {
+        fn assert_send<T: Send>() {}
+        assert_send::<LintEntry>();
+    }
+
+    #[test]
+    fn trait_send_rules_table() {
+        fn assert_send<T: Send>() {}
+        assert_send::<RulesTable>();
+    }
+
+    #[test]
+    fn trait_send_stiles_config() {
         fn assert_send<T: Send>() {}
         assert_send::<StilesConfig>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_sync_config_table() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<ConfigTable>();
+    }
+
+    #[test]
+    fn trait_sync_lint_entry() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<LintEntry>();
+    }
+
+    #[test]
+    fn trait_sync_rules_table() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<RulesTable>();
+    }
+
+    #[test]
+    fn trait_sync_stiles_config() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<StilesConfig>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_unpin_config_table() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<ConfigTable>();
+    }
+
+    #[test]
+    fn trait_unpin_lint_entry() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<LintEntry>();
+    }
+
+    #[test]
+    fn trait_unpin_rules_table() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<RulesTable>();
+    }
+
+    #[test]
+    fn trait_unpin_stiles_config() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<StilesConfig>();
     }

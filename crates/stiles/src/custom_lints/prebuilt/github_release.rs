@@ -612,6 +612,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_send_asset_search() {
+        fn assert_send<T: Send>() {}
+        assert_send::<AssetSearch>();
+    }
+
+    #[test]
     fn trait_send_github_api() {
         fn assert_send<T: Send>() {}
         assert_send::<GitHubApi>();
@@ -621,6 +627,24 @@ mod tests {
     fn trait_send_prebuilt_asset() {
         fn assert_send<T: Send>() {}
         assert_send::<PrebuiltAsset>();
+    }
+
+    #[test]
+    fn trait_send_release() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Release>();
+    }
+
+    #[test]
+    fn trait_send_release_asset() {
+        fn assert_send<T: Send>() {}
+        assert_send::<ReleaseAsset>();
+    }
+
+    #[test]
+    fn trait_sync_asset_search() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<AssetSearch>();
     }
 
     #[test]
@@ -636,6 +660,24 @@ mod tests {
     }
 
     #[test]
+    fn trait_sync_release() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Release>();
+    }
+
+    #[test]
+    fn trait_sync_release_asset() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<ReleaseAsset>();
+    }
+
+    #[test]
+    fn trait_unpin_asset_search() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<AssetSearch>();
+    }
+
+    #[test]
     fn trait_unpin_github_api() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<GitHubApi>();
@@ -645,5 +687,17 @@ mod tests {
     fn trait_unpin_prebuilt_asset() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<PrebuiltAsset>();
+    }
+
+    #[test]
+    fn trait_unpin_release() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Release>();
+    }
+
+    #[test]
+    fn trait_unpin_release_asset() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<ReleaseAsset>();
     }
 }
