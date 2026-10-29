@@ -21,7 +21,7 @@ use crate::{CoverageGap, ProviderName};
 /// let root: Arc<Path> = Arc::from(PathBuf::from("/ws"));
 /// let error = UncoveredFile::builder()
 ///     .file(PathBuf::from("stray.rs"))
-///     .gaps(vec![(ProviderName("rust"), CoverageGap::Unreachable { root })])
+///     .gaps(vec![(ProviderName::new("rust"), CoverageGap::Unreachable { root })])
 ///     .build();
 ///
 /// assert_eq!(
@@ -105,7 +105,7 @@ mod tests {
         let error = UncoveredFile::builder()
             .file(PathBuf::from("stray.rs"))
             .gaps(vec![(
-                ProviderName("rust"),
+                ProviderName::new("rust"),
                 CoverageGap::Unreachable { root: root() },
             )])
             .build();
@@ -124,9 +124,9 @@ mod tests {
         let error = UncoveredFile::builder()
             .file(PathBuf::from("stray.rs"))
             .gaps(vec![
-                (ProviderName("rust"), CoverageGap::StaleSource),
+                (ProviderName::new("rust"), CoverageGap::StaleSource),
                 (
-                    ProviderName("other"),
+                    ProviderName::new("other"),
                     CoverageGap::OutsideRoot { root: root() },
                 ),
             ])
@@ -159,9 +159,9 @@ mod tests {
         let error = UncoveredFile::builder()
             .file(PathBuf::from("stray.rs"))
             .gaps(vec![
-                (ProviderName("rust"), CoverageGap::StaleSource),
+                (ProviderName::new("rust"), CoverageGap::StaleSource),
                 (
-                    ProviderName("other"),
+                    ProviderName::new("other"),
                     CoverageGap::OutsideRoot { root: root() },
                 ),
             ])
@@ -172,9 +172,9 @@ mod tests {
         assert_eq!(
             gaps,
             [
-                (ProviderName("rust"), CoverageGap::StaleSource),
+                (ProviderName::new("rust"), CoverageGap::StaleSource),
                 (
-                    ProviderName("other"),
+                    ProviderName::new("other"),
                     CoverageGap::OutsideRoot { root: root() },
                 ),
             ]

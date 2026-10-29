@@ -1,5 +1,7 @@
 use std::fmt;
 
+use bon::Builder;
+use getset::CopyGetters;
 use stiles_plugin::{self as plugin, AbiVersion};
 
 /// The ABI-relevant identity of one side of the plugin boundary
@@ -10,11 +12,17 @@ use stiles_plugin::{self as plugin, AbiVersion};
 /// out the same way. Which rustc built each side does not enter into it.
 /// This type holds those facts for one side, and [`validate`] compares
 /// the two sides.
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Builder, CopyGetters)]
+#[getset(get_copy = "pub")]
 pub struct AbiIdentity {
-    pub abi_version: AbiVersion,
-    pub types_fingerprint: u64,
-    pub language_fingerprint: u64,
+    /// The version of the plugin declaration protocol
+    abi_version: AbiVersion,
+
+    /// The fingerprint of the types that cross the plugin boundary
+    types_fingerprint: u64,
+
+    /// The fingerprint of the language crate that a plugin builds against
+    language_fingerprint: u64,
 }
 
 impl AbiIdentity {

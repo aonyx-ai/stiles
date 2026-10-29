@@ -53,7 +53,7 @@ pub struct RustDecorationProvider {
 
 impl RustDecorationProvider {
     /// Identifies this provider in diagnostics
-    const NAME: ProviderName = ProviderName("rust");
+    const NAME: ProviderName = ProviderName::new("rust");
 
     /// Loads a Cargo workspace for semantic analysis
     ///

@@ -98,9 +98,9 @@ impl TypeScriptDecorationProvider {
     /// ```
     /// use stiles_typescript::TypeScriptDecorationProvider;
     ///
-    /// assert_eq!(TypeScriptDecorationProvider::NAME.0, "typescript");
+    /// assert_eq!(TypeScriptDecorationProvider::NAME.as_str(), "typescript");
     /// ```
-    pub const NAME: ProviderName = ProviderName("typescript");
+    pub const NAME: ProviderName = ProviderName::new("typescript");
 
     /// Loads the TypeScript project that holds `path`
     ///

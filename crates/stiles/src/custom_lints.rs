@@ -5,6 +5,7 @@ use std::process::{Command, Stdio};
 
 use anyhow::Context as _;
 use bon::bon;
+use getset::{CopyGetters, Getters};
 use libloading::Library;
 use stiles_core::Lint;
 use stiles_types::plugin::{AbiVersion, LintPassFactory, PluginDeclaration, construct};
@@ -162,12 +163,15 @@ impl CustomLints {
 }
 
 /// A rule a loaded plugin declares, and the languages it runs on
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, CopyGetters, Getters)]
 pub struct DeclaredRule {
-    /// The rule's id
-    pub rule: RuleId,
+    /// The id of the rule
+    #[getset(get_copy = "pub")]
+    rule: RuleId,
+
     /// The languages a lint reports the rule on, in load order
-    pub languages: Vec<Language>,
+    #[getset(get = "pub")]
+    languages: Vec<Language>,
 }
 
 /// One lint a plugin exported, as stiles keeps it
@@ -552,22 +556,24 @@ fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loade
     // SAFETY: `declaration` is the address `dlsym` gave for the loaded
     // library's `stiles_plugin_declaration` static.
     let plugin_abi_version = unsafe { abi_version(declaration) };
-    if !host.abi_version.accepts(plugin_abi_version) {
+    if !host.abi_version().accepts(plugin_abi_version) {
         return Err(self::handshake::HandshakeMismatch::AbiVersion {
             plugin: plugin_abi_version,
-            host: host.abi_version,
+            host: host.abi_version(),
         }
         .into());
     }
 
-    let plugin = AbiIdentity {
-        abi_version: plugin_abi_version,
-        // SAFETY: the protocol is one this binary knows, so the plugin
-        // lays both fields out where this binary reads them.
-        types_fingerprint: unsafe { (&raw const (*declaration).types_fingerprint).read() },
-        // SAFETY: as for `types_fingerprint` above.
-        language_fingerprint: unsafe { (&raw const (*declaration).language_fingerprint).read() },
-    };
+    // SAFETY: the protocol is one this binary knows, so the plugin lays
+    // both fingerprints out where this binary reads them.
+    let types_fingerprint = unsafe { (&raw const (*declaration).types_fingerprint).read() };
+    // SAFETY: as for `types_fingerprint` above.
+    let language_fingerprint = unsafe { (&raw const (*declaration).language_fingerprint).read() };
+    let plugin = AbiIdentity::builder()
+        .abi_version(plugin_abi_version)
+        .types_fingerprint(types_fingerprint)
+        .language_fingerprint(language_fingerprint)
+        .build();
     self::handshake::validate(host, &plugin)?;
 
     // SAFETY: the handshake passed, so the plugin lays the declaration

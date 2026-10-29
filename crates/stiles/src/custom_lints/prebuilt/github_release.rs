@@ -3,6 +3,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use anyhow::Context as _;
+use getset::Getters;
 use reqwest::blocking::{Client, Response};
 use reqwest::header::{ACCEPT, AUTHORIZATION, USER_AGENT};
 use serde::Deserialize;
@@ -282,10 +283,14 @@ pub struct ReleaseAsset {
 ///
 /// The two travel together. Stiles unpacks an archive only after it
 /// checks the archive against its digest.
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Getters)]
+#[getset(get = "pub")]
 pub struct PrebuiltAsset {
-    pub archive: ReleaseAsset,
-    pub sidecar: ReleaseAsset,
+    /// The archive of prebuilt lints
+    archive: ReleaseAsset,
+
+    /// The file that publishes the digest of the archive
+    sidecar: ReleaseAsset,
 }
 
 /// Returns the archive named `name` and its sidecar, from any release
@@ -390,11 +395,13 @@ mod tests {
 
     fn name() -> AssetName {
         let tag = AbiTag::builder()
-            .identity(&AbiIdentity {
-                abi_version: AbiVersion { major: 0, minor: 1 },
-                types_fingerprint: 0,
-                language_fingerprint: 0,
-            })
+            .identity(
+                &AbiIdentity::builder()
+                    .abi_version(AbiVersion { major: 0, minor: 1 })
+                    .types_fingerprint(0)
+                    .language_fingerprint(0)
+                    .build(),
+            )
             .target("aarch64-apple-darwin")
             .build();
 
