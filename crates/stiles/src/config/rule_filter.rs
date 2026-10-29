@@ -15,7 +15,7 @@ use stiles_types::RuleId;
 /// a few names those few instead. Naming both is a contradiction rather
 /// than a combination, and the configuration is refused.
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
-pub enum RuleFilter {
+pub(crate) enum RuleFilter {
     /// Every rule a source provides
     #[default]
     All,
@@ -49,7 +49,7 @@ impl RuleFilter {
     }
 
     /// Reports whether a diagnostic from `rule` reaches the report
-    pub fn admits(&self, rule: &RuleId) -> bool {
+    pub(crate) fn admits(&self, rule: &RuleId) -> bool {
         match self {
             Self::All => true,
             Self::Only(named) => named.contains(rule.as_str()),
@@ -96,7 +96,7 @@ impl RuleFilter {
     /// a typo, or a rule that reports nothing here, and stiles cannot tell
     /// those apart. A plugin declares no rule ids. The only ones that stiles
     /// learns are the ones it is handed in a diagnostic.
-    pub fn named(&self) -> &BTreeSet<String> {
+    pub(crate) fn named(&self) -> &BTreeSet<String> {
         static NONE: BTreeSet<String> = BTreeSet::new();
 
         match self {

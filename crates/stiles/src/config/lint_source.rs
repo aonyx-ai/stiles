@@ -18,7 +18,7 @@ use crate::config::{GitRev, GitUrl, LintPath};
 /// assert_eq!(source.to_string(), "lints/no_todo");
 /// ```
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum LintSource {
+pub(crate) enum LintSource {
     /// Lints in a directory of the project or of the machine
     Path(LintPath),
 
@@ -51,7 +51,7 @@ impl std::fmt::Display for LintSource {
 ///     .build();
 /// ```
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Builder)]
-pub struct GitLintSource {
+pub(crate) struct GitLintSource {
     url: GitUrl,
     rev: GitRev,
 }
@@ -64,7 +64,7 @@ impl GitLintSource {
     /// ```ignore
     /// println!("{}", source.url());
     /// ```
-    pub fn url(&self) -> &GitUrl {
+    pub(crate) fn url(&self) -> &GitUrl {
         &self.url
     }
 
@@ -75,7 +75,7 @@ impl GitLintSource {
     /// ```ignore
     /// println!("{}", source.rev());
     /// ```
-    pub fn rev(&self) -> &GitRev {
+    pub(crate) fn rev(&self) -> &GitRev {
         &self.rev
     }
 }

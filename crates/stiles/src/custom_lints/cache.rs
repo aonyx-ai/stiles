@@ -172,7 +172,7 @@ fn remote_directory(source: &GitLintSource) -> String {
 /// run interrupted halfway therefore leaves nothing that another run could
 /// mistake for a finished checkout. The process id keeps two stiles
 /// processes on one machine from writing into the same half-built tree.
-pub fn staging_directory(destination: &Path) -> PathBuf {
+pub(crate) fn staging_directory(destination: &Path) -> PathBuf {
     let mut name = destination.as_os_str().to_os_string();
     name.push(format!(".{}.partial", std::process::id()));
 

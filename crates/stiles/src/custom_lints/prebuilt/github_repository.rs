@@ -14,7 +14,7 @@ const PUBLIC_HOST: &str = "github.com";
 /// publish. Not every remote a project can pin has that shape. This type
 /// says which ones do, and stiles compiles the rest from source.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct GitHubRepository {
+pub(crate) struct GitHubRepository {
     owner: String,
     name: String,
 }
@@ -32,7 +32,7 @@ impl GitHubRepository {
     /// one of these. Neither is a local path, because `file://` serves no
     /// releases.
     #[builder]
-    pub fn from_url(url: &GitUrl, api_host: Option<&str>) -> Option<Self> {
+    pub(crate) fn from_url(url: &GitUrl, api_host: Option<&str>) -> Option<Self> {
         let url = url.to_gix_url();
 
         match url.scheme {

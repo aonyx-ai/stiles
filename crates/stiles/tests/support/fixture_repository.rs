@@ -10,7 +10,7 @@ use tempfile::TempDir;
 /// repository is served over `file://`, which runs the same `upload-pack`
 /// conversation that a remote would. A plain path would let git take a
 /// local shortcut, and the test would stop covering the protocol.
-pub struct FixtureRepository {
+pub(crate) struct FixtureRepository {
     directory: TempDir,
     rev: String,
 }
@@ -22,7 +22,7 @@ impl FixtureRepository {
     ///
     /// Panics if git is unavailable or any step fails, because a fixture
     /// that did not build cannot produce a meaningful test result.
-    pub fn new(build: impl FnOnce(&Path)) -> Self {
+    pub(crate) fn new(build: impl FnOnce(&Path)) -> Self {
         let directory = tempfile::tempdir().expect("temporary directory should be created");
 
         build(directory.path());
@@ -52,12 +52,12 @@ impl FixtureRepository {
     }
 
     /// Returns the `file://` remote stiles should fetch from
-    pub fn url(&self) -> String {
+    pub(crate) fn url(&self) -> String {
         format!("file://{}", self.directory.path().display())
     }
 
     /// Returns the commit a configuration should pin
-    pub fn rev(&self) -> &str {
+    pub(crate) fn rev(&self) -> &str {
         &self.rev
     }
 
@@ -69,7 +69,7 @@ impl FixtureRepository {
     /// # Panics
     ///
     /// Panics if the directory cannot be removed.
-    pub fn remove(self) {
+    pub(crate) fn remove(self) {
         let Self { directory, .. } = self;
 
         directory
@@ -92,7 +92,7 @@ impl FixtureRepository {
 /// # Panics
 ///
 /// Panics if git cannot be run or exits unsuccessfully.
-pub fn git(directory: &Path, arguments: &[&str]) -> String {
+pub(crate) fn git(directory: &Path, arguments: &[&str]) -> String {
     let path = std::env::var_os("PATH").unwrap_or_default();
     let output = Command::new("git")
         .args(arguments)
@@ -125,7 +125,7 @@ pub fn git(directory: &Path, arguments: &[&str]) -> String {
 /// # Panics
 ///
 /// Panics if the stiles crates cannot be located.
-pub fn stiles_crates() -> PathBuf {
+pub(crate) fn stiles_crates() -> PathBuf {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
     std::fs::canonicalize(crates).expect("the stiles crates should be in this repository")
@@ -140,7 +140,7 @@ pub fn stiles_crates() -> PathBuf {
 /// # Panics
 ///
 /// Panics if the package cannot be written.
-pub fn write_lint_package(directory: &Path, name: &str, rule: &str, standalone: Standalone) {
+pub(crate) fn write_lint_package(directory: &Path, name: &str, rule: &str, standalone: Standalone) {
     let crates = stiles_crates();
     let crates = crates.to_str().expect("the path should be UTF-8");
     let workspace = match standalone {
@@ -168,7 +168,7 @@ pub fn write_lint_package(directory: &Path, name: &str, rule: &str, standalone: 
 
 /// Whether a fixture package carries a workspace table of its own
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum Standalone {
+pub(crate) enum Standalone {
     Yes,
     No,
 }
@@ -225,7 +225,7 @@ stiles_plugin::export_lints![rust: [{pass}]];
 /// # Panics
 ///
 /// Panics if cargo cannot resolve the fixture.
-pub fn write_lockfile(directory: &Path) {
+pub(crate) fn write_lockfile(directory: &Path) {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
 
     let output = Command::new(cargo)

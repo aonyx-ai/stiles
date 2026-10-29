@@ -35,7 +35,7 @@ const TARGET: &str = env!("STILES_TARGET");
 /// The name is a contract with publishers, and [`AbiTag::builder`] carries a
 /// test that pins it.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct AbiTag(String);
+pub(crate) struct AbiTag(String);
 
 #[bon]
 impl AbiTag {
@@ -46,7 +46,7 @@ impl AbiTag {
     /// ```ignore
     /// println!("this stiles loads lints tagged {}", AbiTag::host());
     /// ```
-    pub fn host() -> Self {
+    pub(crate) fn host() -> Self {
         Self::builder()
             .identity(&AbiIdentity::host())
             .target(TARGET)

@@ -16,12 +16,12 @@ mod lint_path;
 mod lint_source;
 mod rule_filter;
 
-pub use self::git_rev::GitRev;
-pub use self::git_url::GitUrl;
-pub use self::ignore_pattern::IgnorePattern;
-pub use self::lint_path::LintPath;
-pub use self::lint_source::{GitLintSource, LintSource};
-pub use self::rule_filter::RuleFilter;
+pub(crate) use self::git_rev::GitRev;
+pub(crate) use self::git_url::GitUrl;
+pub(crate) use self::ignore_pattern::IgnorePattern;
+pub(crate) use self::lint_path::LintPath;
+pub(crate) use self::lint_source::{GitLintSource, LintSource};
+pub(crate) use self::rule_filter::RuleFilter;
 
 /// The name stiles's configuration file carries
 ///
@@ -54,7 +54,7 @@ const REPOSITORY_MARKER: &str = ".git";
 ///     .build();
 /// ```
 #[derive(Clone, Eq, PartialEq, Debug, Builder)]
-pub struct StilesConfig {
+pub(crate) struct StilesConfig {
     root: ProjectRoot,
     #[builder(default)]
     ignore: Vec<IgnorePattern>,
@@ -75,7 +75,7 @@ impl StilesConfig {
     /// ```ignore
     /// let admitted = config.rules().admits(diagnostic.rule());
     /// ```
-    pub fn rules(&self) -> &RuleFilter {
+    pub(crate) fn rules(&self) -> &RuleFilter {
         &self.rules
     }
 
@@ -90,7 +90,7 @@ impl StilesConfig {
     /// ```ignore
     /// let names = config.options().names(RULE_ID, "boundary-attributes");
     /// ```
-    pub fn options(&self) -> &RuleOptions {
+    pub(crate) fn options(&self) -> &RuleOptions {
         &self.options
     }
 
@@ -200,7 +200,7 @@ impl StilesConfig {
     /// Only a project that holds stiles's own source sets this. A project
     /// that does not leaves it unset and pins a lint source that names a
     /// stiles revision, which is what the handshake checks.
-    pub fn stiles_source(&self) -> Option<&Path> {
+    pub(crate) fn stiles_source(&self) -> Option<&Path> {
         self.stiles_source.as_deref()
     }
 
@@ -216,7 +216,7 @@ impl StilesConfig {
     ///
     /// println!("configured from {}", config.root());
     /// ```
-    pub fn root(&self) -> &ProjectRoot {
+    pub(crate) fn root(&self) -> &ProjectRoot {
         &self.root
     }
 
@@ -229,7 +229,7 @@ impl StilesConfig {
     ///
     /// assert!(config.ignore().is_empty());
     /// ```
-    pub fn ignore(&self) -> &[IgnorePattern] {
+    pub(crate) fn ignore(&self) -> &[IgnorePattern] {
         &self.ignore
     }
 
@@ -245,7 +245,7 @@ impl StilesConfig {
     ///
     /// assert!(config.lints().is_empty());
     /// ```
-    pub fn lints(&self) -> &[LintSource] {
+    pub(crate) fn lints(&self) -> &[LintSource] {
         &self.lints
     }
 }

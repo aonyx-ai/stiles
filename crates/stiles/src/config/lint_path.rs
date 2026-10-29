@@ -17,7 +17,7 @@ use kawauso_project::project::ProjectRoot;
 /// assert_eq!(path.resolve(&root), Path::new("/project/lints/no_todo"));
 /// ```
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct LintPath(PathBuf);
+pub(crate) struct LintPath(PathBuf);
 
 impl LintPath {
     /// Creates a lint path from its configured source
@@ -27,7 +27,7 @@ impl LintPath {
     /// ```ignore
     /// let path = LintPath::new("lints/no_todo");
     /// ```
-    pub fn new(path: impl Into<PathBuf>) -> Self {
+    pub(crate) fn new(path: impl Into<PathBuf>) -> Self {
         Self(path.into())
     }
 
@@ -47,7 +47,7 @@ impl LintPath {
     ///
     /// assert_eq!(path.resolve(&root), Path::new("/project/lints/no_todo"));
     /// ```
-    pub fn resolve(&self, root: &ProjectRoot) -> PathBuf {
+    pub(crate) fn resolve(&self, root: &ProjectRoot) -> PathBuf {
         root.get().join(&self.0)
     }
 }

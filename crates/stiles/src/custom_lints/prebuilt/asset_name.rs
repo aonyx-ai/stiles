@@ -32,23 +32,23 @@ const SIDECAR: &str = ".sha256";
 /// println!("looking for {name} and {}", name.sidecar());
 /// ```
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct AssetName(String);
+pub(crate) struct AssetName(String);
 
 #[bon]
 impl AssetName {
     /// Returns the name of the archive holding `rev` built for `tag`
     #[builder]
-    pub fn new(rev: &GitRev, tag: &AbiTag) -> Self {
+    pub(crate) fn new(rev: &GitRev, tag: &AbiTag) -> Self {
         Self(format!("{rev}-{tag}{EXTENSION}"))
     }
 
     /// Returns the name as a publisher would have written it
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Returns the name of the file that publishes this archive's digest
-    pub fn sidecar(&self) -> String {
+    pub(crate) fn sidecar(&self) -> String {
         format!("{}{SIDECAR}", self.0)
     }
 }

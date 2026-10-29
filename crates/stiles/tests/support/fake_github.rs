@@ -6,7 +6,7 @@ use getset::Getters;
 
 /// One answer the fake server is prepared to give
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct Answer {
+pub(crate) struct Answer {
     status: u16,
     content_type: &'static str,
     body: Vec<u8>,
@@ -14,7 +14,7 @@ pub struct Answer {
 
 impl Answer {
     /// Returns a successful answer carrying `body` as JSON
-    pub fn json(body: impl Into<String>) -> Self {
+    pub(crate) fn json(body: impl Into<String>) -> Self {
         Self {
             status: 200,
             content_type: "application/json",
@@ -23,7 +23,7 @@ impl Answer {
     }
 
     /// Returns a successful answer carrying `body` as bytes
-    pub fn bytes(body: Vec<u8>) -> Self {
+    pub(crate) fn bytes(body: Vec<u8>) -> Self {
         Self {
             status: 200,
             content_type: "application/octet-stream",
@@ -32,7 +32,7 @@ impl Answer {
     }
 
     /// Returns a successful answer carrying `body` as plain text
-    pub fn text(body: impl Into<String>) -> Self {
+    pub(crate) fn text(body: impl Into<String>) -> Self {
         Self {
             status: 200,
             content_type: "text/plain",
@@ -41,7 +41,7 @@ impl Answer {
     }
 
     /// Returns a failing answer with no body worth reading
-    pub fn failure(status: u16) -> Self {
+    pub(crate) fn failure(status: u16) -> Self {
         Self {
             status,
             content_type: "text/plain",
@@ -52,7 +52,7 @@ impl Answer {
 
 /// What one request carried, as the server saw it
 #[derive(Clone, Eq, PartialEq, Debug, Getters)]
-pub struct Seen {
+pub(crate) struct Seen {
     /// The path of the request, without its query
     #[getset(get = "pub")]
     path: String,
@@ -62,7 +62,7 @@ pub struct Seen {
 
 impl Seen {
     /// Returns the value of `name`, whatever case the sender used
-    pub fn header(&self, name: &str) -> Option<&str> {
+    pub(crate) fn header(&self, name: &str) -> Option<&str> {
         self.headers
             .iter()
             .find(|(header, _)| header.eq_ignore_ascii_case(name))
@@ -79,7 +79,7 @@ impl Seen {
 /// A caller adds routes after the server listens. An answer carries the
 /// addresses of the assets it offers, and nobody knows those until the
 /// server has a port.
-pub struct FakeGitHub {
+pub(crate) struct FakeGitHub {
     server: Arc<tiny_http::Server>,
     url: String,
     routes: Arc<Mutex<HashMap<String, Answer>>>,
@@ -93,7 +93,7 @@ impl FakeGitHub {
     /// # Panics
     ///
     /// Panics if no port can be bound.
-    pub fn start() -> Self {
+    pub(crate) fn start() -> Self {
         let server = Arc::new(
             tiny_http::Server::http("127.0.0.1:0").expect("the fake server should bind a port"),
         );
@@ -175,12 +175,12 @@ impl FakeGitHub {
     }
 
     /// Returns the base address to point stiles at
-    pub fn url(&self) -> &str {
+    pub(crate) fn url(&self) -> &str {
         &self.url
     }
 
     /// Answers `path` with `answer` from now on
-    pub fn route(&self, path: &str, answer: Answer) {
+    pub(crate) fn route(&self, path: &str, answer: Answer) {
         self.routes
             .lock()
             .expect("the routes should be available")
@@ -188,7 +188,7 @@ impl FakeGitHub {
     }
 
     /// Returns every request the server has seen, in order
-    pub fn seen(&self) -> Vec<Seen> {
+    pub(crate) fn seen(&self) -> Vec<Seen> {
         self.seen
             .lock()
             .expect("the record should be available")

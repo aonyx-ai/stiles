@@ -15,7 +15,7 @@ use crate::fixture_repository::stiles_crates;
 /// # Panics
 ///
 /// Panics if the package cannot be written.
-pub fn write_mismatched_lint_package(directory: &Path, name: &str) {
+pub(crate) fn write_mismatched_lint_package(directory: &Path, name: &str) {
     let crates = stiles_crates();
     let crates = crates.to_str().expect("the path should be UTF-8");
 

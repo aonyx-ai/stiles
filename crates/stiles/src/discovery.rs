@@ -11,7 +11,7 @@ use crate::config::StilesConfig;
 mod walk_error_policy;
 mod walk_failure;
 
-pub use self::walk_error_policy::WalkErrorPolicy;
+pub(crate) use self::walk_error_policy::WalkErrorPolicy;
 use self::walk_failure::WalkFailure;
 
 /// The source files a `stiles check` run will inspect
@@ -33,7 +33,7 @@ use self::walk_failure::WalkFailure;
 ///
 /// [`IgnorePattern`]: crate::config::IgnorePattern
 #[derive(Debug)]
-pub struct Discovery {
+pub(crate) struct Discovery {
     files: Vec<PathBuf>,
     errors: Vec<anyhow::Error>,
 }
@@ -185,7 +185,7 @@ impl Discovery {
     /// ```ignore
     /// assert!(discovery.files().iter().all(|file| file.exists()));
     /// ```
-    pub fn files(&self) -> &[PathBuf] {
+    pub(crate) fn files(&self) -> &[PathBuf] {
         &self.files
     }
 
@@ -201,7 +201,7 @@ impl Discovery {
     ///     eprintln!("error: {error:#}");
     /// }
     /// ```
-    pub fn errors(&self) -> &[anyhow::Error] {
+    pub(crate) fn errors(&self) -> &[anyhow::Error] {
         &self.errors
     }
 }

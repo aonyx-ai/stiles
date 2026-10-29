@@ -58,7 +58,7 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 /// and whether stiles holds a token for it. A run that asks about
 /// several sources reuses one client, and therefore one connection
 /// pool.
-pub struct GitHubApi {
+pub(crate) struct GitHubApi {
     base: String,
     api_host: Option<String>,
     token: Option<String>,
@@ -69,7 +69,7 @@ pub struct GitHubApi {
 ///
 /// This reads the environment without a client, so stiles can rule a
 /// remote out before it builds one.
-pub fn configured_repository_host() -> Option<String> {
+pub(crate) fn configured_repository_host() -> Option<String> {
     repository_host(&base_from(std::env::var(API_VARIABLE).ok()))
 }
 
@@ -82,7 +82,7 @@ pub fn configured_repository_host() -> Option<String> {
 /// That is what a private repository looks like without a token. A note
 /// about it on every check would be noise that nobody can fix.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum AssetSearch {
+pub(crate) enum AssetSearch {
     /// The archive and its digest are both published
     Found(PrebuiltAsset),
 
@@ -270,7 +270,7 @@ struct Release {
 
 /// One file attached to a release
 #[derive(Clone, Eq, PartialEq, Debug, Deserialize)]
-pub struct ReleaseAsset {
+pub(crate) struct ReleaseAsset {
     name: String,
 
     /// The API's own address for the asset
@@ -286,7 +286,7 @@ pub struct ReleaseAsset {
 /// checks the archive against its digest.
 #[derive(Clone, Eq, PartialEq, Debug, Getters)]
 #[getset(get = "pub")]
-pub struct PrebuiltAsset {
+pub(crate) struct PrebuiltAsset {
     /// The archive of prebuilt lints
     archive: ReleaseAsset,
 

@@ -23,7 +23,7 @@
 /// ```ignore
 /// assert_eq!(digest("https://example.com/rules"), "cc3eedebbb64629b");
 /// ```
-pub fn digest(text: &str) -> String {
+pub(crate) fn digest(text: &str) -> String {
     const OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
     const PRIME: u64 = 0x0000_0100_0000_01b3;
 

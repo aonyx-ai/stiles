@@ -19,7 +19,7 @@ const CHUNK: usize = 64 * 1024;
 /// trust, because the same publisher writes both. Every library in the
 /// archive still passes the plugin handshake.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct Sha256Digest([u8; 32]);
+pub(crate) struct Sha256Digest([u8; 32]);
 
 impl Sha256Digest {
     /// Returns the digest of the file at `path`
