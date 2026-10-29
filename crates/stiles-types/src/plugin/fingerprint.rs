@@ -4,9 +4,8 @@
 /// report. The report names the type, its module, and the name and type of
 /// every field, recursively. This folds those identities into one value,
 /// so a boundary made of such types hashes to one number. The length goes
-/// in first and the order matters, so two lists holding the same
-/// identities in another order hash apart, as do a list and its own
-/// prefix.
+/// in first, and the order matters. Two lists that hold the same identities
+/// in another order therefore hash apart, as do a list and its own prefix.
 ///
 /// The fold is FNV-1a, a handful of const operations. It detects drift
 /// between two builds of the same project, and a plugin that misreports

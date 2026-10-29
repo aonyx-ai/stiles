@@ -56,7 +56,7 @@ impl RuleOptions {
     ///
     /// Each pair of a rule and an option name must appear once. A
     /// configuration file cannot repeat a key, so the host that reads one
-    /// cannot build a table that does; [`RuleOptions::names`] returns the
+    /// cannot build a table that does. [`RuleOptions::names`] returns the
     /// first match for a caller that builds one by hand.
     ///
     /// # Examples
@@ -154,9 +154,9 @@ impl RuleOptions {
     /// # Errors
     ///
     /// Returns [`ValidateRuleOptionsError::UnknownRules`] naming every such
-    /// rule. An option set on a misspelled rule configures nothing and reads
-    /// exactly like a rule that took the option and found no fault, so
-    /// stiles refuses the file rather than the reader having to notice.
+    /// rule. An option set on a misspelled rule configures nothing. It reads
+    /// exactly like a rule that took the option and found no fault. Stiles
+    /// therefore refuses the file, so the reader does not have to notice.
     ///
     /// # Examples
     ///

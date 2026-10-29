@@ -18,19 +18,18 @@
 //! 2. The two fingerprints are plain integers, readable under any pair
 //!    of compilers.
 //! 3. Only when every one of them matches the host's own constants may
-//!    [`PluginDeclaration::load`] be called, because what it hands back
-//!    is only meaningful once the two images are known to lay it out the
-//!    same way.
+//!    [`PluginDeclaration::load`] be called. What it hands back is only
+//!    meaningful once the two images are known to lay it out the same way.
 //!
-//! Every value that crosses the boundary is one stabby lays out, and every
-//! allocation among them carries the function that frees it, so the side
-//! that allocated a value is the side that frees it whatever the other
-//! side's allocator is. A plugin may therefore set its own
+//! Stabby lays out every value that crosses the boundary. Every allocation
+//! among them carries the function that frees it. The side that allocated
+//! a value is the side that frees it, whatever the allocator of
+//! the other side is. A plugin may therefore set its own
 //! `#[global_allocator]`.
 //!
-//! The handshake reaches how both sides lay out the boundary, not the
-//! source they compiled, not the compiler, and not the dependency graph
-//! each side resolved. Layout is what unsoundness turns on, and it is far
+//! The handshake compares how both sides lay out the boundary. It does not
+//! compare the source they compiled, the compiler, or the dependency graph
+//! that each side resolved. Layout is what unsoundness turns on, and it is far
 //! narrower than source text. A doc comment or a private helper moves
 //! nothing, so a plugin stays loadable across most of stiles's own churn.
 //! A plugin's lockfile picks its own `tree-sitter`. Its `Node` is a
@@ -84,10 +83,10 @@ pub const ABI_VERSION: AbiVersion = AbiVersion { major: 0, minor: 6 };
 /// A fingerprint of how this crate lays out the plugin boundary
 ///
 /// The crate version cannot detect drift, because stiles's crates are
-/// unpublished and hold one version between releases. Hashing the source
-/// text detects far too much of it: a doc comment or a private helper
-/// would refuse every plugin in the tree until each was rebuilt, which is
-/// the whole cost of shipping rules as plugins. This hashes what the two
+/// unpublished and hold one version between releases. A hash of the source
+/// text detects far too much of it. A doc comment or a private helper would
+/// refuse every plugin in the tree until each was rebuilt. That is the
+/// whole cost of rules that ship as plugins. This hashes what the two
 /// images must actually agree on instead.
 ///
 /// Stabby lays out every type that crosses, and each contributes the
@@ -110,9 +109,10 @@ pub const ABI_VERSION: AbiVersion = AbiVersion { major: 0, minor: 6 };
 /// boundary, so they are not here.
 ///
 /// What it does not cover is the signatures of [`LintPass`]'s methods.
-/// The factory's identity reaches the vtable and names its methods in
-/// order, so a method added, removed, or moved is refused, but the report
-/// records each method as a pointer and not what it takes and returns. A
+/// The identity of the factory reaches the vtable and names its methods in
+/// order, so a method added, removed, or moved is refused. The report
+/// records each method as a pointer, though, and not what it takes and
+/// returns. A
 /// changed signature is a change to the protocol and belongs in
 /// [`ABI_VERSION`]. The `abi_version_covers_the_boundary_traits` test in
 /// this module fails when the trait's method list moves, so the bump is
@@ -154,10 +154,10 @@ mod tests {
 
     /// Returns each method signature a trait declares, in declaration order
     ///
-    /// The scan takes the lines inside the trait's block that open a
-    /// method and squeezes their whitespace, so a doc comment or a
-    /// reflowed line changes nothing while an added, removed, reordered,
-    /// or re-signed method does.
+    /// The scan takes the lines inside the block of the trait that open a
+    /// method, and squeezes their whitespace. A doc comment or a reflowed
+    /// line therefore changes nothing. An added, removed, reordered, or
+    /// re-signed method does.
     fn method_signatures(source: &str, declaration: &str) -> Vec<String> {
         let body = source
             .split_once(declaration)

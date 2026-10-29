@@ -17,9 +17,10 @@ use crate::{Decoration, DecorationLookup, FilePath, Span};
 /// allocation and moves no refcount.
 ///
 /// This is `Copy` so that a rule walking siblings and children writes what
-/// it means. Without it, reading a node out of the `Vec` that
-/// [`DecoratedNode::named_children`] returns forces a clone that copies
-/// exactly what a move would and reads as though it costs something.
+/// it means. Without it, a read of a node out of the `Vec` that
+/// [`DecoratedNode::named_children`] returns needs a clone. That clone
+/// copies exactly what a move would, but reads as though it costs
+/// something.
 ///
 /// A node crosses the plugin boundary with every check a pass runs, so
 /// stabby lays it out. The tree-sitter node inside is a C struct that
@@ -155,11 +156,12 @@ impl<'a> DecoratedNode<'a> {
 
     /// Reads the decoration `D` from this node
     ///
-    /// The shape of the result comes from `D` itself, not from this call: a
-    /// decoration declared with cardinality `one` yields [`Option`] and one
+    /// The shape of the result comes from `D` itself, not from this call. A
+    /// decoration declared with cardinality `one` yields [`Option`], and one
     /// declared `many` yields [`Vec`]. Prefer this over [`decoration`] and
-    /// [`decorations_of_type`], which accept any type and so cannot catch a
-    /// rule reading a repeated decoration as though it were singular.
+    /// [`decorations_of_type`], which accept any type. They therefore cannot
+    /// catch a rule that reads a repeated decoration as though it were
+    /// singular.
     ///
     /// [`decoration`]: DecoratedNode::decoration
     /// [`decorations_of_type`]: DecoratedNode::decorations_of_type
