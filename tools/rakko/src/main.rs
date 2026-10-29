@@ -23,7 +23,7 @@ use harness::{
     TestPluginToolchain,
 };
 use rakko_action::{ErasedAction, action_name};
-use rakko_cli::ErasedCommand;
+use rakko_cli::ErasedGroup;
 use rakko_format_json::FormatJson;
 use rakko_format_markdown::FormatMarkdown;
 use rakko_format_rust::FormatRust;
@@ -59,7 +59,7 @@ fn main() {
         .mount(rakko_baseline::bundle())
         .mount(rakko_rust_binary::bundle())
         .mount(stiles())
-        .mount_commands([Box::new(pre_commit) as Box<dyn ErasedCommand>])
+        .mount_groups([Box::new(pre_commit) as Box<dyn ErasedGroup>])
         .run();
 }
 
