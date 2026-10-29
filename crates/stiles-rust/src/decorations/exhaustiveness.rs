@@ -3,7 +3,10 @@
 /// An enum that another crate marks `#[non_exhaustive]` may grow a variant
 /// in any release. A match on it outside that crate therefore needs a
 /// wildcard arm. Inside its own crate the attribute changes nothing.
-/// [`AdtFlags::from_exhaustiveness`] takes it in place of a `bool`.
+///
+/// [`AdtFlags`] holds it, and [`AdtFlags::from_exhaustiveness`] sets it. A
+/// rule reads it out of memory the host allocated, so the discriminant is a
+/// byte. That is a layout that holds from one compiler to the next.
 ///
 /// # Examples
 ///
@@ -15,7 +18,10 @@
 /// assert!(flags.non_exhaustive_external());
 /// ```
 ///
+/// [`AdtFlags`]: crate::decorations::AdtFlags
 /// [`AdtFlags::from_exhaustiveness`]: crate::decorations::AdtFlags::from_exhaustiveness
+#[stabby::stabby]
+#[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum Exhaustiveness {
     /// A match can list every variant: the enum is exhaustive, or the

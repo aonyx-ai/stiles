@@ -19,10 +19,10 @@ use crate::decorations::{ErrorType, ResolvedType, ReturnMode};
 /// # Examples
 ///
 /// ```
-/// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ReturnMode};
+/// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ResultKind, ReturnMode};
 ///
 /// let signature = FnSignature::builder()
-///     .return_type(ResolvedType::new("Result<(), Error>".to_string()).with_result(true))
+///     .return_type(ResolvedType::new("Result<(), Error>".to_string()).with_result_kind(ResultKind::Result))
 ///     .error_type(ErrorType::Generic)
 ///     .return_mode(ReturnMode::Direct)
 ///     .build();
