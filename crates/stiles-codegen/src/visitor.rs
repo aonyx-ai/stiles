@@ -2,6 +2,8 @@ use std::collections::HashSet;
 
 use serde::Deserialize;
 
+use crate::LanguageName;
+
 /// A node type entry from tree-sitter's `node-types.json`
 #[derive(Clone, Debug, Deserialize)]
 struct NodeType {
@@ -42,13 +44,14 @@ struct SubtypeRef {
 ///
 /// ```
 /// let json = r#"[{"type": "source_file", "named": true}]"#;
-/// let code = stiles_codegen::generate_visitor(json, "Rust").unwrap();
+/// let language = stiles_codegen::LanguageName::new("Rust");
+/// let code = stiles_codegen::generate_visitor(json, language).unwrap();
 /// assert!(code.contains("trait RustLintPass: Send + Sync"));
 /// assert!(code.contains("fn check_source_file"));
 /// ```
 pub fn generate_visitor(
     node_types_json: &str,
-    language: &str,
+    language: LanguageName<'_>,
 ) -> Result<String, serde_json::Error> {
     let node_types: Vec<NodeType> = serde_json::from_str(node_types_json)?;
 
@@ -247,21 +250,21 @@ mod tests {
 
     #[test]
     fn generate_visitor_declares_configure_on_the_trait() {
-        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(MINIMAL_JSON, LanguageName::new("Rust")).expect("should parse");
 
         assert!(code.contains("fn configure(&mut self, _options: &RuleOptions) {}"));
     }
 
     #[test]
     fn generate_visitor_default_impls_return_empty_vec() {
-        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(MINIMAL_JSON, LanguageName::new("Rust")).expect("should parse");
 
         assert!(code.contains("Vec::new()"));
     }
 
     #[test]
     fn generate_visitor_dispatches_each_kind_to_its_method() {
-        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(MINIMAL_JSON, LanguageName::new("Rust")).expect("should parse");
 
         assert!(
             code.contains("\"source_file\" => diagnostics.extend(pass.check_source_file(node))")
@@ -270,35 +273,36 @@ mod tests {
 
     #[test]
     fn generate_visitor_excludes_unnamed_nodes_from_the_dispatch() {
-        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(MINIMAL_JSON, LanguageName::new("Rust")).expect("should parse");
 
         assert!(!code.contains("\";\""));
     }
 
     #[test]
     fn generate_visitor_excludes_unnamed_nodes_from_the_methods() {
-        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(MINIMAL_JSON, LanguageName::new("Rust")).expect("should parse");
 
         assert!(!code.contains("check_semicolon"));
     }
 
     #[test]
     fn generate_visitor_imports_the_rule_options() {
-        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(MINIMAL_JSON, LanguageName::new("Rust")).expect("should parse");
 
         assert!(code.contains("use stiles_types::{DecoratedNode, Diagnostic, RuleOptions};"));
     }
 
     #[test]
     fn generate_visitor_produces_dispatch_function() {
-        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(MINIMAL_JSON, LanguageName::new("Rust")).expect("should parse");
 
         assert!(code.contains("pub fn dispatch("));
     }
 
     #[test]
     fn generate_visitor_with_diamond_emits_no_duplicate_arms() {
-        let code = generate_visitor(DIAMOND_SUPERTYPE_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(DIAMOND_SUPERTYPE_JSON, LanguageName::new("Rust"))
+            .expect("should parse");
 
         let dispatch = code
             .split("pub fn dispatch")
@@ -318,27 +322,29 @@ mod tests {
 
     #[test]
     fn generate_visitor_with_different_language_changes_name() {
-        let code = generate_visitor(MINIMAL_JSON, "Python").expect("should parse");
+        let code =
+            generate_visitor(MINIMAL_JSON, LanguageName::new("Python")).expect("should parse");
 
         assert!(code.contains("pub trait PythonLintPass: Send + Sync {"));
     }
 
     #[test]
     fn generate_visitor_with_different_language_drops_the_rust_name() {
-        let code = generate_visitor(MINIMAL_JSON, "Python").expect("should parse");
+        let code =
+            generate_visitor(MINIMAL_JSON, LanguageName::new("Python")).expect("should parse");
 
         assert!(!code.contains("RustLintPass"));
     }
 
     #[test]
     fn generate_visitor_with_invalid_json_returns_error() {
-        let result = generate_visitor("not json", "Rust");
+        let result = generate_visitor("not json", LanguageName::new("Rust"));
         assert!(result.is_err());
     }
 
     #[test]
     fn generate_visitor_with_minimal_json_produces_a_method_per_named_node() {
-        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(MINIMAL_JSON, LanguageName::new("Rust")).expect("should parse");
 
         let missing: Vec<&str> = ["fn check_source_file(", "fn check_function_item("]
             .into_iter()
@@ -364,21 +370,23 @@ mod tests {
 
     #[test]
     fn generate_visitor_with_minimal_json_produces_trait() {
-        let code = generate_visitor(MINIMAL_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(MINIMAL_JSON, LanguageName::new("Rust")).expect("should parse");
 
         assert!(code.contains("pub trait RustLintPass: Send + Sync {"));
     }
 
     #[test]
     fn generate_visitor_with_nested_supertypes_produces_the_outer_method() {
-        let code = generate_visitor(NESTED_SUPERTYPE_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(NESTED_SUPERTYPE_JSON, LanguageName::new("Rust"))
+            .expect("should parse");
 
         assert!(code.contains("check_expression("));
     }
 
     #[test]
     fn generate_visitor_with_nested_supertypes_resolves_leaves() {
-        let code = generate_visitor(NESTED_SUPERTYPE_JSON, "Rust").expect("should parse");
+        let code = generate_visitor(NESTED_SUPERTYPE_JSON, LanguageName::new("Rust"))
+            .expect("should parse");
 
         let missing: Vec<&str> = [
             "\"integer_literal\"",
@@ -394,7 +402,8 @@ mod tests {
 
     #[test]
     fn generate_visitor_with_supertype_dispatches_subtypes() {
-        let code = generate_visitor(SUPERTYPE_JSON, "Rust").expect("should parse");
+        let code =
+            generate_visitor(SUPERTYPE_JSON, LanguageName::new("Rust")).expect("should parse");
 
         let missing: Vec<&str> = ["\"function_item\"", "\"const_item\""]
             .into_iter()
@@ -406,14 +415,16 @@ mod tests {
 
     #[test]
     fn generate_visitor_with_supertype_dispatches_subtypes_to_the_supertype_method() {
-        let code = generate_visitor(SUPERTYPE_JSON, "Rust").expect("should parse");
+        let code =
+            generate_visitor(SUPERTYPE_JSON, LanguageName::new("Rust")).expect("should parse");
 
         assert!(code.contains("check_declaration_statement(node)"));
     }
 
     #[test]
     fn generate_visitor_with_supertype_produces_supertype_method() {
-        let code = generate_visitor(SUPERTYPE_JSON, "Rust").expect("should parse");
+        let code =
+            generate_visitor(SUPERTYPE_JSON, LanguageName::new("Rust")).expect("should parse");
 
         assert!(code.contains("fn check_declaration_statement("));
     }
@@ -458,7 +469,7 @@ mod tests {
             #[test]
             fn output_contains_trait_name(language in "[A-Z][a-z]{1,10}") {
                 let json = r#"[{"type": "x", "named": true}]"#;
-                let code = generate_visitor(json, &language).unwrap();
+                let code = generate_visitor(json, LanguageName::new(&language)).unwrap();
 
                 let expected = format!("pub trait {language}LintPass");
                 prop_assert!(code.contains(&expected));
@@ -467,7 +478,7 @@ mod tests {
             #[test]
             fn output_contains_dispatch(language in "[A-Z][a-z]{1,10}") {
                 let json = r#"[{"type": "x", "named": true}]"#;
-                let code = generate_visitor(json, &language).unwrap();
+                let code = generate_visitor(json, LanguageName::new(&language)).unwrap();
 
                 prop_assert!(code.contains("pub fn dispatch("));
             }
@@ -476,7 +487,7 @@ mod tests {
             fn method_count_matches_named_node_count(
                 json in arb_node_types_json(1..=20),
             ) {
-                let code = generate_visitor(&json, "Test").unwrap();
+                let code = generate_visitor(&json, LanguageName::new("Test")).unwrap();
 
                 let node_types: Vec<NodeType> = serde_json::from_str(&json).unwrap();
                 let named_count = node_types
@@ -491,7 +502,7 @@ mod tests {
             #[test]
             fn invalid_json_returns_error(input in "\\PC{1,50}") {
                 prop_assume!(!input.starts_with('['));
-                let result = generate_visitor(&input, "Rust");
+                let result = generate_visitor(&input, LanguageName::new("Rust"));
                 prop_assert!(result.is_err());
             }
 
@@ -513,7 +524,7 @@ mod tests {
             fn every_check_method_has_default_body(
                 json in arb_node_types_json(1..=10),
             ) {
-                let code = generate_visitor(&json, "Test").unwrap();
+                let code = generate_visitor(&json, LanguageName::new("Test")).unwrap();
                 let check_count = code.matches("fn check_").count();
                 let vec_new_count = code.matches("Vec::new()").count();
                 prop_assert!(

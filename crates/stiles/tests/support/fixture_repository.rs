@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use stiles_types::RuleId;
 use tempfile::TempDir;
 
 /// A git repository built for one test, and the commit it holds
@@ -140,7 +141,12 @@ pub(crate) fn stiles_crates() -> PathBuf {
 /// # Panics
 ///
 /// Panics if the package cannot be written.
-pub(crate) fn write_lint_package(directory: &Path, name: &str, rule: &str, standalone: Standalone) {
+pub(crate) fn write_lint_package(
+    directory: &Path,
+    name: &str,
+    rule: RuleId,
+    standalone: Standalone,
+) {
     let crates = stiles_crates();
     let crates = crates.to_str().expect("the path should be UTF-8");
     let workspace = match standalone {
@@ -177,7 +183,7 @@ pub(crate) enum Standalone {
 ///
 /// The rule fires on `todo!` and reports the rule id it is given, so a
 /// test with two lints can tell which of them spoke.
-fn lint_source(name: &str, rule: &str) -> String {
+fn lint_source(name: &str, rule: RuleId) -> String {
     let pass = name.to_uppercase();
 
     format!(

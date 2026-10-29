@@ -123,10 +123,29 @@ mod tests {
     const DIRECTORY: &str = "/plugin";
     const MANIFEST: &str = "/plugin/Cargo.toml";
 
-    fn artifact_line(manifest: &str, crate_types: &str, filenames: &str) -> String {
-        format!(
-            r#"{{"reason":"compiler-artifact","manifest_path":"{manifest}","target":{{"crate_types":[{crate_types}],"name":"plugin"}},"filenames":[{filenames}]}}"#
-        )
+    /// One `compiler-artifact` message of a package named `plugin`
+    ///
+    /// `crate_types` and `filenames` hold the items of their JSON arrays,
+    /// each one quoted.
+    struct ArtifactLine<'a> {
+        manifest: &'a str,
+        crate_types: &'a str,
+        filenames: &'a str,
+    }
+
+    impl ArtifactLine<'_> {
+        /// Returns the message as cargo prints it, on one line
+        fn render(&self) -> String {
+            let Self {
+                manifest,
+                crate_types,
+                filenames,
+            } = self;
+
+            format!(
+                r#"{{"reason":"compiler-artifact","manifest_path":"{manifest}","target":{{"crate_types":[{crate_types}],"name":"plugin"}},"filenames":[{filenames}]}}"#
+            )
+        }
     }
 
     fn dylib_name(stem: &str) -> String {
@@ -140,7 +159,12 @@ mod tests {
     fn cdylib_artifacts_finds_the_dynamic_library() {
         let stdout = [
             r#"{"reason":"compiler-artifact","manifest_path":"/deps/other/Cargo.toml","target":{"crate_types":["lib"],"name":"other"},"filenames":["/deps/libother.rlib"]}"#.to_string(),
-            artifact_line(MANIFEST, r#""cdylib""#, &dylib_name("libplugin")),
+            ArtifactLine {
+                manifest: MANIFEST,
+                crate_types: r#""cdylib""#,
+                filenames: &dylib_name("libplugin"),
+            }
+            .render(),
             r#"{"reason":"build-finished","success":true}"#.to_string(),
         ]
         .join("\n");
@@ -159,7 +183,12 @@ mod tests {
     fn cdylib_artifacts_ignores_a_dependency_outside_the_directory() {
         let stdout = [
             r#"{"reason":"compiler-artifact","manifest_path":"/deps/other/Cargo.toml","target":{"crate_types":["cdylib"],"name":"other"},"filenames":["/deps/libother.so"]}"#.to_string(),
-            artifact_line(MANIFEST, r#""cdylib""#, &dylib_name("libplugin")),
+            ArtifactLine {
+                manifest: MANIFEST,
+                crate_types: r#""cdylib""#,
+                filenames: &dylib_name("libplugin"),
+            }
+            .render(),
         ]
         .join("\n");
 
@@ -176,12 +205,18 @@ mod tests {
     #[test]
     fn cdylib_artifacts_ignores_a_sibling_with_a_shared_prefix() {
         let stdout = [
-            artifact_line(
-                "/plugin_extra/Cargo.toml",
-                r#""cdylib""#,
-                "\"/plugin_extra/target/release/libextra.so\"",
-            ),
-            artifact_line(MANIFEST, r#""cdylib""#, &dylib_name("libplugin")),
+            ArtifactLine {
+                manifest: "/plugin_extra/Cargo.toml",
+                crate_types: r#""cdylib""#,
+                filenames: "\"/plugin_extra/target/release/libextra.so\"",
+            }
+            .render(),
+            ArtifactLine {
+                manifest: MANIFEST,
+                crate_types: r#""cdylib""#,
+                filenames: &dylib_name("libplugin"),
+            }
+            .render(),
         ]
         .join("\n");
 
@@ -197,7 +232,12 @@ mod tests {
     fn cdylib_artifacts_ignores_unknown_message_reasons() {
         let stdout = [
             r#"{"reason":"a-future-cargo-message","novel_field":42}"#.to_string(),
-            artifact_line(MANIFEST, r#""cdylib""#, &dylib_name("libplugin")),
+            ArtifactLine {
+                manifest: MANIFEST,
+                crate_types: r#""cdylib""#,
+                filenames: &dylib_name("libplugin"),
+            }
+            .render(),
         ]
         .join("\n");
 
@@ -209,16 +249,18 @@ mod tests {
     #[test]
     fn cdylib_artifacts_of_a_workspace_returns_every_member_sorted() {
         let stdout = [
-            artifact_line(
-                "/plugin/lints/second/Cargo.toml",
-                r#""cdylib""#,
-                &dylib_name("libsecond"),
-            ),
-            artifact_line(
-                "/plugin/lints/first/Cargo.toml",
-                r#""cdylib""#,
-                &dylib_name("libfirst"),
-            ),
+            ArtifactLine {
+                manifest: "/plugin/lints/second/Cargo.toml",
+                crate_types: r#""cdylib""#,
+                filenames: &dylib_name("libsecond"),
+            }
+            .render(),
+            ArtifactLine {
+                manifest: "/plugin/lints/first/Cargo.toml",
+                crate_types: r#""cdylib""#,
+                filenames: &dylib_name("libfirst"),
+            }
+            .render(),
         ]
         .join("\n");
 
@@ -240,7 +282,12 @@ mod tests {
             "\"/plugin/target/release/libplugin.rlib\", {}",
             dylib_name("libplugin")
         );
-        let stdout = artifact_line(MANIFEST, r#""cdylib", "rlib""#, &filenames);
+        let stdout = ArtifactLine {
+            manifest: MANIFEST,
+            crate_types: r#""cdylib", "rlib""#,
+            filenames: &filenames,
+        }
+        .render();
 
         let artifacts = cdylib_artifacts(&stdout, Path::new(DIRECTORY)).expect("should find");
 
@@ -256,8 +303,18 @@ mod tests {
     #[test]
     fn cdylib_artifacts_reports_a_package_once() {
         let stdout = [
-            artifact_line(MANIFEST, r#""cdylib""#, &dylib_name("libplugin")),
-            artifact_line(MANIFEST, r#""cdylib""#, &dylib_name("libplugin")),
+            ArtifactLine {
+                manifest: MANIFEST,
+                crate_types: r#""cdylib""#,
+                filenames: &dylib_name("libplugin"),
+            }
+            .render(),
+            ArtifactLine {
+                manifest: MANIFEST,
+                crate_types: r#""cdylib""#,
+                filenames: &dylib_name("libplugin"),
+            }
+            .render(),
         ]
         .join("\n");
 
@@ -280,11 +337,12 @@ mod tests {
 
     #[test]
     fn cdylib_artifacts_without_cdylib_crate_type_names_the_remedy() {
-        let stdout = artifact_line(
-            MANIFEST,
-            r#""lib""#,
-            "\"/plugin/target/release/libplugin.rlib\"",
-        );
+        let stdout = ArtifactLine {
+            manifest: MANIFEST,
+            crate_types: r#""lib""#,
+            filenames: "\"/plugin/target/release/libplugin.rlib\"",
+        }
+        .render();
 
         let error = cdylib_artifacts(&stdout, Path::new(DIRECTORY)).expect_err("should fail");
 

@@ -4,12 +4,15 @@ use std::process::Command;
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use sha2::Digest as _;
+use stiles_types::RuleId;
 use tempfile::TempDir;
 
 #[path = "support/fake_github.rs"]
 mod fake_github;
 #[path = "support/fixture_repository.rs"]
 mod fixture_repository;
+#[path = "support/git_pin.rs"]
+mod git_pin;
 #[path = "support/mismatched_plugin.rs"]
 mod mismatched_plugin;
 
@@ -17,6 +20,7 @@ use self::fake_github::{Answer, FakeGitHub, Seen};
 use self::fixture_repository::{
     FixtureRepository, Standalone, git, write_lint_package, write_lockfile,
 };
+use self::git_pin::GitPin;
 use self::mismatched_plugin::write_mismatched_lint_package;
 
 /// Source that trips the fixture lint and nothing stiles ships
@@ -26,7 +30,7 @@ const TODO_SOURCE: &str = "pub fn later() {\n    todo!()\n}\n";
 const MANIFEST: &str = "[package]\nname = \"target\"\nversion = \"0.1.0\"\nedition = \"2024\"\n";
 
 /// The rule the fixture lint reports under
-const RULE: &str = "fixture.no-todo";
+const RULE: RuleId = RuleId::new("fixture.no-todo");
 
 /// Creates a minimal Cargo package whose `src/lib.rs` holds `source`
 fn package(source: &str) -> TempDir {
@@ -42,7 +46,8 @@ fn package(source: &str) -> TempDir {
 }
 
 /// Points the package's stiles configuration at one git lint source
-fn configure_git_lint(package: &Path, url: &str, rev: &str) {
+fn configure_git_lint(package: &Path, pin: GitPin<'_>) {
+    let GitPin { url, rev } = pin;
     let url = toml::Value::from(url);
     let rev = toml::Value::from(rev);
 
@@ -119,7 +124,7 @@ fn library_name(stem: &str) -> String {
 /// and of `git_lints.rs` compile into one build directory. Two tests that
 /// built a package of the same name would replace the library of the other
 /// while a third read it.
-fn repository_with_one_lint(package: &str, rule: &str) -> FixtureRepository {
+fn repository_with_one_lint(package: &str, rule: RuleId) -> FixtureRepository {
     let package = package.to_owned();
 
     FixtureRepository::new(move |directory| {
@@ -196,7 +201,13 @@ fn check_with_a_checkout_already_present_asks_nothing() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let rules = repository_with_one_lint("warm_lint", RULE);
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, rules.rev());
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: REMOTE,
+            rev: rules.rev(),
+        },
+    );
 
     stiles_asking(&cache, server.url())
         .arg("check")
@@ -231,7 +242,13 @@ fn check_with_a_failing_release_api_warns() {
     let server = FakeGitHub::start();
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: REMOTE,
+            rev: REV,
+        },
+    );
     server.route(RELEASES, Answer::failure(500));
 
     stiles_asking(&cache, server.url())
@@ -253,7 +270,13 @@ fn check_with_a_prebuilt_that_fails_the_handshake_fails() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let rules = repository_with_one_lint("handshake_lint", RULE);
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: rules.rev(),
+        },
+    );
 
     stiles(&cache)
         .arg("check")
@@ -287,7 +310,13 @@ fn check_with_a_published_archive_loads_it_without_a_source() {
     let server = FakeGitHub::start();
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: REMOTE,
+            rev: REV,
+        },
+    );
     publish(&server, &[fixture_library("published_lint")]);
 
     stiles_asking(&cache, server.url())
@@ -443,7 +472,13 @@ fn check_with_a_remote_the_api_does_not_serve_asks_nothing() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let rules = repository_with_one_lint("unserved_lint", RULE);
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: rules.rev(),
+        },
+    );
 
     stiles_asking(&cache, server.url())
         .arg("check")
@@ -465,7 +500,13 @@ fn check_with_a_repository_the_api_does_not_know_says_nothing() {
     let server = FakeGitHub::start();
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: REMOTE,
+            rev: REV,
+        },
+    );
 
     stiles_asking(&cache, server.url())
         .arg("check")
@@ -482,7 +523,13 @@ fn check_with_a_token_sends_it_to_the_api() {
     let server = FakeGitHub::start();
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: REMOTE,
+            rev: REV,
+        },
+    );
     publish(&server, &[fixture_library("token_lint")]);
 
     stiles_asking(&cache, server.url())
@@ -507,7 +554,13 @@ fn check_with_a_wrong_digest_warns() {
     let server = FakeGitHub::start();
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: REMOTE,
+            rev: REV,
+        },
+    );
     let name = publish(&server, &[fixture_library("digest_lint")]);
     server.route(
         &format!("/assets/{name}.sha256"),
@@ -538,7 +591,13 @@ fn check_with_an_empty_prebuilt_directory_builds_from_source() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let rules = repository_with_one_lint("empty_lint", RULE);
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: rules.rev(),
+        },
+    );
 
     stiles(&cache)
         .arg("check")
@@ -563,7 +622,13 @@ fn check_with_prebuilt_lints_in_the_cache_asks_nothing() {
     let server = FakeGitHub::start();
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: REMOTE,
+            rev: REV,
+        },
+    );
     publish(&server, &[fixture_library("cached_lint")]);
 
     stiles_asking(&cache, server.url())
@@ -598,7 +663,13 @@ fn check_with_prebuilt_lints_loads_them_without_a_source() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let rules = repository_with_one_lint("loaded_lint", RULE);
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: rules.rev(),
+        },
+    );
 
     stiles(&cache)
         .arg("check")
@@ -639,19 +710,25 @@ fn check_with_several_prebuilt_libraries_loads_every_one() {
         write_lint_package(
             &directory.join("lints").join("first"),
             "workspace_first",
-            "fixture.first",
+            RuleId::new("fixture.first"),
             Standalone::No,
         );
         write_lint_package(
             &directory.join("lints").join("second"),
             "workspace_second",
-            "fixture.second",
+            RuleId::new("fixture.second"),
             Standalone::No,
         );
         write_lockfile(directory);
     });
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: rules.rev(),
+        },
+    );
 
     stiles(&cache)
         .arg("check")
@@ -714,7 +791,13 @@ fn check_without_a_matching_asset_names_the_archive_nobody_published() {
     let server = FakeGitHub::start();
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), REMOTE, REV);
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: REMOTE,
+            rev: REV,
+        },
+    );
     server.route(
         RELEASES,
         Answer::json(listing(&server, &["other.tar.gz", "other.tar.gz.sha256"])),

@@ -144,7 +144,7 @@ impl DecorationMap {
     /// assert_eq!(map.get::<Name>(7).map(|Name(name)| *name), Some(1));
     /// ```
     pub fn get<T: Decoration>(&self, node_id: usize) -> Option<&T> {
-        self.lookup().get::<T>(node_id, 0)
+        self.lookup().first::<T>(node_id)
     }
 
     /// Retrieves all decorations of type `T` attached to the given node

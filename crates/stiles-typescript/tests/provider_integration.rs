@@ -91,18 +91,27 @@ fn decorate(project: &Project, relative: &str) -> Result<DecoratedTree, Coverage
     }
 }
 
-/// Returns the first node of `kind` whose text is `text`
-fn find<'a>(tree: &'a DecoratedTree, kind: &str, text: &str) -> DecoratedNode<'a> {
-    fn walk<'a>(node: &DecoratedNode<'a>, kind: &str, text: &str) -> Option<DecoratedNode<'a>> {
+/// A node to look for: its kind, and the text it reads
+#[derive(Copy, Clone, Debug)]
+struct Wanted<'a> {
+    kind: &'a str,
+    text: &'a str,
+}
+
+/// Returns the first node that matches `wanted`
+fn find<'a>(tree: &'a DecoratedTree, wanted: Wanted<'_>) -> DecoratedNode<'a> {
+    fn walk<'a>(node: &DecoratedNode<'a>, wanted: Wanted<'_>) -> Option<DecoratedNode<'a>> {
+        let Wanted { kind, text } = wanted;
         if node.kind() == kind && node.text() == text {
             return Some(*node);
         }
         node.named_children()
             .iter()
-            .find_map(|child| walk(child, kind, text))
+            .find_map(|child| walk(child, wanted))
     }
 
-    walk(&tree.root_node(), kind, text).unwrap_or_else(|| panic!("no {kind} node reads {text}"))
+    let Wanted { kind, text } = wanted;
+    walk(&tree.root_node(), wanted).unwrap_or_else(|| panic!("no {kind} node reads {text}"))
 }
 
 /// Returns the first function declaration in `tree`
@@ -281,7 +290,13 @@ fn decorate_lists_the_members_of_a_string_union() {
 
     let tree = decorate(&project, "src/main.ts").expect("the file should be covered");
 
-    let color = find(&tree, "identifier", "color");
+    let color = find(
+        &tree,
+        Wanted {
+            kind: "identifier",
+            text: "color",
+        },
+    );
     let mut members: Vec<&str> = color
         .decoration::<StringUnion>()
         .expect("the parameter should carry its union")
@@ -299,7 +314,13 @@ fn greeting_type() -> ResolvedType {
 
     let tree = decorate(&project, "src/main.ts").expect("the file should be covered");
 
-    let greeting = find(&tree, "identifier", "greeting");
+    let greeting = find(
+        &tree,
+        Wanted {
+            kind: "identifier",
+            text: "greeting",
+        },
+    );
     greeting
         .decoration::<ResolvedType>()
         .expect("the parameter should be resolved")
@@ -414,9 +435,15 @@ fn decorate_sorts_imports_by_where_they_resolve() {
     let sources: Vec<Option<ImportSource>> = ["\"./a\"", "\"dep\"", "\"@ws/lib\"", "\"gone\""]
         .iter()
         .map(|specifier| {
-            find(&tree, "string", specifier)
-                .decoration::<ImportSource>()
-                .copied()
+            find(
+                &tree,
+                Wanted {
+                    kind: "string",
+                    text: specifier,
+                },
+            )
+            .decoration::<ImportSource>()
+            .copied()
         })
         .collect();
     assert_eq!(

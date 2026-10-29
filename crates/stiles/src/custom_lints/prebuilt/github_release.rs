@@ -141,7 +141,7 @@ impl GitHubApi {
         let url = format!("{}/repos/{repository}/releases?per_page=100", self.base);
 
         let response = self
-            .get(&url, "application/vnd.github+json")
+            .get(&url, MediaType::GitHubJson)
             .with_context(|| format!("failed to ask {repository} for its releases"))?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
@@ -180,7 +180,7 @@ impl GitHubApi {
         path: &Path,
     ) -> anyhow::Result<Sha256Digest> {
         let response = self
-            .get(&asset.url, "application/octet-stream")
+            .get(&asset.url, MediaType::OctetStream)
             .with_context(|| format!("failed to download {}", asset.name))?;
 
         let status = response.status();
@@ -212,7 +212,7 @@ impl GitHubApi {
     /// Returns an error if the asset cannot be fetched or is not text.
     pub(crate) fn download_text(&self, asset: &ReleaseAsset) -> anyhow::Result<String> {
         let response = self
-            .get(&asset.url, "application/octet-stream")
+            .get(&asset.url, MediaType::OctetStream)
             .with_context(|| format!("failed to download {}", asset.name))?;
 
         let status = response.status();
@@ -231,12 +231,12 @@ impl GitHubApi {
     /// host signs the request itself and refuses one that also carries an
     /// `Authorization` header. The host check keeps the token off that
     /// second request, and away from anywhere stiles was not pointed.
-    fn get(&self, url: &str, accept: &str) -> anyhow::Result<Response> {
+    fn get(&self, url: &str, accept: MediaType) -> anyhow::Result<Response> {
         let mut request = self
             .client
             .get(url)
             .header(USER_AGENT, concat!("stiles/", env!("CARGO_PKG_VERSION")))
-            .header(ACCEPT, accept);
+            .header(ACCEPT, accept.as_str());
 
         if let Some(token) = self.token.as_deref().filter(|_| self.serves(url)) {
             request = request.header(AUTHORIZATION, format!("Bearer {token}"));
@@ -254,6 +254,30 @@ impl GitHubApi {
         match (url.host_str(), self.api_host.as_deref()) {
             (Some(host), Some(api)) => host.eq_ignore_ascii_case(api),
             (_, _) => false,
+        }
+    }
+}
+
+/// The media type a request asks the API to answer in
+///
+/// The API answers one address in two forms. It describes an asset in
+/// JSON, and it serves the bytes of the same asset when a request asks
+/// for a binary stream.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum MediaType {
+    /// The JSON form of the API, for listings and descriptions
+    GitHubJson,
+
+    /// The raw bytes of a file
+    OctetStream,
+}
+
+impl MediaType {
+    /// Returns the value of the `Accept` header that asks for this type
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::GitHubJson => "application/vnd.github+json",
+            Self::OctetStream => "application/octet-stream",
         }
     }
 }
@@ -632,6 +656,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_send_media_type() {
+        fn assert_send<T: Send>() {}
+        assert_send::<MediaType>();
+    }
+
+    #[test]
     fn trait_send_prebuilt_asset() {
         fn assert_send<T: Send>() {}
         assert_send::<PrebuiltAsset>();
@@ -662,6 +692,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_sync_media_type() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<MediaType>();
+    }
+
+    #[test]
     fn trait_sync_prebuilt_asset() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<PrebuiltAsset>();
@@ -689,6 +725,12 @@ mod tests {
     fn trait_unpin_github_api() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<GitHubApi>();
+    }
+
+    #[test]
+    fn trait_unpin_media_type() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<MediaType>();
     }
 
     #[test]

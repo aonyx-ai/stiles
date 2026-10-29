@@ -3,14 +3,18 @@ use std::process::Command;
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
+use stiles_types::RuleId;
 use tempfile::TempDir;
 
 #[path = "support/fixture_repository.rs"]
 mod fixture_repository;
+#[path = "support/git_pin.rs"]
+mod git_pin;
 
 use self::fixture_repository::{
     FixtureRepository, Standalone, git, write_lint_package, write_lockfile,
 };
+use self::git_pin::GitPin;
 
 /// Source that trips the fixture lints and nothing stiles ships
 const TODO_SOURCE: &str = "pub fn later() {\n    todo!()\n}\n";
@@ -39,7 +43,8 @@ fn package(source: &str) -> TempDir {
 /// Both values go through TOML, not into quotes of our own. A checkout
 /// under a directory with a quote in its name therefore still writes a
 /// configuration that stiles can read.
-fn configure_git_lint(package: &Path, url: &str, rev: &str) {
+fn configure_git_lint(package: &Path, pin: GitPin<'_>) {
+    let GitPin { url, rev } = pin;
     let url = toml::Value::from(url);
     let rev = toml::Value::from(rev);
 
@@ -101,7 +106,7 @@ fn shared_build_directory() -> PathBuf {
 }
 
 /// Creates a repository holding one lint package
-fn repository_with_one_lint(rule: &str) -> FixtureRepository {
+fn repository_with_one_lint(rule: RuleId) -> FixtureRepository {
     FixtureRepository::new(|directory| {
         write_lint_package(directory, "fixture_lint", rule, Standalone::Yes);
         write_lockfile(directory);
@@ -142,7 +147,7 @@ fn fixture_in_an_ambient_git_environment() -> AmbientRun {
         std::env::set_var("GIT_INDEX_FILE", git_dir.join("index"));
     }
 
-    let rules = repository_with_one_lint("fixture.no-todo");
+    let rules = repository_with_one_lint(RuleId::new("fixture.no-todo"));
 
     // SAFETY: as for the two `set_var` calls above.
     unsafe {
@@ -166,9 +171,15 @@ fn fixture_in_an_ambient_git_environment() -> AmbientRun {
 #[test]
 fn check_with_git_lint_source_at_an_unknown_rev_fails() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let rules = repository_with_one_lint("fixture.no-todo");
+    let rules = repository_with_one_lint(RuleId::new("fixture.no-todo"));
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), ABSENT_REV);
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: ABSENT_REV,
+        },
+    );
 
     stiles(&cache)
         .arg("check")
@@ -188,9 +199,15 @@ fn check_with_git_lint_source_at_an_unknown_rev_fails() {
 #[test]
 fn check_with_git_lint_source_ignores_an_ambient_git_environment() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let rules = repository_with_one_lint("fixture.no-todo");
+    let rules = repository_with_one_lint(RuleId::new("fixture.no-todo"));
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: rules.rev(),
+        },
+    );
 
     stiles(&cache)
         .env("GIT_DIR", target.path().join(".git"))
@@ -207,9 +224,15 @@ fn check_with_git_lint_source_ignores_an_ambient_git_environment() {
 #[test]
 fn check_with_git_lint_source_reports_its_diagnostic() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let rules = repository_with_one_lint("fixture.no-todo");
+    let rules = repository_with_one_lint(RuleId::new("fixture.no-todo"));
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: rules.rev(),
+        },
+    );
 
     stiles(&cache)
         .arg("check")
@@ -229,9 +252,15 @@ fn check_with_git_lint_source_reports_its_diagnostic() {
 #[test]
 fn check_with_git_lint_source_reuses_the_checkout_without_the_remote() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");
-    let rules = repository_with_one_lint("fixture.no-todo");
+    let rules = repository_with_one_lint(RuleId::new("fixture.no-todo"));
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: rules.rev(),
+        },
+    );
 
     stiles(&cache)
         .arg("check")
@@ -266,19 +295,25 @@ fn check_with_git_lint_workspace_loads_every_member() {
         write_lint_package(
             &directory.join("lints").join("first"),
             "first",
-            "fixture.first",
+            RuleId::new("fixture.first"),
             Standalone::No,
         );
         write_lint_package(
             &directory.join("lints").join("second"),
             "second",
-            "fixture.second",
+            RuleId::new("fixture.second"),
             Standalone::No,
         );
         write_lockfile(directory);
     });
     let target = package(TODO_SOURCE);
-    configure_git_lint(target.path(), &rules.url(), rules.rev());
+    configure_git_lint(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: rules.rev(),
+        },
+    );
 
     stiles(&cache)
         .arg("check")

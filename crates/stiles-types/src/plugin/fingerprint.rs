@@ -25,21 +25,19 @@
 ///
 /// [`IStable::ID`]: stabby::IStable::ID
 pub const fn stable_fingerprint(ids: &[u64]) -> u64 {
-    let mut hash = mix(0xcbf2_9ce4_8422_2325, ids.len() as u64);
+    let mut hash = mix(0xcbf2_9ce4_8422_2325, (ids.len() as u64).to_le_bytes());
 
     let mut index = 0;
     while index < ids.len() {
-        hash = mix(hash, ids[index]);
+        hash = mix(hash, ids[index].to_le_bytes());
         index += 1;
     }
 
     hash
 }
 
-/// Folds one value into a running FNV-1a hash, byte by byte
-const fn mix(hash: u64, value: u64) -> u64 {
-    let bytes = value.to_le_bytes();
-
+/// Folds the bytes of one value into a running FNV-1a hash
+const fn mix(hash: u64, bytes: [u8; 8]) -> u64 {
     let mut hash = hash;
     let mut index = 0;
     while index < bytes.len() {
