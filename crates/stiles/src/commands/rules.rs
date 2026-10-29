@@ -123,31 +123,38 @@ async fn list(args: RulesArgs, context: &Context, closing: &mut ClosingText) -> 
 mod tests {
     use super::*;
 
-    fn listed(enabled: bool) -> ListedRule {
+    fn listed() -> ListedRule {
         ListedRule {
             rule: "lint.todo-comment",
             languages: vec!["rust", "typescript"],
-            enabled,
+            enabled: true,
+        }
+    }
+
+    fn listed_off() -> ListedRule {
+        ListedRule {
+            enabled: false,
+            ..listed()
         }
     }
 
     #[test]
     fn display_names_the_rule_and_its_languages() {
-        let text = listed(true).to_string();
+        let text = listed().to_string();
 
         assert_eq!(text, "lint.todo-comment (rust, typescript)");
     }
 
     #[test]
     fn display_with_a_rule_turned_off_says_so() {
-        let text = listed(false).to_string();
+        let text = listed_off().to_string();
 
         assert_eq!(text, "lint.todo-comment (rust, typescript), off");
     }
 
     #[test]
     fn json_has_the_rule_its_languages_and_whether_it_runs() {
-        let json = serde_json::to_value(listed(true)).expect("should serialize");
+        let json = serde_json::to_value(listed()).expect("should serialize");
 
         assert_eq!(
             json,

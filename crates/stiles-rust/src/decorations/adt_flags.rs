@@ -1,5 +1,7 @@
 use stiles_macros::Decoration;
 
+use crate::decorations::Exhaustiveness;
+
 /// ADT-specific flags for enum types
 ///
 /// Attached alongside [`ResolvedType`] when the type is an enum.
@@ -45,6 +47,30 @@ impl AdtFlags {
         }
     }
 
+    /// Creates ADT flags from how exhaustive a match on the enum can be
+    ///
+    /// This does what [`new`] does, with a variant in place of a `bool`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::{AdtFlags, Exhaustiveness};
+    ///
+    /// let flags = AdtFlags::from_exhaustiveness(Exhaustiveness::Exhaustive);
+    ///
+    /// assert!(!flags.non_exhaustive_external());
+    /// ```
+    ///
+    /// [`new`]: Self::new
+    pub fn from_exhaustiveness(exhaustiveness: Exhaustiveness) -> Self {
+        Self {
+            non_exhaustive_external: match exhaustiveness {
+                Exhaustiveness::Exhaustive => false,
+                Exhaustiveness::NonExhaustive => true,
+            },
+        }
+    }
+
     /// Returns whether the enum is `#[non_exhaustive]` from an external crate
     ///
     /// # Examples
@@ -64,6 +90,20 @@ impl AdtFlags {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn from_exhaustiveness_exhaustive_leaves_the_flag_unset() {
+        let flags = AdtFlags::from_exhaustiveness(Exhaustiveness::Exhaustive);
+
+        assert!(!flags.non_exhaustive_external());
+    }
+
+    #[test]
+    fn from_exhaustiveness_non_exhaustive_sets_the_flag() {
+        let flags = AdtFlags::from_exhaustiveness(Exhaustiveness::NonExhaustive);
+
+        assert!(flags.non_exhaustive_external());
+    }
 
     #[test]
     fn non_exhaustive_external_when_set_returns_true() {

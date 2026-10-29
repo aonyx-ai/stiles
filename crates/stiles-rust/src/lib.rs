@@ -187,18 +187,18 @@ mod tests {
     #[test]
     fn dispatch_handles_attribute_item() {
         struct AttrChecker {
-            found: bool,
+            visits: usize,
         }
         impl RustLintPass for AttrChecker {
             fn check_attribute_item(&mut self, _node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-                self.found = true;
+                self.visits += 1;
                 Vec::new()
             }
         }
 
         let tree = parse_rust("#[derive(Debug)]\nstruct Foo;");
         let root = tree.root_node();
-        let mut pass = AttrChecker { found: false };
+        let mut pass = AttrChecker { visits: 0 };
 
         fn walk_and_dispatch(node: &DecoratedNode<'_>, pass: &mut impl RustLintPass) {
             dispatch(pass, node);
@@ -208,24 +208,24 @@ mod tests {
         }
 
         walk_and_dispatch(&root, &mut pass);
-        assert!(pass.found, "should have found attribute_item node");
+        assert!(pass.visits > 0, "should have found attribute_item node");
     }
 
     #[test]
     fn dispatch_handles_macro_invocation() {
         struct MacroChecker {
-            found: bool,
+            visits: usize,
         }
         impl RustLintPass for MacroChecker {
             fn check_macro_invocation(&mut self, _node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-                self.found = true;
+                self.visits += 1;
                 Vec::new()
             }
         }
 
         let tree = parse_rust("fn f() { println!(\"hello\"); }");
         let root = tree.root_node();
-        let mut pass = MacroChecker { found: false };
+        let mut pass = MacroChecker { visits: 0 };
 
         fn walk_and_dispatch(node: &DecoratedNode<'_>, pass: &mut impl RustLintPass) {
             dispatch(pass, node);
@@ -235,24 +235,24 @@ mod tests {
         }
 
         walk_and_dispatch(&root, &mut pass);
-        assert!(pass.found, "should have found macro_invocation node");
+        assert!(pass.visits > 0, "should have found macro_invocation node");
     }
 
     #[test]
     fn dispatch_handles_match_arm_node() {
         struct MatchArmChecker {
-            found: bool,
+            visits: usize,
         }
         impl RustLintPass for MatchArmChecker {
             fn check_match_arm(&mut self, _node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-                self.found = true;
+                self.visits += 1;
                 Vec::new()
             }
         }
 
         let tree = parse_rust("fn f() { match 1 { 0 => {} _ => {} } }");
         let root = tree.root_node();
-        let mut pass = MatchArmChecker { found: false };
+        let mut pass = MatchArmChecker { visits: 0 };
 
         fn walk_and_dispatch(node: &DecoratedNode<'_>, pass: &mut impl RustLintPass) {
             dispatch(pass, node);
@@ -262,7 +262,7 @@ mod tests {
         }
 
         walk_and_dispatch(&root, &mut pass);
-        assert!(pass.found, "should have found match_arm nodes");
+        assert!(pass.visits > 0, "should have found match_arm nodes");
     }
 
     #[test]

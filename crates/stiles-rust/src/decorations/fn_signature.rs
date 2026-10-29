@@ -71,10 +71,12 @@ impl FnSignature {
     /// # Examples
     ///
     /// ```
-    /// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ReturnMode};
+    /// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ResultKind, ReturnMode};
     ///
     /// let signature = FnSignature::builder()
-    ///     .return_type(ResolvedType::new("Result<(), Error>".to_string()).with_result(true))
+    ///     .return_type(
+    ///         ResolvedType::new("Result<(), Error>".to_string()).with_result_kind(ResultKind::Result),
+    ///     )
     ///     .error_type(ErrorType::Generic)
     ///     .return_mode(ReturnMode::Direct)
     ///     .build();
@@ -94,10 +96,12 @@ impl FnSignature {
     /// # Examples
     ///
     /// ```
-    /// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ReturnMode};
+    /// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ResultKind, ReturnMode};
     ///
     /// let signature = FnSignature::builder()
-    ///     .return_type(ResolvedType::new("Result<(), Error>".to_string()).with_result(true))
+    ///     .return_type(
+    ///         ResolvedType::new("Result<(), Error>".to_string()).with_result_kind(ResultKind::Result),
+    ///     )
     ///     .error_type(ErrorType::Generic)
     ///     .return_mode(ReturnMode::Direct)
     ///     .build();
@@ -113,10 +117,12 @@ impl FnSignature {
     /// # Examples
     ///
     /// ```
-    /// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ReturnMode};
+    /// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ResultKind, ReturnMode};
     ///
     /// let signature = FnSignature::builder()
-    ///     .return_type(ResolvedType::new("Result<(), Error>".to_string()).with_result(true))
+    ///     .return_type(
+    ///         ResolvedType::new("Result<(), Error>".to_string()).with_result_kind(ResultKind::Result),
+    ///     )
     ///     .error_type(ErrorType::Generic)
     ///     .return_mode(ReturnMode::Direct)
     ///     .build();
@@ -131,12 +137,13 @@ impl FnSignature {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decorations::{TypePath, TypePathRef};
+    use crate::decorations::{ResultKind, TypePath, TypePathRef};
 
     /// Returns the signature of a function that returns
     /// `Result<(), anyhow::Error>` directly
     fn returning_a_result() -> FnSignature {
-        let ret = ResolvedType::new("Result<(), anyhow::Error>".into()).with_result(true);
+        let ret = ResolvedType::new("Result<(), anyhow::Error>".into())
+            .with_result_kind(ResultKind::Result);
         let error = ErrorType::Named(
             TypePath::builder()
                 .krate("anyhow")
