@@ -9,7 +9,7 @@ This is easily the fastest way to get started. Feel free to read through [the
 installation script][install-sh] to make sure it's safe to run.
 
 ```bash
-curl -LsSf https://aonyx-ai.github.io/stiles/install.sh | sh
+curl -LsSf https://opensource.aonyx.ai/stiles/install.sh | sh
 ```
 
 If you don't want to install in `$HOME/.local/bin` you can set a different path
