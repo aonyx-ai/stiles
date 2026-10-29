@@ -11,7 +11,7 @@ that, and a version match is not a trust decision.
 
 When you change your Stiles version, you change your rules pin too.
 
-## What binds them
+## The tie between Stiles and its rules
 
 <!--
 what binds them: why is my rules pin tied to my stiles at all. a rules
@@ -24,7 +24,7 @@ Stiles downloads it or compiles it. Before Stiles calls into that library, it
 checks that the library was built for this Stiles. When it was not, Stiles
 refuses to load the library. No setting overrides that check.
 
-## What is compared
+## The handshake comparison
 
 <!--
 what is compared: what actually has to match. a protocol version and two
@@ -36,7 +36,7 @@ Three values that identify the Stiles source each side was built from.
 [The plugin boundary](/authoring/explanation/plugin-boundary) explains them. Any
 `rustc` can build either side.
 
-## What it costs
+## The cost of an upgrade
 
 <!--
 what it costs: how often do I pay this. every stiles release before 1.0,
@@ -64,7 +64,7 @@ Stiles accepts either order. If you move the rules pin first, you pin rules
 built for a Stiles you do not run yet. Your current Stiles cannot load them.
 Renovate opens this pin update without a Stiles upgrade.
 
-## How do I tell
+## A pin that matches the release
 
 <!--
 how do I tell: what do I run. `stiles abi` prints the tag this stiles loads,
@@ -81,7 +81,7 @@ When a library fails the handshake, Stiles prints the values from both sides on
 stderr and stops. [Troubleshooting](/docs/how-to/troubleshooting) has the exact
 messages.
 
-## What a bot cannot do
+## The limits of Renovate
 
 <!--
 what a bot cannot do: why did renovate not handle this. it watches the rules

@@ -17,7 +17,7 @@ curl -LsSf https://aonyx-ai.github.io/stiles/install.sh | sh
 [Install Stiles][installation] covers Linux, macOS, GitHub Actions, and a
 build from source.
 
-## Where to start
+## Start here
 
 - **[Quick start][quick-start]**  
   Install Stiles, write a rule, and check a project.

@@ -26,7 +26,7 @@ other safely. A rule is a dynamic library, and Stiles passes Stiles types into
 it. Before Stiles calls into the rule, it checks that the rule was built
 against the same Stiles source.
 
-## What decides agreement
+## The agreement check
 
 <!--
 what decides agreement: what is actually compared. the stiles source each side
@@ -71,7 +71,7 @@ not a wrong answer.
 No. A call into a mismatched rule is undefined behavior: it can crash Stiles,
 or corrupt its results without an error.
 
-## What I control
+## Your part
 
 <!--
 what I control: what is mine to get right. one thing. pin the stiles crates to
@@ -81,7 +81,7 @@ the stiles that will load the plugin.
 One thing: pin `stiles-plugin`, `stiles-types`, `stiles-testing`, and the
 language crates your rule uses to the Stiles release that will load your rule.
 
-## How often that costs me
+## Rebuild frequency
 
 <!--
 how often that costs me: when do I rebuild. before 1.0, every stiles release.
@@ -94,7 +94,7 @@ the Stiles you built it for. Plan to rebuild, and to republish any
 
 From 1.0, you rebuild only when the major version changes.
 
-## What crosses safely
+## Values that cross safely
 
 <!--
 what crosses safely: what am I allowed to do inside a rule. use my own global
@@ -105,7 +105,7 @@ allocator, and panic without ending the process.
 - **A panic.** Stiles reports a panic in your rule, and the process keeps
   running.
 
-## What stays my problem
+## Remaining risks
 
 <!--
 what stays my problem: what the handshake does not check. the rest of my

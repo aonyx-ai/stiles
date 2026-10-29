@@ -43,7 +43,7 @@ disable = ["lint.no-inline-comments"]
 boundary-attributes = ["shard", "procedure"]
 ```
 
-## ignore {#ignore}
+## `ignore` {#ignore}
 
 To ignore specific files, you can use the top-level `ignore` property. You can
 ignore specific files, entire directories, or through gitignore-like patterns.
@@ -72,7 +72,7 @@ ignore = [
 You can load multiple lints, each is defined through a `[[lints]]` section. To
 define the lints, you either list a path or a git repository.
 
-### path
+### `path`
 
 Use a lint at a specific directory, relative to the project root. This directory
 has to be a Stiles lint, as described in [writing a rule][writing-a-rule].
@@ -82,7 +82,7 @@ has to be a Stiles lint, as described in [writing a rule][writing-a-rule].
 path = "lints/doc_summary_break"
 ```
 
-### git and rev
+### `git` and `rev`
 
 Use a lint at a (remote) Git repository. You must define a full 40-character
 hash. Learn more at [Shared rules][shared-rules].
@@ -97,7 +97,7 @@ rev = "0123456789abcdef0123456789abcdef01234567"
 
 These are rule-specific configurations that Stiles can keep itself to.
 
-#### enable
+#### `enable`
 
 To enable only specific rules in a lint, add an `enable` property to the
 `[rules]` section. Learn more in [Adopt rules gradually][adopt-rules-gradually].
@@ -107,7 +107,7 @@ To enable only specific rules in a lint, add an `enable` property to the
 enable = ["lint.doc-summary-break"]
 ```
 
-#### disable
+#### `disable`
 
 To disable only specific rules in a lint, add a `disable` property to the
 `[rules]` section. Learn more in [Adopt rules gradually][adopt-rules-gradually].
@@ -117,7 +117,7 @@ To disable only specific rules in a lint, add a `disable` property to the
 disable = ["lint.no-inline-comments"]
 ```
 
-#### rules.options {#rule-options}
+#### `rules.options` {#rule-options}
 
 Stiles rules may define more granular options. These will be documented in the
 rule's documentation. To use these options, add them under a
@@ -128,7 +128,7 @@ rule's documentation. To use these options, add them under a
 boundary-attributes = ["shard", "procedure"]
 ```
 
-## stiles-source
+## `stiles-source`
 
 For Stiles's own development we need to patch `stiles-types`,
 `stiles-plugin`, `stiles-testing`, and every language crate.

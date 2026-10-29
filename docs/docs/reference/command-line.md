@@ -10,7 +10,7 @@ that.
 The main way users interact with Stiles is through our CLI. We describe the
 various options here.
 
-## check
+## `stiles check`
 
 Normally you'll invoke Stiles through `stiles check .`. There's some more
 options you can pass though:
@@ -25,7 +25,7 @@ stiles check [OPTIONS] [PATH]
 | `--keep-going`    | Report each failure and continue. The run still exits non-zero |
 | `--deny-warnings` | Fail on warnings as well as errors                             |
 
-## rules
+## `stiles rules`
 
 To see which rules the configured lints declare, run this in the project. Each
 line names a rule, the languages it runs on, and `off` when the project's
@@ -35,7 +35,7 @@ line names a rule, the languages it runs on, and `off` when the project's
 stiles rules [PATH]
 ```
 
-## abi
+## `stiles abi`
 
 To find the ABI version of a Stiles binary, you can run this command. It takes
 no options.
@@ -57,7 +57,7 @@ output or behavior:
 | `-v`, `--verbose` | Name each file as Stiles checks it            |
 | `--json`          | Write each result as one JSON object per line |
 
-## What ends a run early
+## Early stops
 
 | Cause                                | Default      | With `--keep-going`     |
 | ------------------------------------ | ------------ | ----------------------- |
@@ -89,7 +89,7 @@ error.
 | `Info`   | No               | No                           |
 | `Help`   | No               | No                           |
 
-## Where output goes
+## Output streams
 
 <!--
 stdout or stderr. the result of a command goes to stdout: the diagnostics of

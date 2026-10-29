@@ -10,7 +10,7 @@ reference page of the same name in the usage tree.
 The maintainer of a rules repository can publish the rules compiled, so the
 projects that use them download a library and skip the build.
 
-## the archive
+## The archive
 
 | Part     | Value                                               |
 | -------- | --------------------------------------------------- |
@@ -20,7 +20,7 @@ projects that use them download a library and skip the build.
 | Digest   | A `.sha256` published beside the archive            |
 | Contents | Regular files at the archive root, and nothing else |
 
-## commit the lockfile
+## Commit the lockfile
 
 <!--
 what else do I owe consumers. a committed lockfile, because a git entry builds
@@ -31,7 +31,7 @@ Commit `Cargo.lock`. Stiles always builds a git entry with `--locked`, so
 without a committed lockfile every consumer's build fails, whether or not you
 publish archives.
 
-## when the tag moves
+## A moved tag
 
 <!--
 when do my archives stop being found. when the boundary moves, because the tag
