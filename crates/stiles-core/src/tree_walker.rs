@@ -19,6 +19,60 @@ pub use self::walk_lints_error::WalkLintsError;
 /// node it was checking. The walk stops there, for the reason
 /// [`PassPanic`] gives.
 ///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_types::{
+///     Checked, Configured, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, RuleId,
+///     RuleOptions, Severity,
+/// };
+///
+/// /// Reports every function
+/// struct Functions;
+///
+/// impl LintPass for Functions {
+///     extern "C" fn language(&self) -> Language {
+///         Language::Rust
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+///         let mut diagnostics = vec::Vec::new();
+///         if node.kind() == "function_item" {
+///             diagnostics.push(
+///                 Diagnostic::builder()
+///                     .rule_id(RuleId::new("lint.functions"))
+///                     .severity(Severity::Warn)
+///                     .message("a function")
+///                     .span(node.span())
+///                     .build(),
+///             );
+///         }
+///         Checked::Ok(diagnostics)
+///     }
+/// }
+///
+/// let source = "fn one() {}\nfn two() {}\n";
+/// let mut parser = tree_sitter::Parser::new();
+/// parser.set_language(&tree_sitter_rust::LANGUAGE.into())?;
+/// let tree = DecoratedTree::builder()
+///     .tree(parser.parse(source, None).expect("should parse"))
+///     .language(Language::Rust)
+///     .source(source.to_string())
+///     .file("src/lib.rs")
+///     .build();
+/// let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(Functions)];
+///
+/// let diagnostics = stiles_core::walk(&tree, &mut passes)?;
+///
+/// assert_eq!(diagnostics.len(), 2);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
 /// [`PassPanic`]: crate::PassPanic
 pub fn walk(
     tree: &DecoratedTree,
@@ -45,6 +99,66 @@ pub fn walk(
 /// when a pass reports a rule its plugin did not declare for it. The walk
 /// stops at either one, for the reasons [`PassPanic`] and
 /// [`UndeclaredRule`] give.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_core::Lint;
+/// use stabby::vec;
+/// use stiles_types::{
+///     Checked, Configured, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, RuleId,
+///     RuleOptions, Severity,
+/// };
+///
+/// /// Reports every function
+/// struct Functions;
+///
+/// impl LintPass for Functions {
+///     extern "C" fn language(&self) -> Language {
+///         Language::Rust
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+///         let mut diagnostics = vec::Vec::new();
+///         if node.kind() == "function_item" {
+///             diagnostics.push(
+///                 Diagnostic::builder()
+///                     .rule_id(RuleId::new("lint.functions"))
+///                     .severity(Severity::Warn)
+///                     .message("a function")
+///                     .span(node.span())
+///                     .build(),
+///             );
+///         }
+///         Checked::Ok(diagnostics)
+///     }
+/// }
+///
+/// let source = "fn one() {}\nfn two() {}\n";
+/// let mut parser = tree_sitter::Parser::new();
+/// parser.set_language(&tree_sitter_rust::LANGUAGE.into())?;
+/// let tree = DecoratedTree::builder()
+///     .tree(parser.parse(source, None).expect("should parse"))
+///     .language(Language::Rust)
+///     .source(source.to_string())
+///     .file("src/lib.rs")
+///     .build();
+/// let mut lints = vec![
+///     Lint::builder()
+///         .pass(Box::new(Functions))
+///         .rules(vec![RuleId::new("lint.functions")])
+///         .build(),
+/// ];
+///
+/// let diagnostics = stiles_core::walk_lints(&tree, &mut lints)?;
+///
+/// assert_eq!(diagnostics.len(), 2);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 ///
 /// [`PassPanic`]: crate::PassPanic
 /// [`UndeclaredRule`]: crate::UndeclaredRule

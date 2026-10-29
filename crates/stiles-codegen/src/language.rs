@@ -5,9 +5,39 @@ use std::{env, fs, io};
 use crate::{Fingerprint, generate_visitor, merge_node_types};
 
 /// The file a language crate includes for its generated lint pass trait
+///
+/// # Examples
+///
+/// A language crate includes the file from the output directory of its
+/// build script:
+///
+/// ```ignore
+/// include!(concat!(env!("OUT_DIR"), "/lint_pass.rs"));
+/// ```
+///
+/// The constant names the same file:
+///
+/// ```
+/// assert_eq!(stiles_codegen::LINT_PASS_FILE, "lint_pass.rs");
+/// ```
 pub const LINT_PASS_FILE: &str = "lint_pass.rs";
 
 /// The file a language crate includes for the fingerprint of that trait
+///
+/// # Examples
+///
+/// A language crate includes the file from the output directory of its
+/// build script:
+///
+/// ```ignore
+/// include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
+/// ```
+///
+/// The constant names the same file:
+///
+/// ```
+/// assert_eq!(stiles_codegen::FINGERPRINT_FILE, "visitor_fingerprint.rs");
+/// ```
 pub const FINGERPRINT_FILE: &str = "visitor_fingerprint.rs";
 
 /// Generates a language crate's lint pass trait and its fingerprint

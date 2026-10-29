@@ -39,6 +39,18 @@ pub struct Fingerprint(u64);
 
 impl Fingerprint {
     /// Creates a fingerprint of nothing
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_codegen::Fingerprint;
+    ///
+    /// let empty = Fingerprint::new();
+    /// let mut filled = Fingerprint::new();
+    /// filled.add_bytes(b"");
+    ///
+    /// assert_ne!(empty, filled);
+    /// ```
     pub fn new() -> Self {
         Self(FNV_OFFSET_BASIS)
     }
@@ -54,6 +66,23 @@ impl Fingerprint {
     ///
     /// Returns [`io::Error`] if a directory or file under `root` cannot be
     /// read.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use stiles_codegen::Fingerprint;
+    ///
+    /// let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    /// let mut once = Fingerprint::new();
+    /// once.add_directory(&source)?;
+    /// let mut twice = Fingerprint::new();
+    /// twice.add_directory(&source)?;
+    ///
+    /// assert_eq!(once, twice);
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
     pub fn add_directory(&mut self, root: &Path) -> io::Result<()> {
         let mut files = Vec::new();
         collect_files(root, root, &mut files)?;
@@ -76,6 +105,20 @@ impl Fingerprint {
     /// therefore never folds to the state that another split of the same
     /// bytes would reach. Without it, a file `a` that holds `bc` and a file
     /// `ab` that holds `c` would give one byte stream and one fingerprint.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_codegen::Fingerprint;
+    ///
+    /// let mut joined = Fingerprint::new();
+    /// joined.add_bytes(b"abc");
+    /// let mut split = Fingerprint::new();
+    /// split.add_bytes(b"a");
+    /// split.add_bytes(b"bc");
+    ///
+    /// assert_ne!(joined, split);
+    /// ```
     pub fn add_bytes(&mut self, bytes: &[u8]) {
         self.fold(&(bytes.len() as u64).to_le_bytes());
         self.fold(bytes);
