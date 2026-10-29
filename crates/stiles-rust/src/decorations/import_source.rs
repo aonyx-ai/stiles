@@ -10,6 +10,19 @@ use stiles_macros::Decoration;
 ///
 /// A rule reads it out of memory that the host allocated. The discriminant
 /// is therefore a byte, a layout that holds from one compiler to the next.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_rust::decorations::ImportSource;
+///
+/// let names_variants = match ImportSource::Enum {
+///     ImportSource::Enum => true,
+///     ImportSource::Module | ImportSource::Other | ImportSource::Unresolved => false,
+/// };
+///
+/// assert!(names_variants);
+/// ```
 #[stabby::stabby]
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Decoration)]

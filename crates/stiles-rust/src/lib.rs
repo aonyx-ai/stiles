@@ -14,6 +14,18 @@ pub use self::provider::{LoadRustWorkspaceError, RustDecorationProvider};
 include!(concat!(env!("OUT_DIR"), "/lint_pass.rs"));
 
 /// Returns the tree-sitter language for Rust
+///
+/// # Examples
+///
+/// ```
+/// let mut parser = tree_sitter::Parser::new();
+/// parser.set_language(&stiles_rust::language())?;
+///
+/// let tree = parser.parse("fn main() {}", None).expect("should parse");
+///
+/// assert_eq!(tree.root_node().kind(), "source_file");
+/// # Ok::<(), tree_sitter::LanguageError>(())
+/// ```
 pub fn language() -> tree_sitter::Language {
     tree_sitter_rust::LANGUAGE.into()
 }

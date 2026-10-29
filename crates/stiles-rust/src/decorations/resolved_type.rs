@@ -33,6 +33,16 @@ pub struct ResolvedType {
 
 impl ResolvedType {
     /// Creates a new resolved type
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::ResolvedType;
+    ///
+    /// let ty = ResolvedType::new("Vec<u8>".to_string());
+    ///
+    /// assert_eq!(ty.display(), "Vec<u8>");
+    /// ```
     pub fn new(display: String) -> Self {
         Self {
             display: string::String::from(display.as_str()),
@@ -44,50 +54,140 @@ impl ResolvedType {
     }
 
     /// Marks this type as an enum
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::ResolvedType;
+    ///
+    /// let ty = ResolvedType::new("Shape".to_string()).with_enum(true);
+    ///
+    /// assert!(ty.is_enum());
+    /// ```
     pub fn with_enum(mut self, is_enum: bool) -> Self {
         self.is_enum = is_enum;
         self
     }
 
     /// Marks this type as the never type (`!`)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::ResolvedType;
+    ///
+    /// let ty = ResolvedType::new("!".to_string()).with_never(true);
+    ///
+    /// assert!(ty.is_never());
+    /// ```
     pub fn with_never(mut self, is_never: bool) -> Self {
         self.is_never = is_never;
         self
     }
 
     /// Marks this type as `Result<T, E>`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::ResolvedType;
+    ///
+    /// let ty = ResolvedType::new("Result<(), Error>".to_string()).with_result(true);
+    ///
+    /// assert!(ty.is_result());
+    /// ```
     pub fn with_result(mut self, is_result: bool) -> Self {
         self.is_result = is_result;
         self
     }
 
     /// Marks this type as `Option<T>`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::ResolvedType;
+    ///
+    /// let ty = ResolvedType::new("Option<u8>".to_string()).with_option(true);
+    ///
+    /// assert!(ty.is_option());
+    /// ```
     pub fn with_option(mut self, is_option: bool) -> Self {
         self.is_option = is_option;
         self
     }
 
     /// Returns the human-readable type name
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::ResolvedType;
+    ///
+    /// let ty = ResolvedType::new("Shape".to_string());
+    ///
+    /// assert_eq!(ty.display(), "Shape");
+    /// ```
     pub fn display(&self) -> &str {
         &self.display
     }
 
     /// Returns whether this is an enum type
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::ResolvedType;
+    ///
+    /// let ty = ResolvedType::new("Shape".to_string());
+    ///
+    /// assert!(!ty.is_enum());
+    /// ```
     pub fn is_enum(&self) -> bool {
         self.is_enum
     }
 
     /// Returns whether this is the never type (`!`)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::ResolvedType;
+    ///
+    /// let ty = ResolvedType::new("!".to_string());
+    ///
+    /// assert!(!ty.is_never());
+    /// ```
     pub fn is_never(&self) -> bool {
         self.is_never
     }
 
     /// Returns whether this is a `Result<T, E>` type
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::ResolvedType;
+    ///
+    /// let ty = ResolvedType::new("Result<(), Error>".to_string());
+    ///
+    /// assert!(!ty.is_result());
+    /// ```
     pub fn is_result(&self) -> bool {
         self.is_result
     }
 
     /// Returns whether this is an `Option<T>` type
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::ResolvedType;
+    ///
+    /// let ty = ResolvedType::new("Option<u8>".to_string());
+    ///
+    /// assert!(!ty.is_option());
+    /// ```
     pub fn is_option(&self) -> bool {
         self.is_option
     }

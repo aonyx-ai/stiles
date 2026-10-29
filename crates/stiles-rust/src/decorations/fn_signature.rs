@@ -16,6 +16,20 @@ use crate::decorations::{ErrorType, ResolvedType, ReturnMode};
 /// out. Its optional parts are stabby's [`Option`], because std promises
 /// no layout for an `Option` of these types.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ReturnMode};
+///
+/// let signature = FnSignature::builder()
+///     .return_type(ResolvedType::new("Result<(), Error>".to_string()).with_result(true))
+///     .error_type(ErrorType::Generic)
+///     .return_mode(ReturnMode::Direct)
+///     .build();
+///
+/// assert_eq!(signature.return_mode(), ReturnMode::Direct);
+/// ```
+///
 /// [`Option`]: stabby::option::Option
 #[stabby::stabby]
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Decoration)]
@@ -29,6 +43,16 @@ pub struct FnSignature {
 #[bon]
 impl FnSignature {
     /// Creates a function signature
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::{FnSignature, ReturnMode};
+    ///
+    /// let signature = FnSignature::builder().return_mode(ReturnMode::Opaque).build();
+    ///
+    /// assert!(signature.return_type().is_none());
+    /// ```
     #[builder]
     pub fn new(
         return_type: Option<ResolvedType>,
@@ -43,6 +67,20 @@ impl FnSignature {
     }
 
     /// Returns the resolved return type, awaited for an `async fn`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ReturnMode};
+    ///
+    /// let signature = FnSignature::builder()
+    ///     .return_type(ResolvedType::new("Result<(), Error>".to_string()).with_result(true))
+    ///     .error_type(ErrorType::Generic)
+    ///     .return_mode(ReturnMode::Direct)
+    ///     .build();
+    ///
+    /// assert_eq!(signature.return_type().map(ResolvedType::display), Some("Result<(), Error>"));
+    /// ```
     pub fn return_type(&self) -> Option<&ResolvedType> {
         self.return_type.as_ref()
     }
@@ -52,11 +90,39 @@ impl FnSignature {
     /// [`None`] means the function does not return a `core::result::Result`.
     /// That includes an `async fn` whose awaited type is not one, and one
     /// whose future could not be projected.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ReturnMode};
+    ///
+    /// let signature = FnSignature::builder()
+    ///     .return_type(ResolvedType::new("Result<(), Error>".to_string()).with_result(true))
+    ///     .error_type(ErrorType::Generic)
+    ///     .return_mode(ReturnMode::Direct)
+    ///     .build();
+    ///
+    /// assert_eq!(signature.error_type(), Some(&ErrorType::Generic));
+    /// ```
     pub fn error_type(&self) -> Option<&ErrorType> {
         self.error_type.as_ref()
     }
 
     /// Returns where the return type was read from
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::{ErrorType, FnSignature, ResolvedType, ReturnMode};
+    ///
+    /// let signature = FnSignature::builder()
+    ///     .return_type(ResolvedType::new("Result<(), Error>".to_string()).with_result(true))
+    ///     .error_type(ErrorType::Generic)
+    ///     .return_mode(ReturnMode::Direct)
+    ///     .build();
+    ///
+    /// assert_eq!(signature.return_mode(), ReturnMode::Direct);
+    /// ```
     pub fn return_mode(&self) -> ReturnMode {
         self.return_mode
     }
