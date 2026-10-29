@@ -9,20 +9,20 @@ const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 /// An order-sensitive hash of the inputs that shape a compiled crate
 ///
 /// The build scripts of stiles-types and stiles-rust bake one of these
-/// into each crate, and the custom lint plugin loader compares the plugin's
-/// values against its own. The crate version cannot serve that comparison:
-/// stiles's crates are unpublished and keep one version number between
-/// releases, so two builds of the same version can compile different
-/// source. The fingerprint detects that drift; it is not a security
-/// measure, so an unkeyed 64-bit FNV-1a suffices and avoids pulling a
-/// cryptography dependency into every build script.
+/// into each crate. The loader of custom lint plugins compares the values
+/// of a plugin against its own. The crate version cannot serve that
+/// comparison. Between releases the crates of stiles keep one version
+/// number, so two builds of one version can compile different source. The
+/// fingerprint detects that drift. It is not a security measure, so an
+/// unkeyed 64-bit FNV-1a suffices. It also keeps a cryptography dependency
+/// out of every build script.
 ///
-/// Files enter the hash in sorted path order, with paths relative to the
-/// added directory and `/` separators, so the fingerprint is identical
-/// wherever the crate is checked out and on every platform. Every name
-/// and every file's contents enter as their own run, carrying their
-/// length, so no two trees whose bytes merely fall differently across
-/// names and files can hash alike.
+/// Files enter the hash in sorted path order. Their paths are relative to
+/// the added directory and use `/` separators. The fingerprint is therefore
+/// identical wherever the crate is checked out, and on every platform.
+/// Every name and the contents of every file enter as their own run, with
+/// their length. Two trees whose bytes merely fall differently across names
+/// and files therefore cannot hash alike.
 ///
 /// # Examples
 ///
@@ -45,10 +45,10 @@ impl Fingerprint {
 
     /// Folds every file under `root` into the fingerprint
     ///
-    /// Every file counts, whatever its extension: a file that turns out
-    /// not to influence the build only makes the comparison stricter, and
-    /// a stray mismatch is a refusal the user can see, while a missed one
-    /// is undefined behavior nobody can.
+    /// Every file counts, whatever its extension. A file that does not
+    /// influence the build only makes the comparison stricter. A stray
+    /// mismatch is a refusal that the user can see, while a missed one is
+    /// undefined behavior that nobody can see.
     ///
     /// # Errors
     ///
@@ -72,10 +72,10 @@ impl Fingerprint {
     /// This is how generated code, which lives outside the source tree,
     /// joins the hash.
     ///
-    /// The run's length enters the hash ahead of its content, so a call
-    /// never folds to the state some other split of the same bytes would
-    /// reach: without that, a file named `a` holding `bc` and a file named
-    /// `ab` holding `c` would be one byte stream and one fingerprint.
+    /// The length of the run enters the hash ahead of its content. A call
+    /// therefore never folds to the state that another split of the same
+    /// bytes would reach. Without it, a file `a` that holds `bc` and a file
+    /// `ab` that holds `c` would give one byte stream and one fingerprint.
     pub fn add_bytes(&mut self, bytes: &[u8]) {
         self.fold(&(bytes.len() as u64).to_le_bytes());
         self.fold(bytes);

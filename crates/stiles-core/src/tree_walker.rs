@@ -40,10 +40,11 @@ pub fn walk(
 ///
 /// # Errors
 ///
-/// Returns [`WalkLintsError::Panicked`] when a pass panics, naming the node
-/// it was checking, and [`WalkLintsError::Undeclared`] when a pass reports
-/// a rule its plugin did not declare for it. The walk stops at either one,
-/// for the reasons [`PassPanic`] and [`UndeclaredRule`] give.
+/// Returns [`WalkLintsError::Panicked`] when a pass panics, and the error
+/// names the node it was checking. Returns [`WalkLintsError::Undeclared`]
+/// when a pass reports a rule its plugin did not declare for it. The walk
+/// stops at either one, for the reasons [`PassPanic`] and
+/// [`UndeclaredRule`] give.
 ///
 /// [`PassPanic`]: crate::PassPanic
 /// [`UndeclaredRule`]: crate::UndeclaredRule

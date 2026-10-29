@@ -173,10 +173,9 @@ fn method_name(kind: &str) -> String {
 /// resolves the transitive closure down to concrete node kinds.
 ///
 /// A leaf reachable by more than one path is returned once, at the position
-/// of its first occurrence. Grammars are free to place the same concrete
-/// kind under several supertypes, and the generated dispatch arms them with
-/// `|`, where a repeat is an `unreachable_pattern` rather than a harmless
-/// duplicate.
+/// of its first occurrence. A grammar may place one concrete kind under
+/// several supertypes. The generated dispatch joins the arms with `|`, and
+/// there a repeat is an `unreachable_pattern`, not a harmless duplicate.
 fn collect_leaf_subtypes<'a>(supertype: &'a NodeType, all_types: &'a [NodeType]) -> Vec<&'a str> {
     let mut leaves = Vec::new();
     for sub_ref in &supertype.subtypes {

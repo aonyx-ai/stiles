@@ -17,9 +17,9 @@ pub use self::run_pipeline_error::RunPipelineError;
 
 /// Orchestrates the parse-decorate-execute pipeline
 ///
-/// The pipeline reads a source file, parses it with the appropriate
-/// tree-sitter grammar, runs decoration providers, then walks the
-/// decorated tree through all enabled lint passes.
+/// The pipeline reads a source file and parses it with the tree-sitter
+/// grammar of its language. It then runs the decoration providers, and
+/// walks the decorated tree through all enabled lint passes.
 pub struct Pipeline {
     language: Language,
     parser: tree_sitter::Parser,

@@ -30,8 +30,8 @@ pub const FINGERPRINT_FILE: &str = "visitor_fingerprint.rs";
 /// # Errors
 ///
 /// Returns an error if cargo did not set `CARGO_MANIFEST_DIR` or `OUT_DIR`,
-/// if a `node-types.json` cannot be read or parsed, or if a generated file
-/// cannot be written. Returns an error too if `cargo` refuses a directive.
+/// or if a `node-types.json` cannot be read or parsed. Returns an error too
+/// if a generated file cannot be written, or if `cargo` refuses a directive.
 ///
 /// # Examples
 ///

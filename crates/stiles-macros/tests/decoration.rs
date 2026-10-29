@@ -1,8 +1,8 @@
 //! Exercises the derived `Decoration` implementations against a real tree
 //!
-//! The unit tests in the crate itself check the generated tokens; these check
-//! that the generated code compiles and that a node reads decorations back in
-//! the shape the type declares.
+//! The unit tests in the crate itself check the generated tokens. These
+//! tests check that the generated code compiles, and that a node reads
+//! decorations back in the shape that the type declares.
 
 use std::path::PathBuf;
 
@@ -142,9 +142,9 @@ fn decorate_with_a_local_type(tree: &mut DecoratedTree) -> u64 {
 
 /// Two types of one name in two function bodies must stay apart
 ///
-/// `module_path!` cannot see a function body, so a key built from the
-/// module path and the name alone would be the same for both, and the map
-/// would hand a lookup of one the other's memory.
+/// `module_path!` cannot see a function body. A key built from the module
+/// path and the name alone would therefore be the same for both. The map
+/// would then answer a lookup of one with the memory of the other.
 #[test]
 fn same_named_types_in_two_functions_do_not_collide() {
     #[stabby::stabby]

@@ -7,9 +7,9 @@ use crate::{PassPanic, UndeclaredRule, WalkLintsError};
 ///
 /// A plugin declares the rule ids each of its passes reports, and stiles
 /// knows them before it walks a file. That is what lets a project turn a
-/// rule off, hand it options, or list it. A pass that reports an id it
-/// did not declare would make each of those wrong without a trace, so the
-/// walk refuses such a diagnostic with an [`UndeclaredRule`] error.
+/// rule off, hand it options, or list it. A pass that reports an id it did
+/// not declare would make each of those wrong without a trace. The walk
+/// therefore refuses such a diagnostic with an [`UndeclaredRule`] error.
 ///
 /// # Examples
 ///

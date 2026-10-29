@@ -14,18 +14,19 @@ enum Cardinality {
 
 /// Builds the `Decoration` implementation for a derive input
 ///
-/// A key should name exactly one type definition, so the derive builds it
-/// from the defining module's path, the type's name, and
-/// [`definition_hash`], and rejects generic types, whose single key would
-/// have to cover one layout per instantiation. A key that names another
-/// type is a wrong answer rather than a wrong read: stabby checks the
-/// stored type against the requested one before it casts.
+/// A key should name exactly one type definition. The derive therefore
+/// builds it from the path of the defining module, the name of the type,
+/// and [`definition_hash`]. It rejects generic types, because their single
+/// key would have to cover one layout per instantiation. A key that names
+/// another type is a wrong answer rather than a wrong read. Stabby checks
+/// the stored type against the requested one before it casts.
 ///
 /// # Errors
 ///
-/// Returns an error if the type is generic, if the `decoration` attribute is
-/// missing, names an option other than `cardinality`, is given a cardinality
-/// other than `one` or `many`, or declares a cardinality more than once.
+/// Returns an error if the type is generic, or if the `decoration`
+/// attribute is missing. Returns an error too if the attribute names an
+/// option other than `cardinality`, or gives a cardinality other than `one`
+/// or `many`. A cardinality declared more than once is an error as well.
 pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
     if let Some(parameter) = input.generics.params.first() {
         return Err(Error::new_spanned(
@@ -79,14 +80,14 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
 /// [`module_path!`] stops at module boundaries, so two types of one name
 /// in two function bodies of the same module share a path and a name.
 /// Their definitions still differ, and folding those into the key keeps
-/// the two apart. The hash covers the item as written, so both images
-/// compiling one source derive the same digits, which is what lets a key
+/// the two apart. The hash covers the item as written, so two images that
+/// compile one source derive the same digits. That is what lets a key
 /// travel across the plugin boundary at all.
 ///
 /// Two byte-identical definitions in two scopes of one module remain
 /// indistinguishable. They describe the same layout, so reading one as
-/// the other cannot misread a field, and the plugin handshake already
-/// rests on one compiler laying identical definitions out identically.
+/// the other cannot misread a field. The plugin handshake already rests on
+/// one compiler that lays identical definitions out identically.
 ///
 /// [`module_path!`]: std::module_path
 fn definition_hash(input: &DeriveInput) -> String {

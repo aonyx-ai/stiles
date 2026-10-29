@@ -9,9 +9,9 @@ use crate::decorations::PublicPath;
 ///
 /// Two imports in one file do not prove that one crate re-exports the
 /// other. `serde` and `serde_json` sit side by side in many files, and
-/// `serde_json` re-exports nothing of `serde`. A rule that wants to say
-/// "import this through the facade" needs rust-analyzer's proof that the
-/// item really is reachable there, and this decoration carries it.
+/// `serde_json` re-exports nothing of `serde`. A rule that says "import
+/// this through the facade" needs proof from rust-analyzer that the item
+/// really is reachable there. This decoration carries that proof.
 ///
 /// The provider attaches it to each path a `use_declaration` imports: the
 /// `scoped_identifier` or `identifier` of `use a::B;`, of `use a::B as C;`,
