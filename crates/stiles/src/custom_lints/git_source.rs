@@ -16,7 +16,8 @@ use crate::config::{GitLintSource, GitRev, GitUrl};
 ///
 /// Returns an error if no cache location can be determined.
 pub(crate) fn cached(source: &GitLintSource) -> anyhow::Result<Option<PathBuf>> {
-    let destination = cache::checkout_directory(source)?;
+    let destination =
+        cache::checkout_directory(source).context("failed to find the cached checkout")?;
 
     match holds(&destination, source.rev()) {
         true => Ok(Some(destination)),
@@ -42,7 +43,8 @@ pub(crate) fn cached(source: &GitLintSource) -> anyhow::Result<Option<PathBuf>> 
 /// remote cannot be reached, if it does not serve the pinned commit, or if
 /// the working tree cannot be written.
 pub(crate) fn checkout(source: &GitLintSource) -> anyhow::Result<PathBuf> {
-    let destination = cache::checkout_directory(source)?;
+    let destination = cache::checkout_directory(source)
+        .context("failed to find the directory for the checkout")?;
 
     if holds(&destination, source.rev()) {
         return Ok(destination);
@@ -161,7 +163,8 @@ fn materialize(source: &GitLintSource, staging: &Path) -> anyhow::Result<()> {
     .with_context(|| format!("failed to create a repository at {}", staging.display()))?
     .to_thread_local();
 
-    fetch(&repository, source.url(), source.rev())?;
+    fetch(&repository, source.url(), source.rev())
+        .with_context(|| format!("failed to fetch {} from {}", source.rev(), source.url()))?;
 
     let commit = gix::ObjectId::from_hex(source.rev().as_str().as_bytes())
         .with_context(|| format!("failed to read {} as a commit hash", source.rev()))?;
@@ -206,7 +209,8 @@ fn materialize(source: &GitLintSource, staging: &Path) -> anyhow::Result<()> {
         .write(gix::index::write::Options::default())
         .context("failed to write the index")?;
 
-    detach_head(&repository, commit)?;
+    detach_head(&repository, commit)
+        .with_context(|| format!("failed to point HEAD at {commit}"))?;
 
     Ok(())
 }

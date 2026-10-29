@@ -277,7 +277,10 @@ async fn run(
         outcome = CheckOutcome::Failure;
     }
 
-    remedies.report(context).await?;
+    remedies
+        .report(context)
+        .await
+        .context("failed to report the remedies for uncovered files")?;
 
     let all_diagnostics: Vec<Diagnostic> = all_diagnostics
         .into_iter()

@@ -108,7 +108,7 @@ pub(crate) fn cache_root() -> anyhow::Result<PathBuf> {
 ///
 /// Returns an error if no cache location can be determined.
 pub(crate) fn checkout_directory(source: &GitLintSource) -> anyhow::Result<PathBuf> {
-    let root = cache_root()?;
+    let root = cache_root().context("failed to find the directory for the checkout")?;
 
     Ok(checkout_directory_in(&root, source))
 }
@@ -129,7 +129,7 @@ fn checkout_directory_in(root: &Path, source: &GitLintSource) -> PathBuf {
 ///
 /// Returns an error if no cache location can be determined.
 pub(crate) fn prebuilt_directory(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<PathBuf> {
-    let root = cache_root()?;
+    let root = cache_root().context("failed to find the directory for the prebuilt lints")?;
 
     Ok(prebuilt_directory_in(&root, source, tag))
 }

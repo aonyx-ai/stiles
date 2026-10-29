@@ -87,7 +87,7 @@ impl Discovery {
         let root = std::fs::canonicalize(path)
             .with_context(|| format!("failed to resolve {}", path.display()))?;
 
-        let excludes = build_excludes(config)?;
+        let excludes = build_excludes(config).context("failed to read the ignore patterns")?;
 
         if root.is_file() {
             let Some(extension) = path.extension() else {

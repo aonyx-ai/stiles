@@ -67,27 +67,27 @@ impl CustomLints {
         for Resolved {
             directory,
             contents,
-        } in configured_sources(config, &AbiTag::host(), notices)?
+        } in configured_sources(config, &AbiTag::host(), notices)
+            .context("failed to resolve the configured lint sources")?
         {
             let loaded = match contents {
                 Contents::Sources(locking) => {
-                    { load_sources(&directory, locking, config.stiles_source(), &host) }
-                        .with_context(|| {
-                            format!("failed to load the custom lints at {}", directory.display())
-                        })
+                    load_sources(&directory, locking, config.stiles_source(), &host).with_context(
+                        || format!("failed to load the custom lints at {}", directory.display()),
+                    )?
                 }
                 Contents::Libraries => load_prebuilt(&directory, &host).with_context(|| {
                     format!(
                         "failed to load the prebuilt lints at {}",
                         directory.display()
                     )
-                }),
-            }?;
+                })?,
+            };
 
             lints.extend(loaded.lints);
         }
 
-        refuse_shared_rules(&lints)?;
+        refuse_shared_rules(&lints).context("failed to check the rules that the lints declare")?;
 
         Ok(Self { lints })
     }
@@ -310,7 +310,8 @@ fn configured_sources(
                 path.resolve(config.root()),
                 Contents::Sources(Locking::Unlocked),
             ),
-            LintSource::Git(git) => resolve_git(git, tag, notices)?,
+            LintSource::Git(git) => resolve_git(git, tag, notices)
+                .with_context(|| format!("failed to resolve the lint source {entry}"))?,
         };
 
         anyhow::ensure!(
@@ -372,20 +373,26 @@ fn resolve_git(
     tag: &AbiTag,
     notices: &mut Vec<PrebuiltNotice>,
 ) -> anyhow::Result<(PathBuf, Contents)> {
-    if let Some(directory) = self::prebuilt::cached(source, tag)? {
+    if let Some(directory) =
+        self::prebuilt::cached(source, tag).context("failed to look for cached prebuilt lints")?
+    {
         return Ok((directory, Contents::Libraries));
     }
 
-    if let Some(directory) = self::git_source::cached(source)? {
+    if let Some(directory) =
+        self::git_source::cached(source).context("failed to look for a cached checkout")?
+    {
         return Ok((directory, Contents::Sources(Locking::Locked)));
     }
 
-    if let Some(directory) = self::prebuilt::fetch(source, tag, notices)? {
+    if let Some(directory) =
+        self::prebuilt::fetch(source, tag, notices).context("failed to fetch prebuilt lints")?
+    {
         return Ok((directory, Contents::Libraries));
     }
 
     Ok((
-        self::git_source::checkout(source)?,
+        self::git_source::checkout(source).context("failed to check out the lint source")?,
         Contents::Sources(Locking::Locked),
     ))
 }
@@ -401,7 +408,8 @@ fn load_sources(
     stiles_source: Option<&Path>,
     host: &AbiIdentity,
 ) -> anyhow::Result<Loaded> {
-    let libraries = build(directory, locking, stiles_source)?;
+    let libraries = build(directory, locking, stiles_source)
+        .with_context(|| format!("failed to build the lints at {}", directory.display()))?;
 
     load_libraries(&libraries, host)
 }
@@ -419,7 +427,8 @@ fn load_sources(
 /// Returns an error if the directory cannot be read, if it holds no
 /// library, or if any library fails to load.
 fn load_prebuilt(directory: &Path, host: &AbiIdentity) -> anyhow::Result<Loaded> {
-    let libraries = self::prebuilt::libraries(directory)?;
+    let libraries = self::prebuilt::libraries(directory)
+        .with_context(|| format!("failed to list the libraries at {}", directory.display()))?;
 
     anyhow::ensure!(
         !libraries.is_empty(),
@@ -574,7 +583,7 @@ fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loade
         .types_fingerprint(types_fingerprint)
         .language_fingerprint(language_fingerprint)
         .build();
-    self::handshake::validate(host, &plugin)?;
+    self::handshake::validate(host, &plugin).context("failed the handshake with the plugin")?;
 
     // SAFETY: the handshake passed, so the plugin lays the declaration
     // out the way this binary does, and `load` holds a function this
@@ -651,7 +660,8 @@ mod tests {
     }
 
     fn directories(config: &StilesConfig) -> anyhow::Result<Vec<PathBuf>> {
-        let sources = configured_sources(config, &AbiTag::host(), &mut Vec::new())?;
+        let sources = configured_sources(config, &AbiTag::host(), &mut Vec::new())
+            .context("failed to resolve the configured lint sources")?;
 
         Ok(sources
             .into_iter()
@@ -711,7 +721,7 @@ mod tests {
         let error = directories(&config).expect_err("should fail");
 
         assert!(
-            error.to_string().contains("already configured"),
+            format!("{error:#}").contains("already configured"),
             "unexpected: {error:#}"
         );
     }
@@ -725,7 +735,7 @@ mod tests {
         let error = directories(&config).expect_err("should fail");
 
         assert!(
-            error.to_string().contains("not a directory"),
+            format!("{error:#}").contains("not a directory"),
             "unexpected: {error:#}"
         );
     }
@@ -738,7 +748,7 @@ mod tests {
         let error = directories(&config).expect_err("should fail");
 
         assert!(
-            error.to_string().contains("does not exist"),
+            format!("{error:#}").contains("does not exist"),
             "unexpected: {error:#}"
         );
     }
@@ -752,7 +762,7 @@ mod tests {
         let error = directories(&config).expect_err("should fail");
 
         assert!(
-            error.to_string().contains("no Cargo.toml"),
+            format!("{error:#}").contains("no Cargo.toml"),
             "unexpected: {error:#}"
         );
     }
