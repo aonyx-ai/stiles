@@ -8,8 +8,8 @@ use crate::{BoxedLintPass, Language, Panic, RuleId};
 /// A plugin hands over a constructor for each lint. Passes are stateful,
 /// and the check command constructs a fresh set for every file.
 ///
-/// The factory is one of stabby's boxed callables, so a plugin builds it
-/// from a plain closure and the host calls it through a vtable stabby
+/// The factory is one of stabby's boxed callables. A plugin builds it from
+/// a plain closure, and the host calls it through a vtable that stabby
 /// lays out. Construction runs plugin code, so a panic in it comes back
 /// as a value like any other.
 pub type LintPassFactory =
@@ -39,11 +39,11 @@ pub fn construct(factory: &LintPassFactory) -> Constructed {
 /// One lint a plugin exports, described before it is built
 ///
 /// Stiles reads the language and the rules without running the factory.
-/// It knows every rule of every loaded plugin before the first file, so it
-/// can refuse a configured rule name that nothing reports, list the rules,
-/// and refuse two lints that report one rule on one language. The walk
-/// also holds each pass to its own rules: a diagnostic under any other id
-/// ends the run.
+/// It knows every rule of every loaded plugin before the first file. It can
+/// therefore refuse a configured rule name that nothing reports, and list
+/// the rules. It can also refuse two lints that report one rule on one
+/// language. The walk also holds each pass to its own rules: a diagnostic
+/// under any other id ends the run.
 #[stabby::stabby]
 pub struct ExportedLint {
     /// Builds a fresh pass of the lint

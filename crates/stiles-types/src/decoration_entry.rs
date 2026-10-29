@@ -7,10 +7,10 @@ use crate::DecorationKey;
 ///
 /// [`Box<dyn Any>`] cannot hold a decoration, because its downcast goes
 /// through [`TypeId`], and a plugin's [`TypeId`] for a type differs from
-/// the host's. Stabby's [`Any`] answers the same question across images:
-/// its vtable carries the type's identity and its layout report, both
-/// derived from the definition rather than from the compilation, so a
-/// downcast compares what the two images actually agree on.
+/// the host's. Stabby's [`Any`] answers the same question across images.
+/// Its vtable carries the identity of the type and its layout report. Both
+/// come from the definition, not from the compilation, so a downcast
+/// compares what the two images actually agree on.
 ///
 /// [`Any`]: stabby::Any
 /// [`Box<dyn Any>`]: std::any::Any
@@ -19,9 +19,9 @@ pub type Erased = stabby::dynptr!(Box<dyn stabby::Any + Send + Sync>);
 
 /// One decoration, with the node it sits on and the key it went in under
 ///
-/// A plugin reads these out of the host's memory, so stabby lays the entry
-/// out. The node id sits in the entry rather than in a separate table, so
-/// that a sealed index is one list of positions into one list of entries.
+/// A plugin reads these out of the memory of the host, so stabby lays the
+/// entry out. The node id sits in the entry, not in a separate table. A
+/// sealed index is therefore one list of positions into one list of entries.
 ///
 /// The type is public because [`DecorationLookup`] names it in the layout
 /// stabby records. Its module is not, so nothing outside this crate can
@@ -59,9 +59,9 @@ impl Entry {
 
     /// Returns the decoration as a `T`, or [`None`] if it holds another type
     ///
-    /// Stabby compares the stored type's identity and its layout report
-    /// against `T`'s before it casts, so a key that names the wrong type
-    /// yields [`None`] instead of a misread value.
+    /// Stabby compares the identity and the layout report of the stored type
+    /// against those of `T` before it casts. A key that names the wrong type
+    /// therefore yields [`None`] instead of a misread value.
     pub(crate) fn read<T: crate::Decoration>(&self) -> Option<&T> {
         self.value.stable_downcast_ref::<T, _>()
     }

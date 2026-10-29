@@ -11,10 +11,10 @@ use crate::{DecoratedNode, DecorationKey};
 ///
 /// Implementations fix their own cardinality through [`Ref`]. A decoration a
 /// provider records at most once per node reads back as [`Option`]; one it may
-/// record repeatedly reads back as [`Vec`]. Because that choice travels with
-/// the type rather than the call site, a rule cannot ask for a single value
-/// where the provider records a list, and the mismatch is a compile error
-/// rather than a silently dropped decoration.
+/// record repeatedly reads back as [`Vec`]. That choice travels with the
+/// type, not with the call site. A rule therefore cannot ask for a single
+/// value where the provider records a list. The mismatch is a compile error,
+/// not a silently dropped decoration.
 ///
 /// Derive this rather than writing it by hand; the derive discharges the
 /// safety obligation mechanically:
@@ -26,18 +26,19 @@ use crate::{DecoratedNode, DecorationKey};
 /// pub struct ResolvedType { /* … */ }
 /// ```
 ///
-/// A decoration is [`IStable`]. A plugin reads it out of memory the host
-/// allocated, and only a layout that holds from one compiler to the next
-/// makes that read sound. The bound turns a decoration std would lay out
-/// into a compile error rather than a plugin that reads the wrong bytes.
+/// A decoration is [`IStable`]. A plugin reads it out of memory that the
+/// host allocated. Only a layout that holds from one compiler to the next
+/// makes that read sound. The bound turns a decoration that std would lay
+/// out into a compile error, not a plugin that reads the wrong bytes.
 ///
 /// [`KEY`] should name exactly one type definition. The map finds a value
-/// by key and then asks stabby for it as the requested type, and stabby
-/// compares the stored type's identity and layout report before it casts.
-/// Two types that share a key therefore give each other [`None`], not each
-/// other's memory. The derive macro builds the key from the type's module
-/// path, its name, and a hash of its definition, and rejects generic
-/// types, whose single key would have to cover many layouts.
+/// by key and then asks stabby for it as the requested type. Stabby
+/// compares the identity and the layout report of the stored type before it
+/// casts. Two types that share a key therefore give each other [`None`],
+/// not each other's memory. The derive macro builds the key from the module
+/// path of the type, its name, and a hash of its definition. It rejects
+/// generic types, because their single key would have to cover many
+/// layouts.
 ///
 /// # Examples
 ///
@@ -66,8 +67,8 @@ pub trait Decoration: IStable + Send + Sync + 'static {
     /// The name that identifies this type in the decoration map
     ///
     /// The map compares keys where single-image code would compare
-    /// [`TypeId`]s, because a custom lint plugin and the stiles binary
-    /// compile the same decoration types into different ids. See the
+    /// [`TypeId`]s. A custom lint plugin and the stiles binary compile the
+    /// same decoration types into different ids. See the
     /// trait-level safety contract for what a key must guarantee.
     ///
     /// [`TypeId`]: std::any::TypeId

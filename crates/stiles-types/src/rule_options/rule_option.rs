@@ -5,17 +5,17 @@ use stabby::{string, vec};
 
 /// One option a project set for one rule
 ///
-/// A rule reads the values through [`RuleOptions::names`] rather than
-/// reaching for an option directly, so this is what a host builds and a
-/// rule rarely names. The rule it belongs to is an owned string, because
-/// the name comes from a configuration file and [`RuleId`] admits only a
-/// `&'static str`. A name that no loaded rule
-/// declares is refused by [`RuleOptions::validate`] before any pass runs.
+/// A rule reads the values through [`RuleOptions::names`], not through an
+/// option directly. This is therefore what a host builds and a rule rarely
+/// names. The rule it belongs to is an owned string, because the name comes
+/// from a configuration file and [`RuleId`] admits only a `&'static str`.
+/// [`RuleOptions::validate`] refuses a name that no loaded rule declares,
+/// before any pass runs.
 ///
 /// A value is a list of names. Every option the rules ask for today names
-/// things: the attributes that mark a boundary, the crates a
-/// module may import. A number and a flag have no form here, so a project
-/// that writes one is told at load rather than having it read as nothing.
+/// things: the attributes that mark a boundary, the crates a module may
+/// import. A number and a flag have no form here. A project that writes
+/// one is told at load, rather than having it read as nothing.
 ///
 /// The option crosses the plugin boundary inside [`RuleOptions`]. Stabby
 /// lays it out, and its strings and list are stabby's `String` and `Vec`.

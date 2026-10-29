@@ -20,9 +20,9 @@ pub trait LintPass: Send + Sync {
     /// Returns the language whose trees this pass inspects
     ///
     /// The tree walker hands a pass only the nodes of trees in this
-    /// language. A language adapter answers for the trait it adapts, so a
-    /// rule written against one grammar never sees another grammar's nodes
-    /// that happen to share a kind name.
+    /// language. A language adapter answers for the trait it adapts. A rule
+    /// written against one grammar therefore never sees the nodes of another
+    /// grammar that happen to share a kind name.
     extern "C" fn language(&self) -> Language;
 
     /// Applies the project's options to this pass

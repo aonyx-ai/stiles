@@ -198,9 +198,9 @@ mod tests {
 
     /// Pins the layout every protocol is read through
     ///
-    /// Stiles reads these bytes before it knows which protocol wrote
-    /// them, so a field that moved would make a plugin claim a version
-    /// it never named.
+    /// Stiles reads these bytes before it knows which protocol wrote them.
+    /// A field that moved would make a plugin claim a version it never
+    /// named.
     #[test]
     fn major_sits_first() {
         assert_eq!(offset_of!(AbiVersion, major), 0);

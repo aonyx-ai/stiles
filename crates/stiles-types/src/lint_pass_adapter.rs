@@ -1,9 +1,10 @@
 /// Defines the adapter that bridges a language's lint pass trait to [`LintPass`]
 ///
 /// Every language crate generates a trait with one method per node kind,
-/// such as `RustLintPass`, and a `dispatch` function that routes a node to
-/// its method. The adapter around it is the same for every language except
-/// for three names, so a language crate writes it with this macro:
+/// such as `RustLintPass`. It also generates a `dispatch` function that
+/// routes a node to its method. The adapter around it is the same for every
+/// language except for three names, so a language crate writes it with this
+/// macro:
 ///
 /// ```ignore
 /// stiles_types::lint_pass_adapter!(RustLintPassAdapter, RustLintPass, crate::dispatch, Rust);

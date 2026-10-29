@@ -6,9 +6,9 @@ use crate::{Location, RuleId, Severity, Span, Suggestion};
 /// A diagnostic emitted by a lint rule
 ///
 /// Diagnostics are the primary output of the linting pipeline. Each one
-/// identifies a specific issue found in source code, with a severity, a
-/// primary span, and optional supplementary information like origin
-/// locations, related locations, and suggested fixes.
+/// identifies a specific issue in source code, with a severity and a
+/// primary span. It can also carry origin locations, related locations,
+/// and suggested fixes.
 ///
 /// A diagnostic is what a plugin hands back across the plugin boundary.
 /// Stabby lays it out, and its strings and lists are stabby's `String` and

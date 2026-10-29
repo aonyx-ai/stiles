@@ -4,21 +4,22 @@ use stabby::str::Str;
 ///
 /// The decoration map stores type-erased values and must decide, at
 /// retrieval, whether a stored value is of the requested type. [`TypeId`]
-/// cannot make that call: it incorporates the compiler's per-crate metadata,
-/// so the same source compiled into the stiles binary and into a custom
-/// lint plugin produces two different ids, and a plugin's lookup would
-/// silently miss every decoration the host recorded. A key compared by
-/// string content is identical in both images whenever both were compiled
-/// from the same source, which the plugin handshake enforces.
+/// cannot make that call, because it includes the metadata that the
+/// compiler keeps per crate. One source compiled into the stiles binary and
+/// into a custom lint plugin therefore produces two different ids. A lookup
+/// in a plugin would then silently miss every decoration that the host
+/// recorded. A key compared by string content is identical in both images
+/// whenever both were compiled from one source, which the plugin handshake
+/// enforces.
 ///
 /// A key selects the entry, and stabby decides whether it holds the type
-/// the caller asked for. Stabby compares the stored type's identity and
-/// its layout report before it casts, so two types that share a key give
-/// each other [`None`] rather than each other's memory. A key should
-/// still name exactly one type definition, because a shared key costs a
-/// lookup its answer. The derive macro builds one from the type's module
-/// path, its name, and a hash of its definition, so two types stay apart
-/// even where a module path and a name coincide.
+/// the caller asked for. Stabby compares the identity and the layout report
+/// of the stored type before it casts. Two types that share a key therefore
+/// give each other [`None`], not each other's memory. A key should still
+/// name exactly one type definition, because a shared key costs a lookup
+/// its answer. The derive macro builds one from the module path of the
+/// type, its name, and a hash of its definition. Two types therefore stay
+/// apart even where a module path and a name coincide.
 ///
 /// The name is held as a [`Str`], stabby's string slice, because a key
 /// crosses the plugin boundary with every lookup a plugin makes. Std

@@ -17,8 +17,8 @@ use crate::plugin::{AbiVersion, Loaded};
 ///   that both images lay those values out the same way.
 ///
 /// The fields are public rather than accessed through getters, because
-/// this struct is a wire format: the exporting macro constructs it in a
-/// `const` context and the loader consumes it field by field.
+/// this struct is a wire format. The exporting macro constructs it in a
+/// `const` context, and the loader consumes it field by field.
 ///
 /// [`abi_version`]: PluginDeclaration::abi_version
 /// [`language_fingerprint`]: PluginDeclaration::language_fingerprint
@@ -41,7 +41,7 @@ pub struct PluginDeclaration {
     /// For Rust lints this is stiles-rust's fingerprint, which also covers
     /// the lint pass trait generated from the grammar's node types. A
     /// plugin whose dispatch was generated from a different grammar would
-    /// not crash, but its checks would quietly never fire; the handshake
+    /// not crash, but its checks would quietly never fire. The handshake
     /// turns that into a refusal.
     pub language_fingerprint: u64,
 
@@ -52,9 +52,9 @@ pub struct PluginDeclaration {
     /// and the rule list together.
     ///
     /// This is the only function the boundary needs. After `dlopen` the
-    /// host holds an address and a name and no stabby value, so the first
-    /// hand-over must be a call whose convention both images agree on
-    /// with no prior agreement. Everything the call returns is stabby's.
+    /// host holds an address and a name, and no stabby value. The first
+    /// hand-over must therefore be a call whose convention both images agree
+    /// on with no prior agreement. Everything the call returns is stabby's.
     ///
     /// Anything added later goes inside [`Plugin`] rather than beside it.
     /// A `#[repr(C)]` struct has offsets stiles can reason about per

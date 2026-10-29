@@ -2,12 +2,12 @@
 ///
 /// A lint pass names its language at the plugin boundary, and stiles
 /// runs the pass only on trees of that language. The grammars share node
-/// kind names such as `identifier` and `comment`, so a pass that ran on
-/// every tree would act on nodes it was never written for.
+/// kind names such as `identifier` and `comment`. A pass that ran on every
+/// tree would therefore act on nodes it was never written for.
 ///
 /// The discriminant is a byte. A language crosses the plugin boundary as
-/// the answer to [`LintPass::language`], and an undeclared representation
-/// has no layout that holds from one compiler to the next.
+/// the answer to [`LintPass::language`]. An undeclared representation has
+/// no layout that holds from one compiler to the next.
 ///
 /// [`LintPass::language`]: crate::LintPass::language
 #[stabby::stabby]

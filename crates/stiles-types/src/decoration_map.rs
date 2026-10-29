@@ -10,14 +10,14 @@ use crate::{Decoration, DecorationLookup};
 /// carry any number of decorations of different types.
 ///
 /// The entries sit in one list in insertion order. A lookup needs them
-/// grouped by node, so the map seals a sorted list of positions into that
-/// list the first time anyone reads it, and a later insertion drops the
+/// grouped by node. The map therefore seals a sorted list of positions into
+/// that list the first time anyone reads it. A later insertion drops the
 /// seal. Sealing reads the entries and never moves them, so a shared
 /// borrow is enough to build it.
 ///
-/// A plugin searches the sealed index itself. The alternative, handing a
-/// plugin a pointer to a [`HashMap`] and a function of the host's that
-/// reads it, needs a raw pointer and a cast the compiler cannot check.
+/// A plugin searches the sealed index itself. The alternative is to hand a
+/// plugin a pointer to a [`HashMap`] and a function of the host that reads
+/// it. That needs a raw pointer and a cast that the compiler cannot check.
 ///
 /// [`HashMap`]: std::collections::HashMap
 #[derive(Debug, Default)]
