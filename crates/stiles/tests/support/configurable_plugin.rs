@@ -7,12 +7,14 @@
 
 use std::path::Path;
 
+use stiles_types::RuleId;
+
 /// Writes a cdylib lint package that reads the option `macros`
 ///
 /// The lint reports `rule` for every macro invocation whose name the
 /// project listed. It declares `rule`, so a project may name it in
 /// `[rules]` and in `[rules.options]`.
-pub(crate) fn write_configurable_lint_package(directory: &Path, name: &str, rule: &str) {
+pub(crate) fn write_configurable_lint_package(directory: &Path, name: &str, rule: RuleId) {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let crates = std::fs::canonicalize(crates).expect("the crates directory should exist");
     let crates = crates.to_str().expect("the path should be UTF-8");
@@ -33,7 +35,7 @@ pub(crate) fn write_configurable_lint_package(directory: &Path, name: &str, rule
 }
 
 /// Returns the source of a lint that flags the macros it was configured with
-fn source(name: &str, rule: &str) -> String {
+fn source(name: &str, rule: RuleId) -> String {
     let pass = name.to_uppercase();
 
     format!(

@@ -3,14 +3,18 @@ use std::process::Command;
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
+use stiles_types::RuleId;
 use tempfile::TempDir;
 
 #[path = "support/configurable_plugin.rs"]
 mod configurable_plugin;
+#[path = "support/git_pin.rs"]
+mod git_pin;
 #[path = "support/other_protocol_plugin.rs"]
 mod other_protocol_plugin;
 
 use self::configurable_plugin::write_configurable_lint_package;
+use self::git_pin::GitPin;
 use self::other_protocol_plugin::write_other_protocol_lint_package;
 
 /// Source that trips the example lint and none of the built-ins
@@ -55,7 +59,8 @@ fn write_config(package: &Path, contents: &str) {
 }
 
 /// Points the package's stiles configuration at one pinned repository
-fn configure_git_lint(package: &Path, url: &str, rev: &str) {
+fn configure_git_lint(package: &Path, pin: GitPin<'_>) {
+    let GitPin { url, rev } = pin;
     let url = toml::Value::from(url);
 
     write_config(
@@ -214,8 +219,10 @@ fn check_with_a_git_lint_that_cannot_be_fetched_names_the_source() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");
     configure_git_lint(
         target.path(),
-        "https://stiles.invalid/rules",
-        "0123456789abcdef0123456789abcdef01234567",
+        GitPin {
+            url: "https://stiles.invalid/rules",
+            rev: "0123456789abcdef0123456789abcdef01234567",
+        },
     );
 
     stiles()
@@ -334,7 +341,11 @@ fn check_with_an_enabled_rule_runs_only_that_rule() {
 fn check_with_an_option_configures_the_rule() {
     let target = package(TODO_SOURCE);
     let lints = tempfile::tempdir().expect("temporary directory should be created");
-    write_configurable_lint_package(lints.path(), "configured_lint", "custom.configured");
+    write_configurable_lint_package(
+        lints.path(),
+        "configured_lint",
+        RuleId::new("custom.configured"),
+    );
     let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
     write_config(
         target.path(),
@@ -362,7 +373,11 @@ fn check_with_an_option_configures_the_rule() {
 fn check_with_an_option_for_a_rule_no_lint_reports_fails() {
     let target = package(TODO_SOURCE);
     let lints = tempfile::tempdir().expect("temporary directory should be created");
-    write_configurable_lint_package(lints.path(), "misnamed_lint", "custom.configured");
+    write_configurable_lint_package(
+        lints.path(),
+        "misnamed_lint",
+        RuleId::new("custom.configured"),
+    );
     let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
     write_config(
         target.path(),
@@ -482,7 +497,11 @@ fn check_with_lint_that_exports_no_declaration_fails() {
 fn check_without_an_option_leaves_the_rule_at_its_default() {
     let target = package(TODO_SOURCE);
     let lints = tempfile::tempdir().expect("temporary directory should be created");
-    write_configurable_lint_package(lints.path(), "unconfigured_lint", "custom.configured");
+    write_configurable_lint_package(
+        lints.path(),
+        "unconfigured_lint",
+        RuleId::new("custom.configured"),
+    );
     configure_lint(target.path(), lints.path());
 
     stiles()

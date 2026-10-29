@@ -1,3 +1,4 @@
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use stiles_types::{DecoratedTree, DecorationMap, Diagnostic, Language, LintPass, Severity, Span};
@@ -315,7 +316,7 @@ impl DiagnosticAssertion<'_> {
     ///
     /// # Panics
     ///
-    /// Panics if the span does not match the expected file, start, and end.
+    /// Panics if the span does not match the expected file and range.
     ///
     /// # Examples
     ///
@@ -330,9 +331,10 @@ impl DiagnosticAssertion<'_> {
     /// #     .span(span.clone())
     /// #     .build();
     /// #
-    /// assert_diagnostic(&diagnostic).has_span("<test>", 3, 7);
+    /// assert_diagnostic(&diagnostic).has_span("<test>", 3..7);
     /// ```
-    pub fn has_span(self, file: &str, start: usize, end: usize) -> Self {
+    pub fn has_span(self, file: &str, range: Range<usize>) -> Self {
+        let Range { start, end } = range;
         let expected = Span::builder()
             .file(PathBuf::from(file))
             .start(start)

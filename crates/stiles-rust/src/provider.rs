@@ -1097,10 +1097,6 @@ mod tests {
         u32::try_from(found).expect("the fixture source is small")
     }
 
-    fn range_at(offset: u32, len: u32) -> TextRange {
-        TextRange::new(TextSize::from(offset), TextSize::from(offset + len))
-    }
-
     /// Parses `source` as the contents of `file_path`, without decorating it
     fn parse_rust(source: &str, file_path: PathBuf) -> DecoratedTree {
         let mut parser = tree_sitter::Parser::new();
@@ -1137,11 +1133,11 @@ mod tests {
     #[test]
     fn covering_node_with_range_inside_the_file_returns_a_node() {
         let syntax = covering_source_tree();
-        let value = offset_of("value");
+        let value = TextRange::at(offset_of("value").into(), 5.into());
 
-        let covering = covering_node(&syntax, range_at(value, 5)).expect("should cover `value`");
+        let covering = covering_node(&syntax, value).expect("should cover `value`");
 
-        assert!(covering.text_range().contains_range(range_at(value, 5)));
+        assert!(covering.text_range().contains_range(value));
     }
 
     /// A span past the end of the tree must be skipped, not asserted on
@@ -1153,7 +1149,7 @@ mod tests {
         let syntax = covering_source_tree();
         let past_the_end = u32::try_from(COVERING_SOURCE.len()).expect("fixture is small") + 1;
 
-        let covering = covering_node(&syntax, range_at(past_the_end, 1));
+        let covering = covering_node(&syntax, TextRange::at(past_the_end.into(), 1.into()));
 
         assert!(covering.is_none());
     }
@@ -1284,7 +1280,7 @@ mod tests {
     fn text_range_from_with_offsets_within_u32_returns_the_range() {
         let converted = text_range_from(3..7).expect("a small range should convert");
 
-        assert_eq!(converted, range_at(3, 4));
+        assert_eq!(converted, TextRange::at(3.into(), 4.into()));
     }
 
     /// Records that `DecorateCtx` is not `Send`

@@ -1391,20 +1391,27 @@ fn wildcard_match_arm_flags_a_scrutinee_reached_through_a_field() {
     assert_eq!(flagged_within(&tree, &diagnostics, &func), vec!["_"]);
 }
 
+/// The `function_item` nodes a walk saw, and how many carry a signature
+#[derive(Copy, Clone, Debug, Default)]
+struct SignatureCounts {
+    functions: usize,
+    signatures: usize,
+}
+
 /// Counts the fixture's `function_item` nodes and how many carry a signature
 ///
 /// The walk recurses because a method inside an `impl` block is a
 /// `function_item` too. A top-level loop would never count the `async`
 /// trait method.
-fn count_fn_signatures(node: &DecoratedNode<'_>, functions: &mut usize, signatures: &mut usize) {
+fn count_fn_signatures(node: &DecoratedNode<'_>, counts: &mut SignatureCounts) {
     if node.kind() == "function_item" {
-        *functions += 1;
+        counts.functions += 1;
         if node.decoration::<FnSignature>().is_some() {
-            *signatures += 1;
+            counts.signatures += 1;
         }
     }
     for child in node.named_children() {
-        count_fn_signatures(&child, functions, signatures);
+        count_fn_signatures(&child, counts);
     }
 }
 
@@ -1414,10 +1421,13 @@ fn fixture_signature_counts() -> (usize, usize) {
     let provider = load_provider();
     let tree = parse_and_decorate_fixture(provider);
 
-    let mut fn_count = 0;
-    let mut sig_count = 0;
-    count_fn_signatures(&tree.root_node(), &mut fn_count, &mut sig_count);
-    (fn_count, sig_count)
+    let mut counts = SignatureCounts::default();
+    count_fn_signatures(&tree.root_node(), &mut counts);
+    let SignatureCounts {
+        functions,
+        signatures,
+    } = counts;
+    (functions, signatures)
 }
 
 #[test]

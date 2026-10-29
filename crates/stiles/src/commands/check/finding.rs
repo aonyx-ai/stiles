@@ -113,11 +113,14 @@ fn position(source: &str, offset: usize) -> (usize, usize) {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Range;
+
     use stiles_types::{RuleId, Span};
 
     use super::*;
 
-    fn finding(source: &str, start: usize, end: usize) -> Finding {
+    fn finding(source: &str, range: Range<usize>) -> Finding {
+        let Range { start, end } = range;
         let path: Arc<Path> = Path::new("src/lib.rs").into();
         let sources = HashMap::from([(path, source.to_owned())]);
         let diagnostic = Diagnostic::builder()
@@ -142,7 +145,7 @@ mod tests {
 
     #[test]
     fn display_drops_one_trailing_newline() {
-        let finding = finding("fn a() {}\n", 3, 4);
+        let finding = finding("fn a() {}\n", 3..4);
 
         let text = finding.to_string();
 
@@ -151,7 +154,7 @@ mod tests {
 
     #[test]
     fn display_shows_the_location() {
-        let finding = finding("fn a() {}\n", 3, 4);
+        let finding = finding("fn a() {}\n", 3..4);
 
         let text = finding.to_string();
 
@@ -160,7 +163,7 @@ mod tests {
 
     #[test]
     fn display_shows_the_rendered_snippet() {
-        let finding = finding("fn a() {}\n", 3, 4);
+        let finding = finding("fn a() {}\n", 3..4);
 
         let text = finding.to_string();
 
@@ -169,7 +172,7 @@ mod tests {
 
     #[test]
     fn json_has_the_fields_a_reader_needs() {
-        let finding = finding("fn a() {}\nfn b() {}\n", 13, 14);
+        let finding = finding("fn a() {}\nfn b() {}\n", 13..14);
 
         let json = serde_json::to_value(&finding).expect("should serialize");
 

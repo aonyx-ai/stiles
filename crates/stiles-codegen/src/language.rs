@@ -2,7 +2,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{env, fs, io};
 
-use crate::{Fingerprint, generate_visitor, merge_node_types};
+use crate::{Fingerprint, LanguageName, generate_visitor, merge_node_types};
 
 /// The file a language crate includes for its generated lint pass trait
 ///
@@ -97,7 +97,7 @@ pub fn build_language(
 fn write_language(language: &str, grammars: &[String], out_dir: &Path) -> io::Result<()> {
     let grammars: Vec<&str> = grammars.iter().map(String::as_str).collect();
     let node_types = merge_node_types(&grammars).map_err(invalid_data)?;
-    let code = generate_visitor(&node_types, language).map_err(invalid_data)?;
+    let code = generate_visitor(&node_types, LanguageName::new(language)).map_err(invalid_data)?;
 
     fs::write(out_dir.join(LINT_PASS_FILE), &code)?;
 

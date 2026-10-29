@@ -416,7 +416,7 @@ impl<'a> DecoratedNode<'a> {
     /// assert_eq!(root.decoration::<Bindings>().map(|Bindings(count)| *count), Some(1));
     /// ```
     pub fn decoration<T: Decoration>(&self) -> Option<&'a T> {
-        self.decorations.get::<T>(self.id(), 0)
+        self.decorations.first::<T>(self.id())
     }
 
     /// Retrieves all decorations of type `T` from this node

@@ -64,15 +64,15 @@ impl<'a> DecorationLookup<'a> {
             .map(move |&position| &entries[position])
     }
 
-    /// Returns the `index`th decoration of type `T` on the node `node_id`
+    /// Returns the first decoration of type `T` on the node `node_id`
     ///
-    /// The decoration lives as long as the map this handle borrows.
-    /// Stabby checks the stored type against `T` before it casts, so a
-    /// key that names another type yields [`None`].
-    pub(crate) fn get<T: Decoration>(&self, node_id: usize, index: usize) -> Option<&'a T> {
+    /// The first is the one inserted earliest. The decoration lives as
+    /// long as the map this handle borrows. Stabby checks the stored type
+    /// against `T` before it casts, so a key that names another type
+    /// yields [`None`].
+    pub(crate) fn first<T: Decoration>(&self, node_id: usize) -> Option<&'a T> {
         self.on(node_id)
-            .filter(|entry| entry.key() == T::KEY)
-            .nth(index)?
+            .find(|entry| entry.key() == T::KEY)?
             .read::<T>()
     }
 
@@ -126,7 +126,55 @@ mod tests {
 
         map.insert(1, Count(2));
 
-        assert_eq!(map.lookup().get::<Count>(1, 1), Some(&Count(2)));
+        assert_eq!(map.lookup().get_all::<Count>(1), vec![&Count(1), &Count(2)]);
+    }
+
+    #[test]
+    fn first_returns_the_earliest_entry_of_a_type() {
+        let mut map = DecorationMap::new();
+        map.insert(1, Other(9));
+        map.insert(1, Count(1));
+        map.insert(1, Count(2));
+
+        let found = map.lookup().first::<Count>(1);
+
+        assert_eq!(found, Some(&Count(1)));
+    }
+
+    #[test]
+    fn first_with_an_unknown_node_returns_none() {
+        let mut map = DecorationMap::new();
+        map.insert(1, Count(1));
+
+        let found = map.lookup().first::<Count>(99);
+
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn first_with_another_type_returns_none() {
+        let mut map = DecorationMap::new();
+        map.insert(1, Count(1));
+
+        let found = map.lookup().first::<Other>(1);
+
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn get_all_groups_entries_by_node() {
+        let mut map = DecorationMap::new();
+        map.insert(1, Count(10));
+        map.insert(2, Count(20));
+        map.insert(1, Count(11));
+
+        let lookup = map.lookup();
+        let found = [1, 2, 3].map(|node| lookup.get_all::<Count>(node));
+
+        assert_eq!(
+            found,
+            [vec![&Count(10), &Count(11)], vec![&Count(20)], Vec::new()]
+        );
     }
 
     #[test]
@@ -139,55 +187,6 @@ mod tests {
         let found = map.lookup().get_all::<Count>(1);
 
         assert_eq!(found, vec![&Count(1), &Count(2)]);
-    }
-
-    #[test]
-    fn get_groups_entries_by_node() {
-        let mut map = DecorationMap::new();
-        map.insert(1, Count(10));
-        map.insert(2, Count(20));
-        map.insert(1, Count(11));
-
-        let lookup = map.lookup();
-        let found =
-            [(1, 0), (1, 1), (2, 0), (2, 1)].map(|(node, index)| lookup.get::<Count>(node, index));
-
-        assert_eq!(
-            found,
-            [Some(&Count(10)), Some(&Count(11)), Some(&Count(20)), None]
-        );
-    }
-
-    #[test]
-    fn get_returns_each_entry_under_a_key_in_insertion_order() {
-        let mut map = DecorationMap::new();
-        map.insert(1, Count(1));
-        map.insert(1, Count(2));
-
-        let lookup = map.lookup();
-        let found = [0, 1, 2].map(|index| lookup.get::<Count>(1, index));
-
-        assert_eq!(found, [Some(&Count(1)), Some(&Count(2)), None]);
-    }
-
-    #[test]
-    fn get_with_an_unknown_node_returns_none() {
-        let mut map = DecorationMap::new();
-        map.insert(1, Count(1));
-
-        let found = map.lookup().get::<Count>(99, 0);
-
-        assert!(found.is_none());
-    }
-
-    #[test]
-    fn get_with_another_type_returns_none() {
-        let mut map = DecorationMap::new();
-        map.insert(1, Count(1));
-
-        let found = map.lookup().get::<Other>(1, 0);
-
-        assert!(found.is_none());
     }
 
     #[test]

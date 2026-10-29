@@ -152,15 +152,15 @@ pub const TYPES_FINGERPRINT: u64 = stable_fingerprint(&[
 mod tests {
     use super::*;
 
-    /// Returns each method signature a trait declares, in declaration order
+    /// Returns each method signature `LintPass` declares, in declaration order
     ///
     /// The scan takes the lines inside the block of the trait that open a
     /// method, and squeezes their whitespace. A doc comment or a reflowed
     /// line therefore changes nothing. An added, removed, reordered, or
     /// re-signed method does.
-    fn method_signatures(source: &str, declaration: &str) -> Vec<String> {
-        let body = source
-            .split_once(declaration)
+    fn lint_pass_methods() -> Vec<String> {
+        let body = include_str!("lint_pass.rs")
+            .split_once("pub trait LintPass: Send + Sync {")
             .expect("the trait should be declared in this source")
             .1;
         let body = body
@@ -177,10 +177,7 @@ mod tests {
 
     #[test]
     fn abi_version_covers_the_boundary_traits() {
-        let lint_pass = method_signatures(
-            include_str!("lint_pass.rs"),
-            "pub trait LintPass: Send + Sync {",
-        );
+        let lint_pass = lint_pass_methods();
 
         assert_eq!(
             lint_pass,
