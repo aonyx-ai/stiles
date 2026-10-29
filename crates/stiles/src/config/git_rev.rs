@@ -14,7 +14,7 @@
 /// assert_eq!(rev.as_str().len(), 40);
 /// ```
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct GitRev(String);
+pub(crate) struct GitRev(String);
 
 /// The number of hexadecimal characters in a full SHA-1 commit hash
 const HASH_LENGTH: usize = 40;
@@ -59,7 +59,7 @@ impl GitRev {
     ///
     /// assert!(rev.as_str().starts_with("0123"));
     /// ```
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         &self.0
     }
 }

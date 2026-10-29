@@ -13,7 +13,7 @@
 /// };
 /// ```
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
-pub enum WalkErrorPolicy {
+pub(crate) enum WalkErrorPolicy {
     /// Abandons the walk and returns the first failure
     #[default]
     Fail,

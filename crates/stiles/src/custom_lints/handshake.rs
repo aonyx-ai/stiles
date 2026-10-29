@@ -14,7 +14,7 @@ use stiles_plugin::{self as plugin, AbiVersion};
 /// the two sides.
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Builder, CopyGetters)]
 #[getset(get_copy = "pub")]
-pub struct AbiIdentity {
+pub(crate) struct AbiIdentity {
     /// The version of the plugin declaration protocol
     abi_version: AbiVersion,
 
@@ -27,7 +27,7 @@ pub struct AbiIdentity {
 
 impl AbiIdentity {
     /// Returns the identity baked into this stiles binary
-    pub fn host() -> Self {
+    pub(crate) fn host() -> Self {
         Self {
             abi_version: plugin::ABI_VERSION,
             types_fingerprint: plugin::TYPES_FINGERPRINT,
@@ -45,7 +45,7 @@ impl AbiIdentity {
 /// # Errors
 ///
 /// Returns the first [`HandshakeMismatch`] between the two identities.
-pub fn validate(host: &AbiIdentity, plugin: &AbiIdentity) -> Result<(), HandshakeMismatch> {
+pub(crate) fn validate(host: &AbiIdentity, plugin: &AbiIdentity) -> Result<(), HandshakeMismatch> {
     if !host.abi_version.accepts(plugin.abi_version) {
         return Err(HandshakeMismatch::AbiVersion {
             plugin: plugin.abi_version,
@@ -72,7 +72,7 @@ pub fn validate(host: &AbiIdentity, plugin: &AbiIdentity) -> Result<(), Handshak
 /// a reader. The versions in the other variant tell the user which side to
 /// rebuild.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub enum HandshakeMismatch {
+pub(crate) enum HandshakeMismatch {
     AbiVersion {
         plugin: AbiVersion,
         host: AbiVersion,

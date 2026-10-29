@@ -41,7 +41,7 @@ mod github_release;
 mod github_repository;
 mod notice;
 
-pub use self::notice::PrebuiltNotice;
+pub(crate) use self::notice::PrebuiltNotice;
 
 /// What the downloaded archive is called while it is being checked
 const DOWNLOAD: &str = "archive.tar.gz";

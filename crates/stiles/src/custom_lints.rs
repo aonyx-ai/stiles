@@ -22,8 +22,8 @@ mod git_source;
 mod handshake;
 mod prebuilt;
 
-pub use self::abi_tag::AbiTag;
-pub use self::prebuilt::PrebuiltNotice;
+pub(crate) use self::abi_tag::AbiTag;
+pub(crate) use self::prebuilt::PrebuiltNotice;
 
 /// The lint passes loaded from the project's configured custom lint crates
 ///
@@ -38,7 +38,7 @@ pub use self::prebuilt::PrebuiltNotice;
 /// silently does nothing looks exactly like configuration that works.
 /// `--keep-going` governs the walk errors of single files, not a broken
 /// setup.
-pub struct CustomLints {
+pub(crate) struct CustomLints {
     lints: Vec<LoadedLint>,
 }
 
@@ -132,7 +132,7 @@ impl CustomLints {
     /// single file. A name that matches none of them is a mistake that it
     /// can report, not a filter that quietly admits everything.
     ///
-    pub fn declared(&self) -> BTreeSet<String> {
+    pub(crate) fn declared(&self) -> BTreeSet<String> {
         self.lints
             .iter()
             .flat_map(|lint| &lint.rules)
@@ -144,7 +144,7 @@ impl CustomLints {
     ///
     /// One rule may run on several languages, each through a lint of its
     /// own, so a rule appears once with every language it covers.
-    pub fn rules(&self) -> Vec<DeclaredRule> {
+    pub(crate) fn rules(&self) -> Vec<DeclaredRule> {
         let mut rules: Vec<DeclaredRule> = Vec::new();
 
         for lint in &self.lints {
@@ -166,7 +166,7 @@ impl CustomLints {
 
 /// A rule a loaded plugin declares, and the languages it runs on
 #[derive(Clone, Eq, PartialEq, Hash, Debug, CopyGetters, Getters)]
-pub struct DeclaredRule {
+pub(crate) struct DeclaredRule {
     /// The id of the rule
     #[getset(get_copy = "pub")]
     rule: RuleId,

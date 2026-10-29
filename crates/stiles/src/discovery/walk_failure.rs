@@ -7,7 +7,7 @@ use ignore::Error;
 /// above the root arrives as a plain walk failure. This type classifies a
 /// plain walk failure, where the error alone must say what failed.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum WalkFailure {
+pub(crate) enum WalkFailure {
     /// An entry of the tree could not be read
     DirectoryEntry,
 
@@ -22,7 +22,7 @@ impl WalkFailure {
     /// file. Everything else, I/O included, counts as a directory-entry
     /// failure: the walker cannot tell an unreadable directory from an
     /// unreadable ignore file inside it.
-    pub fn classify(error: &Error) -> Self {
+    pub(crate) fn classify(error: &Error) -> Self {
         match error {
             Error::Glob { glob: _, err: _ } | Error::WithLineNumber { line: _, err: _ } => {
                 Self::IgnoreFile
@@ -54,7 +54,7 @@ impl WalkFailure {
     ///
     /// The caller attaches this string to the walker's own error. That error
     /// stays the cause, so the path and reason it carries reach the user.
-    pub fn context(self) -> &'static str {
+    pub(crate) fn context(self) -> &'static str {
         match self {
             Self::DirectoryEntry => "failed to read a directory entry",
             Self::IgnoreFile => "failed to read an ignore file",

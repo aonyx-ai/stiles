@@ -12,7 +12,7 @@ use std::path::Path;
 /// The lint reports `rule` for every macro invocation whose name the
 /// project listed. It declares `rule`, so a project may name it in
 /// `[rules]` and in `[rules.options]`.
-pub fn write_configurable_lint_package(directory: &Path, name: &str, rule: &str) {
+pub(crate) fn write_configurable_lint_package(directory: &Path, name: &str, rule: &str) {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let crates = std::fs::canonicalize(crates).expect("the crates directory should exist");
     let crates = crates.to_str().expect("the path should be UTF-8");

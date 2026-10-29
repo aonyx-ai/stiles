@@ -16,7 +16,7 @@ use std::path::Path;
 /// # Panics
 ///
 /// Panics if the package cannot be written.
-pub fn write_other_protocol_lint_package(directory: &Path, name: &str) {
+pub(crate) fn write_other_protocol_lint_package(directory: &Path, name: &str) {
     std::fs::create_dir_all(directory.join("src")).expect("the package should be created");
     std::fs::write(
         directory.join("Cargo.toml"),

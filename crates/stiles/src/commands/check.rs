@@ -30,7 +30,7 @@ use crate::discovery::{Discovery, WalkErrorPolicy};
 
 /// Run stiles lints against a project
 #[derive(Debug, Args)]
-pub struct CheckArgs {
+pub(crate) struct CheckArgs {
     /// Path to the target project directory
     #[arg(default_value = ".")]
     path: PathBuf,
@@ -109,7 +109,7 @@ impl CoverageRemedies {
 }
 
 #[command]
-pub async fn check(args: CheckArgs, context: Context) -> CommandResult<Exit> {
+pub(crate) async fn check(args: CheckArgs, context: Context) -> CommandResult<Exit> {
     let mut closing = ClosingText::default();
 
     match run(args, &context, &mut closing).await {

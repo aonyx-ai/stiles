@@ -27,7 +27,7 @@ use crate::config::GitLintSource;
 /// }
 /// ```
 #[derive(Debug)]
-pub enum PrebuiltNotice {
+pub(crate) enum PrebuiltNotice {
     /// The releases were listed, and nobody published the archive
     ///
     /// Nothing is wrong, and the check reports exactly what it would have

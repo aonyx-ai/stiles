@@ -7,7 +7,7 @@ use std::path::Path;
 /// `TempDir` cannot remove. The unit tests in `src/discovery.rs` carry the
 /// same guard, because an integration test cannot reach into the binary it
 /// drives.
-pub struct Unreadable<'a> {
+pub(crate) struct Unreadable<'a> {
     directory: &'a Path,
 }
 
@@ -32,7 +32,7 @@ fn make_readable(directory: &Path) {
 ///
 /// Panics if the mode cannot be cleared, or if `directory` is still readable
 /// afterwards.
-pub fn make_unreadable(directory: &Path) -> Unreadable<'_> {
+pub(crate) fn make_unreadable(directory: &Path) -> Unreadable<'_> {
     std::fs::set_permissions(directory, std::fs::Permissions::from_mode(0o000))
         .expect("permissions should be set");
 

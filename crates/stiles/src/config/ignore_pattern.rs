@@ -19,7 +19,7 @@
 /// assert_eq!(pattern.as_str(), "examples/");
 /// ```
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct IgnorePattern(String);
+pub(crate) struct IgnorePattern(String);
 
 impl IgnorePattern {
     /// Creates a pattern from its gitignore-syntax source
@@ -33,7 +33,7 @@ impl IgnorePattern {
     /// ```ignore
     /// let pattern = IgnorePattern::new("target/");
     /// ```
-    pub fn new(pattern: impl Into<String>) -> Self {
+    pub(crate) fn new(pattern: impl Into<String>) -> Self {
         Self(pattern.into())
     }
 
@@ -44,7 +44,7 @@ impl IgnorePattern {
     /// ```ignore
     /// assert_eq!(IgnorePattern::new("target/").as_str(), "target/");
     /// ```
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         &self.0
     }
 }

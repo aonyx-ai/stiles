@@ -4,10 +4,10 @@ use crate::custom_lints::AbiTag;
 
 /// Print the tag that names the prebuilt lints this stiles can load
 #[derive(Debug, Args)]
-pub struct AbiArgs {}
+pub(crate) struct AbiArgs {}
 
 #[command]
-pub async fn abi(_args: AbiArgs, context: Context) -> CommandResult {
+pub(crate) async fn abi(_args: AbiArgs, context: Context) -> CommandResult {
     context
         .output()
         .artifact(AbiTag::host().to_string())

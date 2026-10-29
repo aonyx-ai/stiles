@@ -24,7 +24,7 @@
 /// );
 /// ```
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct GitUrl(gix::url::Url);
+pub(crate) struct GitUrl(gix::url::Url);
 
 /// What stands in for credentials when a remote is printed
 const REDACTED_USERINFO: &str = "***";
@@ -66,7 +66,7 @@ impl GitUrl {
     /// ```
     ///
     /// [`Display`]: std::fmt::Display
-    pub fn to_gix_url(&self) -> gix::url::Url {
+    pub(crate) fn to_gix_url(&self) -> gix::url::Url {
         self.0.clone()
     }
 
@@ -89,7 +89,7 @@ impl GitUrl {
     ///
     /// assert_eq!(url.slug(), "rules");
     /// ```
-    pub fn slug(&self) -> String {
+    pub(crate) fn slug(&self) -> String {
         let path = String::from_utf8_lossy(&self.0.path);
         let slug = path.trim_end_matches('/');
         let slug = slug.rsplit('/').next().unwrap_or(slug);

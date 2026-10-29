@@ -12,7 +12,7 @@ use crate::custom_lints::{CustomLints, DeclaredRule};
 
 /// List the rules the project's configured lints declare
 #[derive(Debug, Args)]
-pub struct RulesArgs {
+pub(crate) struct RulesArgs {
     /// Path to the target project directory
     #[arg(default_value = ".")]
     path: PathBuf,
@@ -74,7 +74,7 @@ fn language_name(language: Language) -> &'static str {
 }
 
 #[command]
-pub async fn rules(args: RulesArgs, context: Context) -> CommandResult<Exit> {
+pub(crate) async fn rules(args: RulesArgs, context: Context) -> CommandResult<Exit> {
     let mut closing = ClosingText::default();
 
     match list(args, &context, &mut closing).await {
