@@ -58,7 +58,8 @@ const DOWNLOAD: &str = "archive.tar.gz";
 /// Returns an error if no cache location can be determined, which is the
 /// condition that also stops a git checkout.
 pub(crate) fn cached(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<Option<PathBuf>> {
-    let directory = cache::prebuilt_directory(source, tag)?;
+    let directory = cache::prebuilt_directory(source, tag)
+        .context("failed to find the cached prebuilt lints")?;
 
     match holds_libraries(&directory) {
         true => Ok(Some(directory)),
@@ -90,7 +91,8 @@ pub(crate) fn fetch(
     tag: &AbiTag,
     notices: &mut Vec<PrebuiltNotice>,
 ) -> anyhow::Result<Option<PathBuf>> {
-    let directory = cache::prebuilt_directory(source, tag)?;
+    let directory = cache::prebuilt_directory(source, tag)
+        .context("failed to find the directory for the prebuilt lints")?;
     let host = self::github_release::configured_repository_host();
 
     let Some(repository) = GitHubRepository::from_url()
@@ -178,7 +180,10 @@ fn install(
     name: &AssetName,
     destination: &Path,
 ) -> anyhow::Result<Installed> {
-    let asset = match api.find_asset(repository, name)? {
+    let asset = match api
+        .find_asset(repository, name)
+        .with_context(|| format!("failed to look for {name} in the releases of {repository}"))?
+    {
         AssetSearch::Found(asset) => asset,
         AssetSearch::NoMatch => return Ok(Installed::Absent),
         AssetSearch::Unlisted => return Ok(Installed::Unlisted),
@@ -248,16 +253,21 @@ fn unpack(
 ) -> anyhow::Result<()> {
     let downloaded = staging.join(DOWNLOAD);
 
-    let published = api.download_text(sidecar)?;
-    let published = Sha256Digest::from_sidecar(&published)?;
-    let arrived = api.download(archive, &downloaded)?;
+    let published = api
+        .download_text(sidecar)
+        .context("failed to download the digest of the archive")?;
+    let published = Sha256Digest::from_sidecar(&published)
+        .context("failed to read the digest of the archive")?;
+    let arrived = api
+        .download(archive, &downloaded)
+        .context("failed to download the archive")?;
 
     anyhow::ensure!(
         arrived == published,
         "the archive has digest {arrived}, but the sidecar beside it publishes {published}"
     );
 
-    self::archive::extract(&downloaded, staging)?;
+    self::archive::extract(&downloaded, staging).context("failed to unpack the archive")?;
 
     std::fs::remove_file(&downloaded)
         .with_context(|| format!("failed to remove {}", downloaded.display()))?;

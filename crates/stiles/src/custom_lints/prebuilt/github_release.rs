@@ -158,7 +158,8 @@ impl GitHubApi {
             response,
             MAX_LISTING,
             &format!("the releases of {repository}"),
-        )?;
+        )
+        .with_context(|| format!("failed to read the releases of {repository}"))?;
         let releases: Vec<Release> = serde_json::from_str(&body)
             .with_context(|| format!("failed to read the releases of {repository} as JSON"))?;
 

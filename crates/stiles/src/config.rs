@@ -129,7 +129,11 @@ impl StilesConfig {
             .or_start();
 
         let project: Project<ConfigTable> = Project::builder()
-            .application(APPLICATION.parse()?)
+            .application(
+                APPLICATION
+                    .parse()
+                    .context("failed to read the name of the application")?,
+            )
             .load(&search)?;
 
         let root = project.root().clone();
@@ -367,8 +371,8 @@ impl LintEntry {
             }
             (Some(path), None, None) => Ok(LintSource::Path(LintPath::new(path))),
             (None, Some(git), Some(rev)) => {
-                let url = GitUrl::new(git)?;
-                let rev = GitRev::new(rev)?;
+                let url = GitUrl::new(git).context("failed to read the git remote of a lint")?;
+                let rev = GitRev::new(rev).context("failed to read the rev of a lint")?;
 
                 Ok(LintSource::Git(
                     GitLintSource::builder().url(url).rev(rev).build(),

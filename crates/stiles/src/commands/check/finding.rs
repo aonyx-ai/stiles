@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::slice;
 use std::sync::Arc;
 
+use anyhow::Context as _;
 use bon::bon;
 use serde::Serialize;
 use stiles_types::{Diagnostic, Severity};
@@ -49,7 +50,8 @@ impl Finding {
         diagnostic: &Diagnostic,
         sources: &HashMap<Arc<Path>, String>,
     ) -> anyhow::Result<Self> {
-        let rendered = stiles_reporting::render_to_string(slice::from_ref(diagnostic), sources)?;
+        let rendered = stiles_reporting::render_to_string(slice::from_ref(diagnostic), sources)
+            .context("failed to render the diagnostic")?;
         let span = diagnostic.span();
         let (line, column) = match sources.get(span.file()) {
             Some(source) => position(source, span.start()),
