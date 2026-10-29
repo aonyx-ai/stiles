@@ -11,6 +11,21 @@ use crate::Span;
 /// A suggestion crosses the plugin boundary inside a [`Diagnostic`], so
 /// stabby lays it out and its strings are stabby's `String`.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_types::{Span, Suggestion};
+///
+/// let span = Span::builder().file("src/lib.rs").start(3).end(4).build();
+/// let suggestion = Suggestion::builder()
+///     .span(span.clone())
+///     .replacement("Some(_)")
+///     .message("name the variant")
+///     .build();
+///
+/// assert_eq!(suggestion.replacement(), "Some(_)");
+/// ```
+///
 /// [`Diagnostic`]: crate::Diagnostic
 #[stabby::stabby]
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -23,6 +38,21 @@ pub struct Suggestion {
 #[bon]
 impl Suggestion {
     /// Creates a suggestion to replace the text at `span` with `replacement`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(4).build();
+    /// let suggestion = Suggestion::builder()
+    ///     .span(span.clone())
+    ///     .replacement("Some(_)")
+    ///     .message("name the variant")
+    ///     .build();
+    ///
+    /// assert_eq!(suggestion.span(), &span);
+    /// ```
     #[builder]
     pub fn new(
         span: Span,
@@ -37,16 +67,61 @@ impl Suggestion {
     }
 
     /// Returns the span of the text to be replaced
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(4).build();
+    /// let suggestion = Suggestion::builder()
+    ///     .span(span.clone())
+    ///     .replacement("Some(_)")
+    ///     .message("name the variant")
+    ///     .build();
+    ///
+    /// assert_eq!(suggestion.span().end(), 4);
+    /// ```
     pub fn span(&self) -> &Span {
         &self.span
     }
 
     /// Returns the replacement text
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(4).build();
+    /// let suggestion = Suggestion::builder()
+    ///     .span(span.clone())
+    ///     .replacement("Some(_)")
+    ///     .message("name the variant")
+    ///     .build();
+    ///
+    /// assert_eq!(suggestion.replacement(), "Some(_)");
+    /// ```
     pub fn replacement(&self) -> &str {
         &self.replacement
     }
 
     /// Returns the human-readable description of this suggestion
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(4).build();
+    /// let suggestion = Suggestion::builder()
+    ///     .span(span.clone())
+    ///     .replacement("Some(_)")
+    ///     .message("name the variant")
+    ///     .build();
+    ///
+    /// assert_eq!(suggestion.message(), "name the variant");
+    /// ```
     pub fn message(&self) -> &str {
         &self.message
     }

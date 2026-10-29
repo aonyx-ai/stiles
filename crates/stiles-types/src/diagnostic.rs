@@ -18,6 +18,22 @@ use crate::{Location, RuleId, Severity, Span, Suggestion};
 /// because every allocation stabby makes carries its own release function.
 /// The severity is one byte and sits last, so it puts no padding between
 /// the pointer-sized fields before it.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+///
+/// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+/// let diagnostic = Diagnostic::builder()
+///     .rule_id(RuleId::new("lint.example"))
+///     .severity(Severity::Warn)
+///     .message("a wildcard arm")
+///     .span(span.clone())
+///     .build();
+///
+/// assert_eq!(diagnostic.message(), "a wildcard arm");
+/// ```
 #[stabby::stabby]
 #[derive(Clone, Debug)]
 pub struct Diagnostic {
@@ -33,6 +49,22 @@ pub struct Diagnostic {
 #[bon]
 impl Diagnostic {
     /// Creates a new diagnostic with the required fields
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span.clone())
+    ///     .build();
+    ///
+    /// assert_eq!(diagnostic.rule_id(), RuleId::new("lint.example"));
+    /// ```
     #[builder]
     pub fn new(
         rule_id: RuleId,
@@ -52,18 +84,82 @@ impl Diagnostic {
     }
 
     /// Adds an origin location to this diagnostic
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span.clone())
+    ///     .build();
+    ///
+    /// let origin = Location::builder().span(span).message("the value is set here").build();
+    ///
+    /// let diagnostic = diagnostic.with_origin(origin);
+    ///
+    /// assert_eq!(diagnostic.origins().len(), 1);
+    /// ```
     pub fn with_origin(mut self, origin: Location) -> Self {
         self.origins.push(origin);
         self
     }
 
     /// Adds a related location to this diagnostic
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span.clone())
+    ///     .build();
+    ///
+    /// let related = Location::builder().span(span).message("the value is used here").build();
+    ///
+    /// let diagnostic = diagnostic.with_related(related);
+    ///
+    /// assert_eq!(diagnostic.related().len(), 1);
+    /// ```
     pub fn with_related(mut self, related: Location) -> Self {
         self.related.push(related);
         self
     }
 
     /// Adds a suggested fix to this diagnostic
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span.clone())
+    ///     .build();
+    ///
+    /// let suggestion = Suggestion::builder()
+    ///     .span(span)
+    ///     .replacement("Some(_)")
+    ///     .message("name the variant")
+    ///     .build();
+    ///
+    /// let diagnostic = diagnostic.with_suggestion(suggestion);
+    ///
+    /// assert_eq!(diagnostic.suggestions().len(), 1);
+    /// ```
     pub fn with_suggestion(mut self, suggestion: Suggestion) -> Self {
         self.suggestions.push(suggestion);
         self
@@ -98,36 +194,148 @@ impl Diagnostic {
     }
 
     /// Returns the rule that produced this diagnostic
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span.clone())
+    ///     .build();
+    ///
+    /// assert_eq!(diagnostic.rule_id().as_str(), "lint.example");
+    /// ```
     pub fn rule_id(&self) -> RuleId {
         self.rule_id
     }
 
     /// Returns the severity of this diagnostic
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span.clone())
+    ///     .build();
+    ///
+    /// assert_eq!(diagnostic.severity(), Severity::Warn);
+    /// ```
     pub fn severity(&self) -> Severity {
         self.severity
     }
 
     /// Returns the human-readable diagnostic message
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span.clone())
+    ///     .build();
+    ///
+    /// assert_eq!(diagnostic.message(), "a wildcard arm");
+    /// ```
     pub fn message(&self) -> &str {
         &self.message
     }
 
     /// Returns the primary source span
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span.clone())
+    ///     .build();
+    ///
+    /// assert_eq!(diagnostic.span(), &span);
+    /// ```
     pub fn span(&self) -> &Span {
         &self.span
     }
 
     /// Returns origin locations that explain where something was defined
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span.clone())
+    ///     .build();
+    ///
+    /// assert!(diagnostic.origins().is_empty());
+    /// ```
     pub fn origins(&self) -> &[Location] {
         &self.origins
     }
 
     /// Returns related locations that provide additional context
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span.clone())
+    ///     .build();
+    ///
+    /// assert!(diagnostic.related().is_empty());
+    /// ```
     pub fn related(&self) -> &[Location] {
         &self.related
     }
 
     /// Returns suggested source code fixes
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span.clone())
+    ///     .build();
+    ///
+    /// assert!(diagnostic.suggestions().is_empty());
+    /// ```
     pub fn suggestions(&self) -> &[Suggestion] {
         &self.suggestions
     }

@@ -14,6 +14,18 @@ use crate::FilePath;
 /// stabby lays it out. Its file is a [`FilePath`], for the reason that
 /// type gives.
 ///
+/// # Examples
+///
+/// ```
+/// use std::path::Path;
+///
+/// use stiles_types::Span;
+///
+/// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+///
+/// assert_eq!(span.end() - span.start(), 4);
+/// ```
+///
 /// [`Diagnostic`]: crate::Diagnostic
 #[stabby::stabby]
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -30,6 +42,18 @@ impl Span {
     /// # Panics
     ///
     /// Panics if `start > end`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use stiles_types::Span;
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    ///
+    /// assert_eq!(span.start(), 3);
+    /// ```
     #[builder]
     pub fn new(file: impl Into<FilePath>, start: usize, end: usize) -> Self {
         let file = file.into();
@@ -41,6 +65,18 @@ impl Span {
     }
 
     /// Returns the file path this span belongs to
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use stiles_types::Span;
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    ///
+    /// assert_eq!(span.file(), Path::new("src/lib.rs"));
+    /// ```
     pub fn file(&self) -> &Path {
         self.file.as_path()
     }
@@ -66,11 +102,35 @@ impl Span {
     }
 
     /// Returns the start byte offset (inclusive)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use stiles_types::Span;
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    ///
+    /// assert_eq!(span.start(), 3);
+    /// ```
     pub fn start(&self) -> usize {
         self.start
     }
 
     /// Returns the end byte offset (exclusive)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use stiles_types::Span;
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    ///
+    /// assert_eq!(span.end(), 7);
+    /// ```
     pub fn end(&self) -> usize {
         self.end
     }

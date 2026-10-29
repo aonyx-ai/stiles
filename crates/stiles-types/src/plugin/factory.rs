@@ -12,10 +12,77 @@ use crate::{BoxedLintPass, Language, Panic, RuleId};
 /// a plain closure, and the host calls it through a vtable that stabby
 /// lays out. Construction runs plugin code, so a panic in it comes back
 /// as a value like any other.
+///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
+/// use stiles_types::{
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+/// };
+///
+/// /// Reports nothing
+/// struct Quiet;
+///
+/// impl LintPass for Quiet {
+///     extern "C" fn language(&self) -> Language {
+///         Language::Rust
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+///         Checked::Ok(vec::Vec::new())
+///     }
+/// }
+///
+/// let quiet = factory(|| Constructed::Ok(boxed_lint_pass(Quiet)));
+///
+/// let pass: Result<_, _> = construct(&quiet).into();
+///
+/// assert!(pass.is_ok());
+/// ```
 pub type LintPassFactory =
     stabby::dynptr!(stabby::boxed::Box<dyn Fn() -> Constructed + Send + Sync>);
 
 /// What a [`LintPassFactory`] hands back: a pass, or the panic that stopped it
+///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
+/// use stiles_types::{
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+/// };
+///
+/// /// Reports nothing
+/// struct Quiet;
+///
+/// impl LintPass for Quiet {
+///     extern "C" fn language(&self) -> Language {
+///         Language::Rust
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+///         Checked::Ok(vec::Vec::new())
+///     }
+/// }
+///
+/// let quiet = factory(|| Constructed::Ok(boxed_lint_pass(Quiet)));
+///
+/// let constructed: Constructed = construct(&quiet);
+/// let pass: Result<_, _> = constructed.into();
+///
+/// assert!(pass.is_ok());
+/// ```
 pub type Constructed = result::Result<BoxedLintPass, Panic>;
 
 /// Returns the factory that runs `build`
@@ -23,6 +90,39 @@ pub type Constructed = result::Result<BoxedLintPass, Panic>;
 /// A factory is one of stabby's boxed callables, and building one means
 /// naming a stabby type. This keeps that name in this crate, so a plugin
 /// exports lints without depending on stabby itself.
+///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
+/// use stiles_types::{
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+/// };
+///
+/// /// Reports nothing
+/// struct Quiet;
+///
+/// impl LintPass for Quiet {
+///     extern "C" fn language(&self) -> Language {
+///         Language::Rust
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+///         Checked::Ok(vec::Vec::new())
+///     }
+/// }
+///
+/// let quiet = factory(|| Constructed::Ok(boxed_lint_pass(Quiet)));
+///
+/// let pass: Result<_, _> = construct(&quiet).into();
+///
+/// assert!(pass.is_ok_and(|pass| pass.language() == Language::Rust));
+/// ```
 pub fn factory(build: impl Fn() -> Constructed + Send + Sync + 'static) -> LintPassFactory {
     stabby::boxed::Box::new(build).into()
 }
@@ -32,6 +132,39 @@ pub fn factory(build: impl Fn() -> Constructed + Send + Sync + 'static) -> LintP
 /// The factory is a stabby callable, and calling one means naming a
 /// stabby trait. This keeps that name in this crate, so the loader
 /// constructs a pass without depending on stabby itself.
+///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
+/// use stiles_types::{
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+/// };
+///
+/// /// Reports nothing
+/// struct Quiet;
+///
+/// impl LintPass for Quiet {
+///     extern "C" fn language(&self) -> Language {
+///         Language::Rust
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+///         Checked::Ok(vec::Vec::new())
+///     }
+/// }
+///
+/// let quiet = factory(|| Constructed::Ok(boxed_lint_pass(Quiet)));
+///
+/// let pass: Result<_, _> = construct(&quiet).into();
+///
+/// assert!(pass.is_ok());
+/// ```
 pub fn construct(factory: &LintPassFactory) -> Constructed {
     factory.call()
 }
@@ -44,6 +177,43 @@ pub fn construct(factory: &LintPassFactory) -> Constructed {
 /// the rules. It can also refuse two lints that report one rule on one
 /// language. The walk also holds each pass to its own rules: a diagnostic
 /// under any other id ends the run.
+///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
+/// use stiles_types::{
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+/// };
+///
+/// /// Reports nothing
+/// struct Quiet;
+///
+/// impl LintPass for Quiet {
+///     extern "C" fn language(&self) -> Language {
+///         Language::Rust
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+///         Checked::Ok(vec::Vec::new())
+///     }
+/// }
+///
+/// let quiet = factory(|| Constructed::Ok(boxed_lint_pass(Quiet)));
+///
+/// let lint = ExportedLint {
+///     factory: quiet,
+///     language: Language::Rust,
+///     rules: [RuleId::new("lint.quiet")].into_iter().collect(),
+/// };
+///
+/// assert_eq!(lint.rules.len(), 1);
+/// ```
 #[stabby::stabby]
 pub struct ExportedLint {
     /// Builds a fresh pass of the lint
@@ -67,6 +237,46 @@ pub struct ExportedLint {
 /// boundary. A plugin that gains something else to declare puts it here
 /// rather than on a second function. The list is stabby's, because the
 /// plugin allocates it and stiles frees it.
+///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
+/// use stiles_types::{
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+/// };
+///
+/// /// Reports nothing
+/// struct Quiet;
+///
+/// impl LintPass for Quiet {
+///     extern "C" fn language(&self) -> Language {
+///         Language::Rust
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+///         Checked::Ok(vec::Vec::new())
+///     }
+/// }
+///
+/// let quiet = factory(|| Constructed::Ok(boxed_lint_pass(Quiet)));
+///
+/// let lint = ExportedLint {
+///     factory: quiet,
+///     language: Language::Rust,
+///     rules: [RuleId::new("lint.quiet")].into_iter().collect(),
+/// };
+/// let plugin = Plugin {
+///     lints: [lint].into_iter().collect(),
+/// };
+///
+/// assert_eq!(plugin.lints.len(), 1);
+/// ```
 #[stabby::stabby]
 pub struct Plugin {
     /// Every lint the plugin exports, in the order it named them
@@ -77,6 +287,47 @@ pub struct Plugin {
 ///
 /// Building either list runs plugin code, so it carries a panic like
 /// every other call into the plugin.
+///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
+/// use stiles_types::{
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+/// };
+///
+/// /// Reports nothing
+/// struct Quiet;
+///
+/// impl LintPass for Quiet {
+///     extern "C" fn language(&self) -> Language {
+///         Language::Rust
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+///         Checked::Ok(vec::Vec::new())
+///     }
+/// }
+///
+/// let quiet = factory(|| Constructed::Ok(boxed_lint_pass(Quiet)));
+///
+/// let lint = ExportedLint {
+///     factory: quiet,
+///     language: Language::Rust,
+///     rules: [RuleId::new("lint.quiet")].into_iter().collect(),
+/// };
+/// let loaded = Loaded::Ok(Plugin {
+///     lints: [lint].into_iter().collect(),
+/// });
+/// let plugin: Result<Plugin, _> = loaded.into();
+///
+/// assert!(plugin.is_ok());
+/// ```
 ///
 /// [`PluginDeclaration::load`]: crate::plugin::PluginDeclaration::load
 pub type Loaded = result::Result<Plugin, Panic>;

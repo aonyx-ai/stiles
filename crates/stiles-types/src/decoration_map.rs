@@ -19,6 +19,31 @@ use crate::{Decoration, DecorationLookup};
 /// plugin a pointer to a [`HashMap`] and a function of the host that reads
 /// it. That needs a raw pointer and a cast that the compiler cannot check.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_types::{DecoratedNode, Decoration, DecorationKey, DecorationMap};
+///
+/// /// The name of a binding
+/// #[stabby::stabby]
+/// struct Name(u32);
+///
+/// impl Decoration for Name {
+///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Name"));
+///
+///     type Ref<'a> = Option<&'a Self>;
+///
+///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+///         node.decoration::<Self>()
+///     }
+/// }
+///
+/// let mut map = DecorationMap::new();
+/// map.insert(7, Name(1));
+///
+/// assert_eq!(map.get::<Name>(7).map(|Name(name)| *name), Some(1));
+/// ```
+///
 /// [`HashMap`]: std::collections::HashMap
 #[derive(Debug, Default)]
 pub struct DecorationMap {
@@ -28,11 +53,61 @@ pub struct DecorationMap {
 
 impl DecorationMap {
     /// Creates an empty decoration map
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedNode, Decoration, DecorationKey, DecorationMap};
+    ///
+    /// /// The name of a binding
+    /// #[stabby::stabby]
+    /// struct Name(u32);
+    ///
+    /// impl Decoration for Name {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Name"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// let map = DecorationMap::new();
+    ///
+    /// assert!(map.get::<Name>(7).is_none());
+    /// ```
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Attaches a decoration to the node with the given tree-sitter node ID
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedNode, Decoration, DecorationKey, DecorationMap};
+    ///
+    /// /// The name of a binding
+    /// #[stabby::stabby]
+    /// struct Name(u32);
+    ///
+    /// impl Decoration for Name {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Name"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// let mut map = DecorationMap::new();
+    ///
+    /// map.insert(7, Name(1));
+    ///
+    /// assert!(map.get::<Name>(7).is_some());
+    /// ```
     pub fn insert<T: Decoration>(&mut self, node_id: usize, value: T) {
         self.entries
             .push(Entry::builder().node_id(node_id).value(value).build());
@@ -42,11 +117,63 @@ impl DecorationMap {
     /// Retrieves the first decoration of type `T` attached to the given node
     ///
     /// Returns [`None`] if no decoration of that type exists for this node.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedNode, Decoration, DecorationKey, DecorationMap};
+    ///
+    /// /// The name of a binding
+    /// #[stabby::stabby]
+    /// struct Name(u32);
+    ///
+    /// impl Decoration for Name {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Name"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// let mut map = DecorationMap::new();
+    /// map.insert(7, Name(1));
+    /// map.insert(7, Name(2));
+    ///
+    /// assert_eq!(map.get::<Name>(7).map(|Name(name)| *name), Some(1));
+    /// ```
     pub fn get<T: Decoration>(&self, node_id: usize) -> Option<&T> {
         self.lookup().get::<T>(node_id, 0)
     }
 
     /// Retrieves all decorations of type `T` attached to the given node
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedNode, Decoration, DecorationKey, DecorationMap};
+    ///
+    /// /// The name of a binding
+    /// #[stabby::stabby]
+    /// struct Name(u32);
+    ///
+    /// impl Decoration for Name {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Name"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// let mut map = DecorationMap::new();
+    /// map.insert(7, Name(1));
+    /// map.insert(7, Name(2));
+    ///
+    /// assert_eq!(map.get_all::<Name>(7).len(), 2);
+    /// ```
     pub fn get_all<T: Decoration>(&self, node_id: usize) -> Vec<&T> {
         self.lookup().get_all::<T>(node_id)
     }
@@ -56,6 +183,35 @@ impl DecorationMap {
     /// Entries already present win: [`DecorationMap::get`] returns the
     /// first decoration of a type for a node. [`DecorationMap::get_all`]
     /// still returns the merged entries.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedNode, Decoration, DecorationKey, DecorationMap};
+    ///
+    /// /// The name of a binding
+    /// #[stabby::stabby]
+    /// struct Name(u32);
+    ///
+    /// impl Decoration for Name {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Name"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// let mut map = DecorationMap::new();
+    /// map.insert(7, Name(1));
+    /// let mut other = DecorationMap::new();
+    /// other.insert(7, Name(2));
+    ///
+    /// map.merge(other);
+    ///
+    /// assert_eq!(map.get::<Name>(7).map(|Name(name)| *name), Some(1));
+    /// ```
     pub fn merge(&mut self, other: DecorationMap) {
         self.entries.extend(other.entries);
         self.sealed.take();

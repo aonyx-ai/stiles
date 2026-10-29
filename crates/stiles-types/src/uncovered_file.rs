@@ -44,6 +44,21 @@ pub struct UncoveredFile {
 
 impl UncoveredFile {
     /// Returns the file that could not be analyzed
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use stiles_types::{CoverageGap, ProviderName, UncoveredFile};
+    ///
+    /// let error = UncoveredFile::builder()
+    ///     .file(Path::new("stray.rs"))
+    ///     .gaps(vec![(ProviderName::new("rust"), CoverageGap::StaleSource)])
+    ///     .build();
+    ///
+    /// assert_eq!(error.file(), Path::new("stray.rs"));
+    /// ```
     pub fn file(&self) -> &Path {
         &self.file
     }
@@ -51,6 +66,21 @@ impl UncoveredFile {
     /// Returns each provider consulted and its reason for declining
     ///
     /// The slice is empty when no providers were configured.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use stiles_types::{CoverageGap, ProviderName, UncoveredFile};
+    ///
+    /// let error = UncoveredFile::builder()
+    ///     .file(Path::new("stray.rs"))
+    ///     .gaps(vec![(ProviderName::new("rust"), CoverageGap::StaleSource)])
+    ///     .build();
+    ///
+    /// assert_eq!(error.gaps().len(), 1);
+    /// ```
     pub fn gaps(&self) -> &[(ProviderName, CoverageGap)] {
         &self.gaps
     }

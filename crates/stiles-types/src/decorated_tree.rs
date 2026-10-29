@@ -11,6 +11,24 @@ use crate::{DecoratedNode, DecorationMap, FilePath, Language};
 /// information. The tree and decorations together form the input to lint
 /// rules.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_types::{DecoratedTree, Language};
+///
+/// let source = "fn main() {}";
+/// let mut parser = tree_sitter::Parser::new();
+/// parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+/// let tree = DecoratedTree::builder()
+///     .tree(parser.parse(source, None).expect("the source should parse"))
+///     .language(Language::Rust)
+///     .source(source.to_string())
+///     .file("src/main.rs")
+///     .build();
+///
+/// assert_eq!(tree.root_node().kind(), "source_file");
+/// ```
+///
 /// [`Tree`]: tree_sitter::Tree
 pub struct DecoratedTree {
     tree: tree_sitter::Tree,
@@ -26,6 +44,24 @@ impl DecoratedTree {
     ///
     /// The language decides which lint passes see the tree, so it must be
     /// the language of the grammar that produced it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedTree, Language};
+    ///
+    /// let source = "fn main() {}";
+    /// let mut parser = tree_sitter::Parser::new();
+    /// parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    ///
+    /// assert_eq!(tree.language(), Language::Rust);
+    /// ```
     #[builder]
     pub fn new(
         tree: tree_sitter::Tree,
@@ -44,6 +80,41 @@ impl DecoratedTree {
 
     /// Returns a mutable reference to the decoration map for providers to
     /// populate
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedNode, DecoratedTree, Decoration, DecorationKey, DecorationMap, Language};
+    ///
+    /// /// Marks the root of a file
+    /// #[stabby::stabby]
+    /// struct Root;
+    ///
+    /// impl Decoration for Root {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Root"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// # let source = "fn main() {}";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let mut tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    /// let root = tree.root_node().id();
+    ///
+    /// tree.decorations_mut().insert(root, Root);
+    ///
+    /// assert!(tree.root_node().get::<Root>().is_some());
+    /// ```
     pub fn decorations_mut(&mut self) -> &mut DecorationMap {
         &mut self.decorations
     }
@@ -51,11 +122,66 @@ impl DecoratedTree {
     /// Merges provider decorations into this tree
     ///
     /// See [`DecorationMap::merge`] for the conflict behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedNode, DecoratedTree, Decoration, DecorationKey, DecorationMap, Language};
+    ///
+    /// /// Marks the root of a file
+    /// #[stabby::stabby]
+    /// struct Root;
+    ///
+    /// impl Decoration for Root {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Root"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// # let source = "fn main() {}";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let mut tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    /// let root = tree.root_node().id();
+    /// let mut decorations = DecorationMap::new();
+    /// decorations.insert(root, Root);
+    ///
+    /// tree.merge_decorations(decorations);
+    ///
+    /// assert!(tree.root_node().get::<Root>().is_some());
+    /// ```
     pub fn merge_decorations(&mut self, decorations: DecorationMap) {
         self.decorations.merge(decorations);
     }
 
     /// Returns the root node wrapped as a [`DecoratedNode`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedTree, Language};
+    ///
+    /// let source = "fn main() {}";
+    /// let mut parser = tree_sitter::Parser::new();
+    /// parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    ///
+    /// assert_eq!(tree.root_node().text(), source);
+    /// ```
     pub fn root_node(&self) -> DecoratedNode<'_> {
         DecoratedNode::builder()
             .node(self.tree.root_node())
@@ -66,16 +192,70 @@ impl DecoratedTree {
     }
 
     /// Returns the language the tree was parsed as
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedTree, Language};
+    ///
+    /// let source = "fn main() {}";
+    /// let mut parser = tree_sitter::Parser::new();
+    /// parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    ///
+    /// assert_eq!(tree.language(), Language::Rust);
+    /// ```
     pub fn language(&self) -> Language {
         self.language
     }
 
     /// Returns the source text of the file
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedTree, Language};
+    ///
+    /// let source = "fn main() {}";
+    /// let mut parser = tree_sitter::Parser::new();
+    /// parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    ///
+    /// assert_eq!(tree.source(), "fn main() {}");
+    /// ```
     pub fn source(&self) -> &str {
         &self.source
     }
 
     /// Returns the file path
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedTree, Language};
+    ///
+    /// let source = "fn main() {}";
+    /// let mut parser = tree_sitter::Parser::new();
+    /// parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    ///
+    /// assert_eq!(tree.file(), std::path::Path::new("src/main.rs"));
+    /// ```
     pub fn file(&self) -> &Path {
         self.file.as_path()
     }
