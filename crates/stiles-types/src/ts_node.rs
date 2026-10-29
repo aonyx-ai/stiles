@@ -16,11 +16,12 @@ use std::ffi::c_void;
 ///
 /// The type is public because stabby names it in the layout it records
 /// for [`DecoratedNode`]. Its module is not, so nothing outside this crate
-/// can name it.
+/// can name it, and it stays out of the documentation.
 ///
 /// [`DecoratedNode`]: crate::DecoratedNode
 /// [`StableLike`]: stabby::abi::StableLike
 /// [`StableLike::new`]: stabby::abi::StableLike::new
+#[doc(hidden)]
 #[stabby::stabby]
 pub struct TsNode {
     context: [u32; 4],
