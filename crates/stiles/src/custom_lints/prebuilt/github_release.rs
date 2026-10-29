@@ -451,8 +451,19 @@ mod tests {
         serde_json::from_str(json).expect("the fixture should parse")
     }
 
+    /// Whether the release of a fixture listing is still a draft
+    #[derive(Copy, Clone, Debug)]
+    enum Stage {
+        Draft,
+        Published,
+    }
+
     /// Returns a listing holding one release with `assets` attached
-    fn listing(draft: bool, assets: &[&str]) -> String {
+    fn listing(stage: Stage, assets: &[&str]) -> String {
+        let draft = match stage {
+            Stage::Draft => true,
+            Stage::Published => false,
+        };
         let assets: Vec<String> = assets
             .iter()
             .map(|name| format!(r#"{{"name":"{name}","url":"https://api/{name}","size":1}}"#))
@@ -559,7 +570,10 @@ mod tests {
     #[test]
     fn select_asset_finds_the_archive() {
         let name = name();
-        let releases = releases(&listing(false, &[name.as_str(), &name.sidecar()]));
+        let releases = releases(&listing(
+            Stage::Published,
+            &[name.as_str(), &name.sidecar()],
+        ));
 
         let asset = select_asset(&releases, &name).expect("the pair should be found");
 
@@ -569,7 +583,10 @@ mod tests {
     #[test]
     fn select_asset_finds_the_sidecar_of_the_archive() {
         let name = name();
-        let releases = releases(&listing(false, &[name.as_str(), &name.sidecar()]));
+        let releases = releases(&listing(
+            Stage::Published,
+            &[name.as_str(), &name.sidecar()],
+        ));
 
         let asset = select_asset(&releases, &name).expect("the pair should be found");
 
@@ -581,8 +598,8 @@ mod tests {
         let name = name();
         let json = format!(
             "[{},{}]",
-            listing(false, &["other.tar.gz"]).trim_matches(['[', ']']),
-            listing(false, &[name.as_str(), &name.sidecar()]).trim_matches(['[', ']'])
+            listing(Stage::Published, &["other.tar.gz"]).trim_matches(['[', ']']),
+            listing(Stage::Published, &[name.as_str(), &name.sidecar()]).trim_matches(['[', ']'])
         );
         let releases = releases(&json);
 
@@ -593,7 +610,7 @@ mod tests {
     #[test]
     fn select_asset_skips_a_draft() {
         let name = name();
-        let releases = releases(&listing(true, &[name.as_str(), &name.sidecar()]));
+        let releases = releases(&listing(Stage::Draft, &[name.as_str(), &name.sidecar()]));
 
         assert_eq!(select_asset(&releases, &name), None);
     }
@@ -602,7 +619,7 @@ mod tests {
     #[test]
     fn select_asset_without_a_sidecar_is_none() {
         let name = name();
-        let releases = releases(&listing(false, &[name.as_str()]));
+        let releases = releases(&listing(Stage::Published, &[name.as_str()]));
 
         assert_eq!(select_asset(&releases, &name), None);
     }
@@ -611,7 +628,7 @@ mod tests {
     fn select_asset_without_the_archive_is_none() {
         let name = name();
         let releases = releases(&listing(
-            false,
+            Stage::Published,
             &["another.tar.gz", "another.tar.gz.sha256"],
         ));
 

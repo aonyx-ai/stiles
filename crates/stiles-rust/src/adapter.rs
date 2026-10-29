@@ -50,12 +50,9 @@ mod tests {
 
     #[test]
     fn adapter_delegates_to_dispatch() {
-        struct FnFinder {
-            found: bool,
-        }
+        struct FnFinder;
         impl RustLintPass for FnFinder {
             fn check_function_item(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-                self.found = true;
                 vec![
                     Diagnostic::builder()
                         .rule_id(RuleId::new("test.fn"))
@@ -69,7 +66,7 @@ mod tests {
 
         let tree = parse_rust("fn main() {}");
         let fn_node = tree.root_node().named_child(0).unwrap();
-        let mut adapter = RustLintPassAdapter::new(FnFinder { found: false });
+        let mut adapter = RustLintPassAdapter::new(FnFinder);
 
         let checked: Result<_, Panic> = adapter.check_node(&fn_node).into();
 

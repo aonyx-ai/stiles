@@ -99,6 +99,7 @@ fn is_wildcard_pattern(match_pattern: &DecoratedNode<'_>) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use stiles_rust::decorations::{AdtKind, Exhaustiveness};
     use stiles_testing::{assert_no_diagnostics, decorate, execute, parse};
     use stiles_types::{DecoratedTree, DecorationMap, Language};
 
@@ -143,7 +144,7 @@ mod tests {
     fn wildcard_on_an_enum_scrutinee_is_flagged() {
         let diagnostics = run(
             SOURCE,
-            ResolvedType::new("Color".into()).with_enum(true),
+            ResolvedType::new("Color".into()).with_adt_kind(AdtKind::Enum),
             None,
         );
 
@@ -172,8 +173,8 @@ mod tests {
     fn wildcard_on_an_externally_non_exhaustive_enum_is_not_flagged() {
         let diagnostics = run(
             SOURCE,
-            ResolvedType::new("Color".into()).with_enum(true),
-            Some(AdtFlags::new(true)),
+            ResolvedType::new("Color".into()).with_adt_kind(AdtKind::Enum),
+            Some(AdtFlags::from_exhaustiveness(Exhaustiveness::NonExhaustive)),
         );
 
         assert_no_diagnostics(&diagnostics);
@@ -188,8 +189,8 @@ mod tests {
     fn wildcard_on_an_enum_this_crate_may_exhaust_is_flagged() {
         let diagnostics = run(
             SOURCE,
-            ResolvedType::new("Color".into()).with_enum(true),
-            Some(AdtFlags::new(false)),
+            ResolvedType::new("Color".into()).with_adt_kind(AdtKind::Enum),
+            Some(AdtFlags::from_exhaustiveness(Exhaustiveness::Exhaustive)),
         );
 
         assert_eq!(diagnostics.len(), 1);

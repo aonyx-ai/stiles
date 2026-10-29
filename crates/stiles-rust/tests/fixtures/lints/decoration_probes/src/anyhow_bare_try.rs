@@ -146,7 +146,7 @@ fn is_context_call(operand: &DecoratedNode<'_>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use stiles_rust::decorations::{ErrorType, ReturnMode, TypePath};
+    use stiles_rust::decorations::{ErrorType, ResultKind, ReturnMode, TypePath};
     use stiles_testing::{assert_no_diagnostics, decorate, execute, parse};
     use stiles_types::{DecorationMap, Language};
 
@@ -200,7 +200,7 @@ mod tests {
         let mut map = DecorationMap::new();
         map.insert(
             operand,
-            ResolvedType::new("Result<(), Error>".into()).with_result(true),
+            ResolvedType::new("Result<(), Error>".into()).with_result_kind(ResultKind::Result),
         );
         map.insert(
             function,

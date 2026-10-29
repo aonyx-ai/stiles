@@ -21,8 +21,8 @@ use stiles_types::{
 };
 
 use crate::decorations::{
-    AdtFlags, ErrorType, FnSignature, ImportSource, PublicPath, Reexports, ResolvedType,
-    ReturnMode, TypePath,
+    AdtFlags, AdtKind, ErrorType, Exhaustiveness, FnSignature, ImportSource, NeverKind, OptionKind,
+    PublicPath, Reexports, ResolvedType, ResultKind, ReturnMode, TypePath,
 };
 
 mod load_rust_workspace_error;
@@ -650,6 +650,30 @@ fn is_instance_of(ty: &Type<'_>, target: Option<Enum>) -> bool {
     }
 }
 
+/// Returns whether `ty` is `core::result::Result`
+fn result_kind(ctx: &DecorateCtx<'_, '_>, ty: &Type<'_>) -> ResultKind {
+    match is_instance_of(ty, ctx.core_result) {
+        true => ResultKind::Result,
+        false => ResultKind::Other,
+    }
+}
+
+/// Returns whether `ty` is `core::option::Option`
+fn option_kind(ctx: &DecorateCtx<'_, '_>, ty: &Type<'_>) -> OptionKind {
+    match is_instance_of(ty, ctx.core_option) {
+        true => OptionKind::Option,
+        false => OptionKind::Other,
+    }
+}
+
+/// Returns whether `ty` is the never type (`!`)
+fn never_kind(ty: &Type<'_>) -> NeverKind {
+    match ty.is_never() {
+        true => NeverKind::Never,
+        false => NeverKind::Other,
+    }
+}
+
 /// Returns the path of `ty`'s definition, if it has one
 ///
 /// The path is the definition's, not a re-export's.
@@ -717,8 +741,8 @@ fn resolve_function(ctx: &DecorateCtx<'_, '_>, range: TextRange) -> Option<FnSig
     let error_type = result_error_type(ctx, &ret_type);
 
     let resolved = ResolvedType::new(display)
-        .with_result(is_instance_of(&ret_type, ctx.core_result))
-        .with_never(ret_type.is_never());
+        .with_result_kind(result_kind(ctx, &ret_type))
+        .with_never_kind(never_kind(&ret_type));
 
     Some(
         FnSignature::builder()
@@ -737,9 +761,9 @@ fn resolve_match_scrutinee(
     let ty_info = ctx.sema.type_of_expr(&expr_node)?;
 
     let ty = ty_info.original;
-    let is_enum = match ty.as_adt() {
-        Some(Adt::Enum(_)) => true,
-        Some(Adt::Struct(_) | Adt::Union(_)) | None => false,
+    let adt_kind = match ty.as_adt() {
+        Some(Adt::Enum(_)) => AdtKind::Enum,
+        Some(Adt::Struct(_) | Adt::Union(_)) | None => AdtKind::Other,
     };
 
     let func = find_enclosing_fn(ctx, scrutinee_range);
@@ -748,7 +772,7 @@ fn resolve_match_scrutinee(
         None => format!("{ty:?}"),
     };
 
-    let resolved = ResolvedType::new(display).with_enum(is_enum);
+    let resolved = ResolvedType::new(display).with_adt_kind(adt_kind);
 
     let flags = match ty.as_adt() {
         Some(Adt::Enum(e)) => {
@@ -756,7 +780,11 @@ fn resolve_match_scrutinee(
             let local_krate = func.map(|f| f.module(ctx.sema.db).krate(ctx.sema.db));
             let is_external = local_krate.is_some_and(|lk| lk != krate);
             let has_non_exhaustive = e.attrs(ctx.sema.db).is_non_exhaustive();
-            Some(AdtFlags::new(has_non_exhaustive && is_external))
+            let exhaustiveness = match (has_non_exhaustive, is_external) {
+                (true, true) => Exhaustiveness::NonExhaustive,
+                (true, false) | (false, true) | (false, false) => Exhaustiveness::Exhaustive,
+            };
+            Some(AdtFlags::from_exhaustiveness(exhaustiveness))
         }
         Some(Adt::Struct(_) | Adt::Union(_)) | None => None,
     };
@@ -775,15 +803,11 @@ fn resolve_expr_type(ctx: &DecorateCtx<'_, '_>, range: TextRange) -> Option<Reso
         None => format!("{ty:?}"),
     };
 
-    let is_result = is_instance_of(&ty, ctx.core_result);
-    let is_option = is_instance_of(&ty, ctx.core_option);
-    let is_never = ty.is_never();
-
     Some(
         ResolvedType::new(display)
-            .with_result(is_result)
-            .with_option(is_option)
-            .with_never(is_never),
+            .with_result_kind(result_kind(ctx, &ty))
+            .with_option_kind(option_kind(ctx, &ty))
+            .with_never_kind(never_kind(&ty)),
     )
 }
 
