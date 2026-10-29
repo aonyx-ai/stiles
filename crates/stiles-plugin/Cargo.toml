@@ -11,9 +11,9 @@ repository.workspace = true
 # whose analysis stacks a plugin never runs.
 [dependencies]
 stabby.workspace = true
-stiles-rust = { path = "../stiles-rust", version = "=0.1.0", default-features = false }
+stiles-rust = { path = "../stiles-rust", version = "=0.2.0", default-features = false }
 stiles-types.workspace = true
-stiles-typescript = { path = "../stiles-typescript", version = "=0.1.0", default-features = false }
+stiles-typescript = { path = "../stiles-typescript", version = "=0.2.0", default-features = false }
 
 [dev-dependencies]
 tree-sitter.workspace = true

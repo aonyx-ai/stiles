@@ -33,12 +33,12 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 tar.workspace = true
-stiles-core = { path = "../stiles-core", version = "=0.1.0" }
-stiles-reporting = { path = "../stiles-reporting", version = "=0.1.0" }
-stiles-plugin = { path = "../stiles-plugin", version = "=0.1.0" }
-stiles-rust = { path = "../stiles-rust", version = "=0.1.0" }
-stiles-typescript = { path = "../stiles-typescript", version = "=0.1.0" }
-stiles-types = { path = "../stiles-types", version = "=0.1.0" }
+stiles-core = { path = "../stiles-core", version = "=0.2.0" }
+stiles-reporting = { path = "../stiles-reporting", version = "=0.2.0" }
+stiles-plugin = { path = "../stiles-plugin", version = "=0.2.0" }
+stiles-rust = { path = "../stiles-rust", version = "=0.2.0" }
+stiles-typescript = { path = "../stiles-typescript", version = "=0.2.0" }
+stiles-types = { path = "../stiles-types", version = "=0.2.0" }
 
 [dev-dependencies]
 assert_cmd = "2"
