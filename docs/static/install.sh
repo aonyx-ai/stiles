@@ -2,7 +2,7 @@
 #
 # Installs the latest release of stiles.
 #
-#   curl -LsSf https://aonyx-ai.github.io/stiles/install.sh | sh
+#   curl -LsSf https://opensource.aonyx.ai/stiles/install.sh | sh
 #
 # The line above runs this in whichever /bin/sh the machine has, which is
 # not always bash, so the script is POSIX shell.

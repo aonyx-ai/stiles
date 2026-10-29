@@ -80,13 +80,13 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 
-[checking]: https://aonyx-ai.github.io/stiles/docs/reference/command-line
-[configuration]: https://aonyx-ai.github.io/stiles/docs/reference/configuration
-[custom-lints]: https://aonyx-ai.github.io/stiles/authoring/how-to/write-a-rule
-[docs]: https://aonyx-ai.github.io/stiles/
-[install]: https://aonyx-ai.github.io/stiles/docs/how-to/install
-[languages]: https://aonyx-ai.github.io/stiles/docs/reference/supported-languages
-[prebuilt-lints]: https://aonyx-ai.github.io/stiles/docs/reference/prebuilt-archives
+[checking]: https://opensource.aonyx.ai/stiles/docs/reference/command-line
+[configuration]: https://opensource.aonyx.ai/stiles/docs/reference/configuration
+[custom-lints]: https://opensource.aonyx.ai/stiles/authoring/how-to/write-a-rule
+[docs]: https://opensource.aonyx.ai/stiles/
+[install]: https://opensource.aonyx.ai/stiles/docs/how-to/install
+[languages]: https://opensource.aonyx.ai/stiles/docs/reference/supported-languages
+[prebuilt-lints]: https://opensource.aonyx.ai/stiles/docs/reference/prebuilt-archives
 [releases]: https://github.com/aonyx-ai/stiles/releases
 [rules]: https://github.com/aonyx-ai/stiles-aonyx-rules
 [ts]: https://tree-sitter.github.io/tree-sitter/

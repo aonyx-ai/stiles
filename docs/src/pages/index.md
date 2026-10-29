@@ -11,7 +11,7 @@ carry, because only your project wants them.
 ## Install
 
 ```bash
-curl -LsSf https://aonyx-ai.github.io/stiles/install.sh | sh
+curl -LsSf https://opensource.aonyx.ai/stiles/install.sh | sh
 ```
 
 [Install Stiles][installation] covers Linux, macOS, GitHub Actions, and a

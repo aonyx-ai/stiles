@@ -1,0 +1,19 @@
+{
+  // The site is static, so the Worker has no `main`: Cloudflare serves the
+  // assets directly, and no code of ours runs on a request.
+  "name": "stiles-docs",
+  "compatibility_date": "2026-09-03",
+  // The Worker answers on the path route that den attaches to it. A
+  // workers.dev hostname would be a second public origin serving the same
+  // site.
+  "workers_dev": false,
+  "assets": {
+    // The route hands the Worker the full path, so the site sits under
+    // `stiles/` in this directory, where the base URL of Docusaurus puts it.
+    // The deploy job lays the directory out from the build artifact.
+    "directory": "dist",
+    // Docusaurus emits `404.html`, and Cloudflare looks for the nearest one
+    // above a missing path, which is the one in `stiles/`.
+    "not_found_handling": "404-page",
+  },
+}
