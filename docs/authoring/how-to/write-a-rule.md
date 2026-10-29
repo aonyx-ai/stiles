@@ -9,7 +9,7 @@ You start in an empty directory and finish with your own rule running in your
 project. The guide follows the `doc_summary_break` example, which flags a doc
 comment whose summary line has no blank line after it.
 
-## start from an example
+## Start from an example
 
 <!--
 where do I begin. doc_summary_break, or custom_lint for the same shape with more
@@ -26,7 +26,7 @@ of this guide explains it.
 has the same files and structure, with more comments. Start there if you prefer
 comments to code.
 
-## what a crate holds
+## The crate manifest
 
 ```toml title="lints/doc_summary_break/Cargo.toml"
 [package]
@@ -43,7 +43,7 @@ stiles-types = "=0.1.0"
 crate-type = ["cdylib"]
 ```
 
-## hook a node kind
+## Hook a node kind
 
 A lint implements the lint pass trait of the language it checks. This example
 checks Rust, so it implements `RustLintPass`. The
@@ -69,7 +69,7 @@ impl RustLintPass for DocSummaryBreak {
 }
 ```
 
-## declare and export the rule
+## Declare and export the rule
 
 ```rust
 const RULE_ID: RuleId = RuleId::new("lint.doc-summary-break");
@@ -83,7 +83,7 @@ impl stiles_plugin::DeclaresRules for DocSummaryBreak {
 stiles_plugin::export_lints![rust: [DocSummaryBreak]];
 ```
 
-## test it
+## Test the rule
 
 ```rust
 use stiles_rust::RustLintPassAdapter;
@@ -105,7 +105,7 @@ fn a_second_line_against_the_summary_is_flagged() {
 }
 ```
 
-## run it
+## Run the rule
 
 ```toml title=".config/stiles.toml"
 [[lints]]
@@ -116,7 +116,7 @@ path = "lints/doc_summary_break"
 stiles check .
 ```
 
-## give the rule options
+## Give the rule options
 
 ```toml title=".config/stiles.toml"
 [rules.options."lint.repeated-primitive-params"]
@@ -133,7 +133,7 @@ impl RustLintPass for RepeatedPrimitiveParams {
 }
 ```
 
-## next
+## Next steps
 
 <!--
 where now. api, configuration, shared-rules, prebuilt archives.

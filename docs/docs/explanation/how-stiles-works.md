@@ -11,7 +11,7 @@ Stiles is a universal linting tool that allows you to write your own lints for
 any (supported) language in similar style. It's based on a simple concept:
 decorating tree-sitter trees with language-specific information.
 
-## What a run does
+## The steps of a run
 
 1. Load rules (cached, prebuilt, or compile from source)
 2. Load project in [language adapter](#language-tooling)
@@ -65,7 +65,7 @@ The load has four consequences:
 - **The load happens once per run.** A check of one file in a large project
   still loads the whole project first, so the start of a run can be slow.
 
-## What a clean run promises
+## The promise of a clean run
 
 <!--
 clean means inspected: why is an uncovered file an error. running only the rules

@@ -7,7 +7,7 @@ non-goal: duplicating any of it here.
 
 The API documentation for each Stiles crate is on docs.rs.
 
-## the table
+## Crates
 
 | Crate                                  | Holds                                                                                               |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------- |

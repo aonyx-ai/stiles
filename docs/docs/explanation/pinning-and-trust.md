@@ -9,7 +9,7 @@ non-goal: how to pin. shared-rules covers the mechanics.
 A pinned commit, a published digest and a successful load each look like a
 reason to trust a rules repository. None of them is.
 
-## Why a commit
+## Commit pins
 
 <!--
 why a commit: why not a branch. a linter that changes underneath a project is
@@ -20,7 +20,7 @@ A branch moves when someone pushes to it, so the rules on a branch can change
 while your project stays the same. Stiles requires a `rev` for every `git`
 entry.
 
-## Why the full hash
+## Full hashes
 
 <!--
 why the full hash: why not an abbreviation. it grows ambiguous as a repository
@@ -42,7 +42,7 @@ commit hash and never refreshes it, so a second run sends no request to the
 remote. [Cache layout](/docs/reference/cache-layout) shows where Stiles stores
 it.
 
-## What the digest proves
+## The digest
 
 <!--
 what the digest proves: does a matching digest mean safe. no. the same publisher
@@ -55,7 +55,7 @@ before unpacking anything, so a truncated or corrupted download never reaches
 the disk as files. The digest does not tell you who built the archive, or what
 is in it.
 
-## What the handshake proves
+## The handshake
 
 <!--
 what the handshake proves: does loading successfully mean safe. no. only that
@@ -77,7 +77,7 @@ and no trust decision, said outright.
 The pin and the digest check what you downloaded, and the handshake checks how
 it was built. None of them checks what the code does.
 
-## Where trust comes from
+## The source of trust
 
 <!--
 where trust comes from: what decides it then. the configuration. a named
