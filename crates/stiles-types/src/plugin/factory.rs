@@ -1,3 +1,4 @@
+use stabby::closure::Call0Dyn as _;
 use stabby::{result, vec};
 
 use crate::{BoxedLintPass, Language, Panic, RuleId};
@@ -32,8 +33,6 @@ pub fn factory(build: impl Fn() -> Constructed + Send + Sync + 'static) -> LintP
 /// stabby trait. This keeps that name in this crate, so the loader
 /// constructs a pass without depending on stabby itself.
 pub fn construct(factory: &LintPassFactory) -> Constructed {
-    use stabby::closure::Call0Dyn;
-
     factory.call()
 }
 

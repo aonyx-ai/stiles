@@ -47,8 +47,6 @@ impl GitUrl {
     /// let url = GitUrl::new("https://github.com/aonyx-ai/stiles-aonyx-rules")?;
     /// ```
     pub(crate) fn new(url: impl AsRef<str>) -> anyhow::Result<Self> {
-        // gitoxide's error renders the remote it rejected, so none of it
-        // crosses into stiles's error.
         gix::url::parse(url.as_ref())
             .map(Self)
             .map_err(|_| anyhow::anyhow!("cannot read the git remote"))

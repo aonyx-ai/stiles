@@ -58,6 +58,12 @@ impl AbiTag {
     /// A newline separates the values, and each fingerprint occupies a
     /// fixed width. Two different identities therefore cannot produce one
     /// input to the digest.
+    ///
+    /// The digest reads the floor of the protocol, not the version that
+    /// stiles writes. Stiles reads every protocol from the floor upward, so
+    /// two builds of stiles with one floor accept each other's archives.
+    /// Before 1.0 the floor is the version itself, so every release asks for
+    /// its own archives.
     #[builder]
     pub(super) fn new(identity: &AbiIdentity, target: &str) -> Self {
         let AbiIdentity {
@@ -66,10 +72,6 @@ impl AbiTag {
             language_fingerprint,
         } = identity;
 
-        // The floor rather than the version stiles writes. Stiles reads
-        // every protocol from the floor upward, so two stiles builds sharing
-        // one accept each other's archives. Before 1.0 the floor is the
-        // version itself, so every release asks for its own archives.
         let floor = abi_version.floor();
 
         let key = digest(&format!(
