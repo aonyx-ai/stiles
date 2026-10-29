@@ -5,10 +5,10 @@ use crate::config::{GitRev, GitUrl, LintPath};
 /// Where one configured set of custom lints comes from
 ///
 /// A project either keeps its lints beside its code or shares them with
-/// other projects through a repository. The two arrive at the same place,
-/// a directory holding cargo packages that stiles builds and loads, so
-/// they differ only in how that directory comes to exist: a path is
-/// already there, and a git source is fetched into the cache first.
+/// other projects through a repository. The two arrive at the same place: a
+/// directory of cargo packages that stiles builds and loads. They differ
+/// only in how that directory comes to exist. A path is already there, and
+/// a git source is fetched into the cache first.
 ///
 /// # Examples
 ///
@@ -38,9 +38,9 @@ impl std::fmt::Display for LintSource {
 /// A repository and the commit stiles checks its lints out at
 ///
 /// Both halves are required, and the [`GitRev`] is a full hash, so the
-/// source names exactly one tree. That is what lets stiles treat a
-/// checkout as permanent once it exists: the cache never has to ask
-/// whether the remote moved, because this source cannot follow it.
+/// source names exactly one tree. That is what lets stiles treat a checkout
+/// as permanent once it exists. The cache never has to ask whether the
+/// remote moved, because this source cannot follow it.
 ///
 /// # Examples
 ///

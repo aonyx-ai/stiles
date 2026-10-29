@@ -62,9 +62,9 @@ impl RuleFilter {
     /// # Errors
     ///
     /// Returns an error naming every one of them. A misspelled rule
-    /// disables nothing and reads exactly like a rule that found no
-    /// fault, so stiles refuses the file rather than the reader having
-    /// to notice.
+    /// disables nothing, and reads exactly like a rule that found no fault.
+    /// Stiles therefore refuses the file, so the reader does not have to
+    /// notice.
     pub(crate) fn validate(&self, declared: &BTreeSet<String>) -> anyhow::Result<()> {
         let unknown: Vec<&str> = self
             .named()
@@ -93,9 +93,9 @@ impl RuleFilter {
     /// Returns the rules this filter names, which a run may never see
     ///
     /// A name that no loaded rule reports is worth saying out loud. It is
-    /// a typo, or a rule that reports nothing here, and stiles cannot
-    /// tell those apart: a plugin declares no rule ids, so the only ones
-    /// stiles learns are the ones it is handed in a diagnostic.
+    /// a typo, or a rule that reports nothing here, and stiles cannot tell
+    /// those apart. A plugin declares no rule ids. The only ones that stiles
+    /// learns are the ones it is handed in a diagnostic.
     pub fn named(&self) -> &BTreeSet<String> {
         static NONE: BTreeSet<String> = BTreeSet::new();
 

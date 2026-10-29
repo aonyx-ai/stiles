@@ -36,9 +36,9 @@ fn package(source: &str) -> TempDir {
 
 /// Points the package's stiles configuration at one git lint source
 ///
-/// Both values go through TOML rather than into quotes of our own, so a
-/// checkout under a directory holding a quote still writes a configuration
-/// stiles can read.
+/// Both values go through TOML, not into quotes of our own. A checkout
+/// under a directory with a quote in its name therefore still writes a
+/// configuration that stiles can read.
 fn configure_git_lint(package: &Path, url: &str, rev: &str) {
     let url = toml::Value::from(url);
     let rev = toml::Value::from(rev);
@@ -54,14 +54,15 @@ fn configure_git_lint(package: &Path, url: &str, rev: &str) {
 
 /// Returns a stiles that keeps its fetched sources inside `cache`
 ///
-/// Every test points the cache somewhere of its own, so a run neither
-/// reads nor writes the cache of the person running it, and one test
-/// cannot serve another's checkout.
+/// Every test points the cache somewhere of its own. A run therefore
+/// neither reads nor writes the cache of the person who runs it, and one
+/// test cannot serve the checkout of another.
 ///
-/// The git configuration is emptied too. A fetch that quietly depended on
-/// the identity in someone's `~/.gitconfig` passed everywhere it was
+/// The git configuration is emptied too. A fetch once quietly depended on
+/// the identity in someone's `~/.gitconfig`. It passed everywhere it was
 /// written and failed on every build agent, which is where stiles most
-/// needs to work, so these tests run with the same nothing an agent has.
+/// needs to work. These tests therefore run with the same nothing that an
+/// agent has.
 ///
 /// The same reasoning removes a token and a release API. Neither belongs
 /// near a fixture remote.
@@ -80,16 +81,18 @@ fn stiles(cache: &TempDir) -> Command {
 
 /// Returns the build directory every fixture plugin in this file shares
 ///
-/// Each test fetches into a cache of its own, so a fixture would otherwise
-/// compile stiles-rust and everything under it from nothing, every test and
-/// every run. The dependencies are the same ones each time, so one directory
-/// outside the caches turns several cold builds into one. It sits under
-/// `CARGO_TARGET_TMPDIR`, which cargo keeps beside the workspace's own build
-/// output, so the warmth survives between runs as well as within one.
+/// Each test fetches into a cache of its own. A fixture would otherwise
+/// compile stiles-rust and everything under it from nothing, in every test
+/// and every run. The dependencies are the same ones each time, so one
+/// directory outside the caches turns several cold builds into one. It sits
+/// under `CARGO_TARGET_TMPDIR`, which cargo keeps beside the build output
+/// of the workspace. The warm build therefore survives between runs as well
+/// as within one.
 ///
-/// Stiles passes its environment to the cargo it runs, so this is also how
-/// someone with `CARGO_TARGET_DIR` already set builds their plugins, and the
-/// artifact search reads the paths cargo reports rather than assuming any.
+/// Stiles passes its environment to the cargo it runs. This is therefore
+/// also how someone with `CARGO_TARGET_DIR` already set builds their
+/// plugins. The artifact search reads the paths that cargo reports, and
+/// assumes none.
 fn shared_build_directory() -> PathBuf {
     let directory = Path::new(env!("CARGO_TARGET_TMPDIR")).join("git_lint_plugins");
     std::fs::create_dir_all(&directory).expect("the build directory should be created");
@@ -220,9 +223,9 @@ fn check_with_git_lint_source_reports_its_diagnostic() {
 /// A checkout in the cache is used without asking the remote again
 ///
 /// The remote is deleted between the two runs, so a second run that still
-/// succeeds cannot have reached it. This is what makes a pinned source
-/// cheap enough to sit in front of every check, and what keeps a check
-/// working with no network at all.
+/// succeeds cannot have reached it. This makes a pinned source cheap enough
+/// to sit in front of every check. It also keeps a check working with no
+/// network at all.
 #[test]
 fn check_with_git_lint_source_reuses_the_checkout_without_the_remote() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");
@@ -248,9 +251,9 @@ fn check_with_git_lint_source_reuses_the_checkout_without_the_remote() {
 
 /// A repository of rules is a workspace, and every member is a rule
 ///
-/// This is the shape the extraction of stiles's own rules produces, so
-/// one entry has to load all of them rather than the first one cargo
-/// happened to finish.
+/// This is the shape that the extraction of stiles's own rules produces.
+/// One entry therefore has to load all of them, not the first one that
+/// cargo happened to finish.
 #[test]
 fn check_with_git_lint_workspace_loads_every_member() {
     let cache = tempfile::tempdir().expect("temporary directory should be created");

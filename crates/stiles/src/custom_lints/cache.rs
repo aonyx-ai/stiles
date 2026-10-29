@@ -1,10 +1,10 @@
 //! Where stiles keeps what it fetches for custom lints
 //!
 //! A lint source that is not already a directory on the machine has to
-//! become one before stiles can use it. This module owns the layout of
-//! the cache those arrive in: where its root is, where one source sits
-//! under it, and where a fetch assembles a source before it is whole
-//! enough to install.
+//! become one before stiles can use it. This module owns the layout of the
+//! cache that those arrive in. It says where its root is, and where one
+//! source sits under it. It also says where a fetch assembles a source
+//! before it is whole enough to install.
 //!
 //! The layout is written into directory names that outlive the process,
 //! so each part of it is stable by construction rather than by habit.
@@ -24,20 +24,20 @@ use crate::config::GitLintSource;
 /// The environment variable that moves the cache somewhere else
 ///
 /// Tests set it so that a run never reads or writes the cache of the
-/// person running them, and a continuous integration job sets it to a
-/// directory it knows how to restore between runs.
+/// person who runs them. A continuous integration job sets it to a
+/// directory that it knows how to restore between runs.
 const CACHE_VARIABLE: &str = "STILES_CACHE_DIR";
 
 /// Where stiles may keep the lint sources it fetches
 ///
-/// The candidates are read from the environment in one place and resolved
-/// in another, so the precedence between them can be tested without a
-/// process to set variables in.
+/// The candidates are read from the environment in one place, and resolved
+/// in another. A test can therefore check the precedence between them
+/// without a process to set variables in.
 ///
 /// Only the override is stiles's own. The directory beside it comes from
-/// etcetera, which reads `XDG_CACHE_HOME` and falls back to the home
-/// directory the way the base directory specification asks for, including
-/// ignoring a value that is not an absolute path.
+/// etcetera, which reads `XDG_CACHE_HOME`. It falls back to the home
+/// directory as the base directory specification asks. It also ignores a
+/// value that is not an absolute path.
 #[derive(Clone, Eq, PartialEq, Debug)]
 struct CacheLocation {
     override_directory: Option<OsString>,
@@ -47,9 +47,9 @@ struct CacheLocation {
 impl CacheLocation {
     /// Reads the candidate locations from the environment
     ///
-    /// An empty override counts as unset, because that is what a shell
-    /// leaves behind when it expands something that was never set, and
-    /// joining onto it would put the cache at the filesystem root.
+    /// An empty override counts as unset. That is what a shell leaves
+    /// behind when it expands something that was never set. A join onto it
+    /// would put the cache at the filesystem root.
     fn from_environment() -> Self {
         Self {
             override_directory: present(std::env::var_os(CACHE_VARIABLE)),
@@ -150,10 +150,10 @@ fn prebuilt_directory_in(root: &Path, source: &GitLintSource, tag: &AbiTag) -> P
 
 /// Returns the directory that holds everything cached for one remote
 ///
-/// The remote contributes a readable name so that the cache can be
-/// browsed, and a digest so that two remotes ending in the same segment
-/// stay apart. Both layouts under the cache root use this, so a remote is
-/// spelled the same way wherever it appears.
+/// The remote contributes a readable name, so that a person can browse the
+/// cache. It also contributes a digest, so that two remotes that end in one
+/// segment stay apart. Both layouts under the cache root use this, so a
+/// remote is spelled the same way wherever it appears.
 ///
 /// The digest reads the remote as it prints, credentials removed. Two
 /// people who hold different tokens for one repository therefore share a
@@ -168,10 +168,10 @@ fn remote_directory(source: &GitLintSource) -> String {
 
 /// Returns the directory a checkout is assembled in before it is installed
 ///
-/// A fetch writes here and is renamed into place only once it is whole, so
-/// a run interrupted halfway leaves nothing another run could mistake for
-/// a finished checkout. The process id keeps two stiles processes on one machine
-/// from writing into the same half-built tree.
+/// A fetch writes here, and is renamed into place only once it is whole. A
+/// run interrupted halfway therefore leaves nothing that another run could
+/// mistake for a finished checkout. The process id keeps two stiles
+/// processes on one machine from writing into the same half-built tree.
 pub fn staging_directory(destination: &Path) -> PathBuf {
     let mut name = destination.as_os_str().to_os_string();
     name.push(format!(".{}.partial", std::process::id()));

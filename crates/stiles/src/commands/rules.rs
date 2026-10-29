@@ -21,9 +21,9 @@ pub struct RulesArgs {
 /// One rule as `stiles rules` lists it
 ///
 /// A rule can run on several languages, each through its own lint, and the
-/// listing names them all. `enabled` says whether the project's `[rules]`
-/// let the rule's diagnostics through, so a reader sees the effect of the
-/// configuration and not just what the plugins offer.
+/// listing names them all. `enabled` says whether the `[rules]` of the
+/// project let the diagnostics of the rule through. A reader then sees the
+/// effect of the configuration, not just what the plugins offer.
 #[derive(Clone, Eq, PartialEq, Debug, Serialize)]
 struct ListedRule {
     rule: &'static str,

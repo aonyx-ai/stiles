@@ -86,9 +86,9 @@ fn shared_build_directory() -> PathBuf {
 
 /// Returns the tag this stiles asks publishers of prebuilt lints for
 ///
-/// The test reads it from the binary rather than deriving it, so that the
-/// name a publisher would use and the name stiles looks for are the same
-/// string by construction.
+/// The test reads it from the binary rather than deriving it. The name
+/// that a publisher would use and the name that stiles looks for are then
+/// the same string by construction.
 fn abi_tag() -> String {
     let output = Command::cargo_bin("stiles")
         .expect("stiles binary should exist")
@@ -116,9 +116,9 @@ fn library_name(stem: &str) -> String {
 /// Creates a repository holding one lint package called `package`
 ///
 /// Every test names its package after itself. The fixtures of this file
-/// and of `git_lints.rs` compile into one build directory, so two tests
-/// that built a package of the same name would replace each other's
-/// library while a third read it.
+/// and of `git_lints.rs` compile into one build directory. Two tests that
+/// built a package of the same name would replace the library of the other
+/// while a third read it.
 fn repository_with_one_lint(package: &str, rule: &str) -> FixtureRepository {
     let package = package.to_owned();
 
@@ -703,8 +703,8 @@ fn clone_into(rules: &FixtureRepository, destination: &Path) {
 ///
 /// The compile that follows costs minutes on every machine and every
 /// build agent, and silence there reads exactly like a warm cache. The
-/// releases were listed and nobody published this archive, which is the
-/// one empty-handed case a publisher can act on, so it is named rather
+/// releases were listed and nobody published this archive. That is the one
+/// empty-handed case that a publisher can act on, so it is named rather
 /// than guessed at.
 ///
 /// This is a note and not a warning. Nothing is broken, and the check

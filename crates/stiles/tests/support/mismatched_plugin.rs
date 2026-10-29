@@ -5,9 +5,9 @@ use crate::fixture_repository::stiles_crates;
 /// Writes a package whose declaration claims a protocol stiles refuses
 ///
 /// The library it builds is a real one: stiles can open it and find the
-/// declaration it looks for. Only the protocol version is wrong, which is
-/// the first thing the handshake compares, so the refusal comes from the
-/// handshake rather than from the loader failing earlier.
+/// declaration it looks for. Only the protocol version is wrong, and that
+/// is the first thing the handshake compares. The refusal therefore comes
+/// from the handshake, not from an earlier failure of the loader.
 ///
 /// A test uses this to prove that a library stiles did not compile
 /// itself is held to the same standard as one it did.

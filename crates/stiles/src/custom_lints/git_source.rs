@@ -30,18 +30,18 @@ pub(crate) fn cached(source: &GitLintSource) -> anyhow::Result<Option<PathBuf>> 
 /// A checkout is permanent once it exists, because a [`GitRev`] names one
 /// immutable commit: the same source can never want different content
 /// later. A run that finds its checkout therefore touches no network at
-/// all, which keeps a check working on a train and keeps the common case
+/// all. That keeps a check working on a train, and keeps the common case
 /// as fast as a local path.
 ///
 /// Two runs may fetch the same pin at once. The rename into place decides
-/// which of them wins, and the loser discards its own work and reads what
-/// the winner installed, because both fetched the same commit.
+/// which of them wins. The loser discards its own work and reads what the
+/// winner installed, because both fetched the same commit.
 ///
 /// # Errors
 ///
-/// Returns an error if the cache directory cannot be created, if the
-/// remote cannot be reached, if it does not serve the pinned commit, or if
-/// the working tree cannot be written.
+/// Returns an error if the cache directory cannot be created, or if the
+/// remote cannot be reached or does not serve the pinned commit. Returns an
+/// error too if the working tree cannot be written.
 pub(crate) fn checkout(source: &GitLintSource) -> anyhow::Result<PathBuf> {
     let destination = cache::checkout_directory(source)
         .context("failed to find the directory for the checkout")?;
@@ -96,11 +96,11 @@ pub(crate) fn checkout(source: &GitLintSource) -> anyhow::Result<PathBuf> {
 
 /// Reports whether `directory` is a repository checked out at `rev`
 ///
-/// The question is asked of git rather than of the filesystem, because a
-/// directory can exist for reasons a fetch never intended: a half-copied
-/// backup, or a checkout of some other commit. Anything that does not
-/// answer with the pinned commit is treated as absent and refetched, since
-/// a wrong tree would silently run the wrong rules.
+/// The question goes to git, not to the filesystem. A directory can exist
+/// for reasons that a fetch never intended: a half-copied backup, or a
+/// checkout of some other commit. Anything that does not answer with the
+/// pinned commit counts as absent and is fetched again. A wrong tree would
+/// silently run the wrong rules.
 ///
 /// What this does not detect is an edit to a file the checkout already
 /// holds, which leaves `HEAD` answering correctly. A fetch installs a
@@ -133,8 +133,8 @@ fn holds(directory: &Path, rev: &GitRev) -> bool {
 ///
 /// Every other category stays open. A private rule repository is fetched
 /// with the credentials and the transport settings that the home directory
-/// and the environment carry, and denying those would only turn a working
-/// fetch into a failing one.
+/// and the environment carry. To deny those would only turn a working fetch
+/// into a failing one.
 fn open_options() -> gix::open::Options {
     let permissions = gix::open::Permissions {
         env: gix::open::permissions::Environment {
@@ -218,14 +218,14 @@ fn materialize(source: &GitLintSource, staging: &Path) -> anyhow::Result<()> {
 /// Points the checkout's `HEAD` at the commit it was built from
 ///
 /// This is what lets a later run recognize the checkout as the pin it
-/// already has, and it leaves the cache full of repositories a person can
-/// inspect with ordinary git.
+/// already has. It also leaves the cache full of repositories that a person
+/// can inspect with ordinary git.
 ///
 /// The file is written rather than edited through a ref transaction,
 /// because a transaction also writes a reflog, and a reflog entry needs a
-/// committer. Stiles would then be unable to fetch on any machine whose
-/// git identity is unset, which is most build agents, and would fail there
-/// with an error about `user.email` that has nothing to do with linting. A
+/// committer. Stiles would then be unable to fetch on any machine whose git
+/// identity is unset, which is most build agents. It would fail there with
+/// an error about `user.email` that has nothing to do with linting. A
 /// detached `HEAD` is a file holding the hash, and this checkout has no
 /// history worth logging.
 ///
@@ -243,11 +243,11 @@ fn detach_head(repository: &gix::Repository, commit: gix::ObjectId) -> anyhow::R
 
 /// Asks the remote for the pinned commit and nothing else
 ///
-/// The refspec names the commit itself rather than a branch, so the remote
-/// sends the one history stiles asked for even when no branch tip matches
-/// it. Depth one cuts that history to a single commit, because the lints
-/// are built from the tree, never from what came before it. Tags are
-/// declined for the same reason.
+/// The refspec names the commit itself rather than a branch. The remote
+/// therefore sends the one history that stiles asked for, even when no
+/// branch tip matches it. Depth one cuts that history to a single commit,
+/// because the lints are built from the tree, never from what came before
+/// it. Tags are declined for the same reason.
 ///
 /// # Errors
 ///

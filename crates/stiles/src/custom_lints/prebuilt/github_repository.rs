@@ -23,7 +23,7 @@ pub struct GitHubRepository {
 impl GitHubRepository {
     /// Returns the repository `url` names, if an API here serves it
     ///
-    /// The API always serves a remote on github.com. It also serves one
+    /// The API always serves a remote on `github.com`. It also serves one
     /// on `api_host`, which is how a project inside a GitHub Enterprise
     /// installation reaches its own releases. Whoever points stiles at
     /// that API names the host it answers for.

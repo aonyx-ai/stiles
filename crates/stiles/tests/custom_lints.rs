@@ -37,9 +37,9 @@ fn package(source: &str) -> TempDir {
 
 /// Points the package's stiles configuration at one custom lint path
 ///
-/// The path goes through a TOML value rather than into quotes of our own,
-/// so a checkout under a directory holding a quote still writes a
-/// configuration stiles can read.
+/// The path goes through a TOML value, not into quotes of our own. A
+/// checkout under a directory with a quote in its name therefore still
+/// writes a configuration that stiles can read.
 fn configure_lint(package: &Path, lint_path: &Path) {
     let lint_path = lint_path.to_str().expect("the lint path should be UTF-8");
     let lint_path = toml::Value::from(lint_path);
@@ -98,11 +98,10 @@ fn shared_build_directory() -> PathBuf {
 
 /// Writes a workspace of two plugin packages and returns its root
 ///
-/// The members differ in the node they answer to, so a source holding
+/// The members differ in the node they answer to, so a source that holds
 /// both proves that stiles loaded both libraries. Their dependencies are
-/// path dependencies on this repository,
-/// which is what makes the handshake pass: stiles and both plugins are
-/// built from the same stiles source.
+/// path dependencies on this repository. That is what makes the handshake
+/// pass: stiles and both plugins are built from the same stiles source.
 fn workspace_of_lints() -> TempDir {
     let directory = tempfile::tempdir().expect("temporary directory should be created");
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -207,8 +206,8 @@ fn check_with_a_disabled_rule_runs_the_rest() {
 ///
 /// The remote here does not resolve, so the fetch fails before any
 /// protocol runs. The test asserts that the report names both the remote
-/// and the commit, because neither alone tells a reader which entry of
-/// their configuration to look at.
+/// and the commit. Neither alone tells a reader which entry of their
+/// configuration to look at.
 #[test]
 fn check_with_a_git_lint_that_cannot_be_fetched_names_the_source() {
     let target = package(TODO_SOURCE);
@@ -286,9 +285,9 @@ fn check_with_a_rule_no_lint_reports_fails() {
 
 /// Pins that a configured directory may be a workspace of plugins
 ///
-/// One entry naming a repository of rules is the reason this matters: a
-/// shared rule set is a workspace, and loading only its first library
-/// would run a fraction of the rules while looking like it ran them all.
+/// One entry that names a repository of rules is the reason this matters.
+/// A shared rule set is a workspace. A load of only its first library would
+/// run a fraction of the rules, and look like it ran them all.
 #[test]
 fn check_with_a_workspace_of_lints_reports_every_member() {
     let target = package(TODO_SOURCE);
@@ -356,9 +355,9 @@ fn check_with_an_option_configures_the_rule() {
 
 /// Pins that an option set on a rule nothing reports is refused
 ///
-/// An option on a misspelled rule configures nothing and reads exactly
-/// like a rule that took it and found no fault, which is the same reason
-/// `[rules]` refuses a name nothing reports.
+/// An option on a misspelled rule configures nothing. It reads exactly
+/// like a rule that took it and found no fault. That is the same reason
+/// why `[rules]` refuses a name that nothing reports.
 #[test]
 fn check_with_an_option_for_a_rule_no_lint_reports_fails() {
     let target = package(TODO_SOURCE);
@@ -403,8 +402,8 @@ fn check_with_both_rule_lists_fails() {
 /// Pins the whole path: configure, compile, handshake, lint, report
 ///
 /// Both sides are built from this repository here, as the setup
-/// documentation asks of a real user, so the handshake passes for the
-/// same reason theirs does.
+/// documentation asks of a real user. The handshake therefore passes for
+/// the same reason that theirs does.
 #[test]
 fn check_with_custom_lint_reports_its_diagnostic() {
     let target = package(TODO_SOURCE);
@@ -476,9 +475,9 @@ fn check_with_lint_that_exports_no_declaration_fails() {
 
 /// Pins that a rule the project configured nothing for still runs
 ///
-/// The pass is configured either way, with a table holding nothing for
-/// it, so an unconfigured rule reports what it reports by default rather
-/// than failing to load.
+/// The pass is configured either way, with a table that holds nothing for
+/// it. An unconfigured rule therefore reports what it reports by default,
+/// and does not fail to load.
 #[test]
 fn check_without_an_option_leaves_the_rule_at_its_default() {
     let target = package(TODO_SOURCE);

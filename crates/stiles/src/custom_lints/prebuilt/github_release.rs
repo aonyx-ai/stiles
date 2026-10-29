@@ -78,9 +78,9 @@ pub fn configured_repository_host() -> Option<String> {
 /// The two empty-handed answers are not the same thing, and only one of
 /// them is worth telling the reader about. `NoMatch` means the releases
 /// were listed and nobody published this archive, which a publisher can
-/// act on. `Unlisted` means stiles could not see the repository at all,
-/// which is what a private repository looks like without a token, and
-/// saying so on every check would be noise nobody can fix.
+/// act on. `Unlisted` means stiles could not see the repository at all.
+/// That is what a private repository looks like without a token. A note
+/// about it on every check would be noise that nobody can fix.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum AssetSearch {
     /// The archive and its digest are both published

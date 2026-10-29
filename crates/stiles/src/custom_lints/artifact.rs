@@ -6,9 +6,9 @@ use serde::Deserialize;
 
 /// One line of `cargo build --message-format=json-render-diagnostics`
 ///
-/// Only the fields the artifact search reads are declared, and only
+/// Only the fields that the artifact search reads are declared. Only
 /// `reason` is required, because cargo adds message kinds and fields over
-/// time and an unknown one is not an error.
+/// time, and an unknown one is not an error.
 #[derive(Debug, Deserialize)]
 struct BuildMessage {
     reason: String,
@@ -30,21 +30,21 @@ struct Target {
 /// Finds every dynamic library cargo built from a package under `directory`
 ///
 /// `stdout` is the JSON message stream of a successful `cargo build`. A
-/// configured entry may name a single package or a workspace of them, and
-/// a repository of shared rules is usually the latter, so the search
-/// collects all of them rather than one.
+/// configured entry may name a single package or a workspace of them. A
+/// repository of shared rules is usually the latter, so the search collects
+/// all of them rather than one.
 ///
-/// Artifacts are matched by where their manifest sits rather than by
-/// package name, so a dependency that happens to share a plugin's name
-/// cannot be loaded in its place. Dependencies resolve outside the
-/// configured directory, into cargo's registry and git caches, which is
-/// what makes containment a sufficient test.
+/// Artifacts are matched by where their manifest sits, not by package name.
+/// A dependency that happens to share the name of a plugin therefore cannot
+/// be loaded in its place. Dependencies resolve outside the configured
+/// directory, into the registry and git caches of cargo. That is what makes
+/// containment a sufficient test.
 ///
 /// The result is keyed by manifest path, which sorts it and keeps one
-/// library per package in a single step. Both matter: cargo emits
-/// artifacts in whatever order the build finished them, so lint order
-/// would otherwise shift between runs, and a package cargo reports twice
-/// would be loaded twice and report every finding twice.
+/// library per package in a single step. Both matter. Cargo emits artifacts
+/// in whatever order the build finished them, so the order of the lints
+/// would otherwise shift between runs. A package that cargo reports twice
+/// would be loaded twice, and would report every finding twice.
 ///
 /// # Errors
 ///

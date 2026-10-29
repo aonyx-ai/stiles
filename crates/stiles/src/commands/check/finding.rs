@@ -14,8 +14,8 @@ use stiles_types::{Diagnostic, Severity};
 /// A finding is the artifact the check command sends to its presenter, one
 /// per diagnostic. In text mode the presenter prints the rendered snippet,
 /// the same text stiles always printed. With `--json` it prints the fields
-/// below as one JSON object per line, so a clean run prints nothing in
-/// either mode and a caller reads the findings one line at a time.
+/// below as one JSON object per line. A clean run therefore prints nothing
+/// in either mode, and a caller reads the findings one line at a time.
 ///
 /// `start` and `end` are byte offsets into the file. `line` and `column`
 /// count from one, and the column counts characters, the way an editor
