@@ -9,47 +9,60 @@ use crate::decorations::Exhaustiveness;
 /// decisions like whether a wildcard match arm is acceptable.
 ///
 /// A rule reads it out of memory the host allocated, so stabby lays it
-/// out.
+/// out. It holds an [`Exhaustiveness`] rather than a `bool`, so a call
+/// site that records it names the answer it gives.
 ///
 /// # Examples
 ///
 /// ```
-/// use stiles_rust::decorations::AdtFlags;
+/// use stiles_rust::decorations::{AdtFlags, Exhaustiveness};
 ///
-/// let flags = AdtFlags::new(false);
+/// let flags = AdtFlags::from_exhaustiveness(Exhaustiveness::Exhaustive);
 ///
 /// assert!(!flags.non_exhaustive_external());
 /// ```
 ///
+/// [`Exhaustiveness`]: crate::decorations::Exhaustiveness
 /// [`ResolvedType`]: crate::decorations::ResolvedType
 #[stabby::stabby]
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Decoration)]
 #[decoration(cardinality = "one")]
 pub struct AdtFlags {
-    non_exhaustive_external: bool,
+    exhaustiveness: Exhaustiveness,
 }
 
 impl AdtFlags {
-    /// Creates ADT flags
+    /// Creates ADT flags from how exhaustive a match on the enum can be
     ///
     /// # Examples
     ///
     /// ```
-    /// use stiles_rust::decorations::AdtFlags;
+    /// use stiles_rust::decorations::{AdtFlags, Exhaustiveness};
     ///
-    /// let flags = AdtFlags::new(true);
+    /// let flags = AdtFlags::from_exhaustiveness(Exhaustiveness::NonExhaustive);
     ///
     /// assert!(flags.non_exhaustive_external());
     /// ```
-    pub fn new(non_exhaustive_external: bool) -> Self {
-        Self {
-            non_exhaustive_external,
-        }
+    pub fn from_exhaustiveness(exhaustiveness: Exhaustiveness) -> Self {
+        Self { exhaustiveness }
     }
 
-    /// Creates ADT flags from how exhaustive a match on the enum can be
+    /// Returns how exhaustive a match on the enum can be
     ///
-    /// This does what [`new`] does, with a variant in place of a `bool`.
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::{AdtFlags, Exhaustiveness};
+    ///
+    /// let flags = AdtFlags::from_exhaustiveness(Exhaustiveness::NonExhaustive);
+    ///
+    /// assert_eq!(flags.exhaustiveness(), Exhaustiveness::NonExhaustive);
+    /// ```
+    pub fn exhaustiveness(&self) -> Exhaustiveness {
+        self.exhaustiveness
+    }
+
+    /// Returns whether the enum is `#[non_exhaustive]` from an external crate
     ///
     /// # Examples
     ///
@@ -60,36 +73,24 @@ impl AdtFlags {
     ///
     /// assert!(!flags.non_exhaustive_external());
     /// ```
-    ///
-    /// [`new`]: Self::new
-    pub fn from_exhaustiveness(exhaustiveness: Exhaustiveness) -> Self {
-        Self {
-            non_exhaustive_external: match exhaustiveness {
-                Exhaustiveness::Exhaustive => false,
-                Exhaustiveness::NonExhaustive => true,
-            },
-        }
-    }
-
-    /// Returns whether the enum is `#[non_exhaustive]` from an external crate
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use stiles_rust::decorations::AdtFlags;
-    ///
-    /// let flags = AdtFlags::new(false);
-    ///
-    /// assert!(!flags.non_exhaustive_external());
-    /// ```
     pub fn non_exhaustive_external(&self) -> bool {
-        self.non_exhaustive_external
+        match self.exhaustiveness {
+            Exhaustiveness::Exhaustive => false,
+            Exhaustiveness::NonExhaustive => true,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exhaustiveness_returns_the_recorded_answer() {
+        let flags = AdtFlags::from_exhaustiveness(Exhaustiveness::NonExhaustive);
+
+        assert_eq!(flags.exhaustiveness(), Exhaustiveness::NonExhaustive);
+    }
 
     #[test]
     fn from_exhaustiveness_exhaustive_leaves_the_flag_unset() {
@@ -103,20 +104,6 @@ mod tests {
         let flags = AdtFlags::from_exhaustiveness(Exhaustiveness::NonExhaustive);
 
         assert!(flags.non_exhaustive_external());
-    }
-
-    #[test]
-    fn non_exhaustive_external_when_set_returns_true() {
-        let flags = AdtFlags::new(true);
-
-        assert!(flags.non_exhaustive_external());
-    }
-
-    #[test]
-    fn non_exhaustive_external_when_unset_returns_false() {
-        let flags = AdtFlags::new(false);
-
-        assert!(!flags.non_exhaustive_external());
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # The plugin boundary as this commit builds it. A test in stiles-plugin
 # fails when these values differ from the code, and `rakko check-abi`
 # fails when a fingerprint moves and the version does not.
-version = "0.6"
+version = "0.7"
 types-fingerprint = "48ca7c976724ff07"
-language-fingerprint = "b752a1db90c20cae"
+language-fingerprint = "5725c65e3fecf19a"

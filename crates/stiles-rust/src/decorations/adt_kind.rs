@@ -1,7 +1,8 @@
 /// Says whether a resolved type is an enum
 ///
-/// [`ResolvedType::with_adt_kind`] takes it in place of a `bool`, so a call
-/// site names the answer it records.
+/// [`ResolvedType`] holds it, and [`ResolvedType::with_adt_kind`] sets it.
+/// A rule reads it out of memory the host allocated, so the discriminant
+/// is a byte. That is a layout that holds from one compiler to the next.
 ///
 /// # Examples
 ///
@@ -13,7 +14,10 @@
 /// assert!(ty.is_enum());
 /// ```
 ///
+/// [`ResolvedType`]: crate::decorations::ResolvedType
 /// [`ResolvedType::with_adt_kind`]: crate::decorations::ResolvedType::with_adt_kind
+#[stabby::stabby]
+#[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum AdtKind {
     /// The type is an enum
