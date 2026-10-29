@@ -380,19 +380,37 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
+    fn trait_send_check_args() {
+        fn assert_send<T: Send>() {}
+        assert_send::<CheckArgs>();
+    }
+
+    #[test]
+    fn trait_send_coverage_remedies() {
         fn assert_send<T: Send>() {}
         assert_send::<CoverageRemedies>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_sync_check_args() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<CheckArgs>();
+    }
+
+    #[test]
+    fn trait_sync_coverage_remedies() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<CoverageRemedies>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_unpin_check_args() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<CheckArgs>();
+    }
+
+    #[test]
+    fn trait_unpin_coverage_remedies() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<CoverageRemedies>();
     }

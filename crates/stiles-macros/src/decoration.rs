@@ -291,4 +291,22 @@ mod tests {
 
         assert!(error.to_string().contains("missing"));
     }
+
+    #[test]
+    fn trait_send_cardinality() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Cardinality>();
+    }
+
+    #[test]
+    fn trait_sync_cardinality() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Cardinality>();
+    }
+
+    #[test]
+    fn trait_unpin_cardinality() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Cardinality>();
+    }
 }

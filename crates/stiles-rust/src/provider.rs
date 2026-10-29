@@ -1276,4 +1276,80 @@ mod tests {
 
         assert_eq!(converted, range_at(3, 4));
     }
+
+    /// Records that `DecorateCtx` is not `Send`
+    ///
+    /// `DecorateCtx` borrows the `Semantics` of rust-analyzer and holds a
+    /// `SyntaxNode`. Neither may cross a thread, so `DecorateCtx` is neither
+    /// `Send` nor `Sync`.
+    #[test]
+    fn trait_not_send_decorate_ctx() {}
+
+    /// Records that `DecorateCtx` is not `Sync`
+    ///
+    /// `DecorateCtx` borrows the `Semantics` of rust-analyzer and holds a
+    /// `SyntaxNode`. Neither may cross a thread, so `DecorateCtx` is neither
+    /// `Send` nor `Sync`.
+    #[test]
+    fn trait_not_sync_decorate_ctx() {}
+
+    #[test]
+    fn trait_send_module_paths() {
+        fn assert_send<T: Send>() {}
+        assert_send::<ModulePaths>();
+    }
+
+    #[test]
+    fn trait_send_rust_decoration_provider() {
+        fn assert_send<T: Send>() {}
+        assert_send::<RustDecorationProvider>();
+    }
+
+    #[test]
+    fn trait_send_target() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Target>();
+    }
+
+    #[test]
+    fn trait_sync_module_paths() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<ModulePaths>();
+    }
+
+    #[test]
+    fn trait_sync_rust_decoration_provider() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<RustDecorationProvider>();
+    }
+
+    #[test]
+    fn trait_sync_target() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Target>();
+    }
+
+    #[test]
+    fn trait_unpin_decorate_ctx() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<DecorateCtx<'static, 'static>>();
+    }
+
+    #[test]
+    fn trait_unpin_module_paths() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<ModulePaths>();
+    }
+
+    #[test]
+    fn trait_unpin_rust_decoration_provider() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<RustDecorationProvider>();
+    }
+
+    #[test]
+    fn trait_unpin_target() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Target>();
+    }
 }
