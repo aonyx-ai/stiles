@@ -82,9 +82,9 @@ fn rejected_imports_project() -> PathBuf {
 
 /// Loads the fixture workspace once and lends it to every test
 ///
-/// Loading runs `cargo metadata` and `cargo check` against the fixture. Doing
-/// that per test meant every test thread invoking Cargo against one directory
-/// at the same time, and the losers of that contention got a workspace whose
+/// Loading runs `cargo metadata` and `cargo check` against the fixture. A
+/// load per test made every test thread run Cargo against one directory at
+/// the same time. The losers of that contention got a workspace whose
 /// sysroot had not finished loading. Tests that only touch locally declared
 /// types survived it; the ones resolving `std` types failed. Loading once
 /// leaves nothing to contend over.

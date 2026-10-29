@@ -20,7 +20,7 @@
 ///
 /// Each lint carries the language of its group and the rule names its
 /// [`DeclaresRules`] implementation returns. Stiles refuses two lints that
-/// declare one rule for one language, and it ends a run in which a pass
+/// declare one rule for one language. It also ends a run in which a pass
 /// reports a rule it did not declare.
 ///
 /// The macro writes the `stiles_plugin_declaration` static that stiles's

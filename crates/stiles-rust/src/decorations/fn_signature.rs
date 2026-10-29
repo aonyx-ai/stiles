@@ -6,9 +6,9 @@ use crate::decorations::{ErrorType, ResolvedType, ReturnMode};
 
 /// Function signature information
 ///
-/// Attached to `function_item` nodes, and to the `function_signature_item` of
-/// a declaration without a body, so lints can inspect the return type
-/// without re-querying the semantic model. Every resolved function gets a
+/// Attached to `function_item` nodes, and to the `function_signature_item`
+/// of a declaration without a body. Lints can then inspect the return type
+/// without a new query to the semantic model. Every resolved function gets a
 /// signature, even an empty one. An absent decoration would look like a
 /// function the provider never reached, and those are different facts.
 ///

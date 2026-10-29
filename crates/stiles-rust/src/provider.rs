@@ -227,22 +227,21 @@ impl DecorationProvider for RustDecorationProvider {
     /// Four conditions must hold before a single decoration is produced,
     /// and their order matters. The file must be interned by the VFS, or
     /// rust-analyzer has never heard of it. It must not be excluded, or
-    /// every question the database can be asked about it panics: the VFS
-    /// keeps an excluded file's identity and neither its contents nor a
-    /// source root, so the check has to come before the database is touched
-    /// at all, not merely before its text is read. It must belong to a
-    /// module, because `parse_guess_edition` papers over a missing module by
-    /// guessing the current edition and then resolves nothing. And the text
-    /// the pipeline parsed must equal the text the database holds, because
-    /// the byte ranges carried by every target index into rust-analyzer's
-    /// parse of that text.
+    /// every question to the database about it panics. The VFS keeps the
+    /// identity of an excluded file, but neither its contents nor a source
+    /// root. The check therefore comes before any use of the database, not
+    /// merely before the read of its text. It must belong to a module.
+    /// Without one, `parse_guess_edition` guesses the current edition and
+    /// then resolves nothing. And the text that the pipeline parsed must
+    /// equal the text that the database holds. The byte ranges of every
+    /// target index into the parse of that text by rust-analyzer.
     ///
     /// Only the first two conditions are guards. The module check protects
-    /// nothing, because establishing the module reads whatever sibling
-    /// modules the crate declares; a file whose text the load dropped would
-    /// already have brought the process down by then, which is why
+    /// nothing, because the search for the module reads every sibling module
+    /// that the crate declares. A file whose text the load dropped would
+    /// already have brought the process down by then. That is why
     /// `give_text_to_files_that_have_none` repairs the database at load
-    /// time, so the read here needs no careful ordering.
+    /// time, and the read here needs no careful order.
     ///
     /// # Errors
     ///
@@ -779,10 +778,10 @@ fn resolve_expr_type(ctx: &DecorateCtx<'_, '_>, range: TextRange) -> Option<Reso
 
 /// Returns what the qualifier of a `use` declaration names
 ///
-/// The target range covers the whole declaration, so the covering node in
-/// rust-analyzer's tree is the [`ast::Use`] itself, and the qualifier comes
-/// from its use tree. A declaration with no qualifier, such as `use serde;`,
-/// yields [`None`] and so gets no decoration.
+/// The target range covers the whole declaration. The covering node in the
+/// tree of rust-analyzer is therefore the [`ast::Use`] itself, and the
+/// qualifier comes from its use tree. A declaration with no qualifier, such
+/// as `use serde;`, yields [`None`] and so gets no decoration.
 ///
 /// A qualifier rust-analyzer resolves to nothing becomes
 /// [`ImportSource::Unresolved`]. A rule can then separate a failed lookup
@@ -848,9 +847,9 @@ fn import_source_of(resolution: PathResolution<'_>) -> ImportSource {
 
 /// The public module paths of each dependency one file has asked about
 ///
-/// Every target of a file looks out of the same crate, and a module of
-/// another crate is visible from every module of this one alike. One walk
-/// of a dependency therefore serves every `use` path in the file.
+/// Every target of a file looks out of the same crate. A module of another
+/// crate is visible from every module of this one alike. One walk of a
+/// dependency therefore serves every `use` path in the file.
 #[derive(Default)]
 struct ModulePaths {
     by_crate: HashMap<Crate, HashMap<Module, Vec<String>>>,
@@ -867,16 +866,16 @@ impl ModulePaths {
 
 /// Returns the shortest public path from the root of `krate` to each module
 ///
-/// The walk goes breadth first through the modules that the file's module
-/// can see, so it enters only `pub` modules, and it reaches a module first
-/// along its shortest path. A module that `krate` re-exports from another
-/// crate is part of the walk, because a path through it is a public path
-/// of `krate`.
+/// The walk goes breadth first through the modules that the module of the
+/// file can see. It therefore enters only `pub` modules, and it reaches a
+/// module first along its shortest path. A module that `krate` re-exports
+/// from another crate is part of the walk, because a path through it is a
+/// public path of `krate`.
 ///
 /// A module that `#[doc(hidden)]` marks is not part of the walk, because
-/// its authors do not offer it as a path. The mark can sit on the module
-/// or on the `pub use` that re-exports it, and only the import map of
-/// `krate` records the second, so the walk asks the map about each step.
+/// its authors do not offer it as a path. The mark can sit on the module or
+/// on the `pub use` that re-exports it. Only the import map of `krate`
+/// records the second, so the walk asks the map about each step.
 fn public_module_paths(ctx: &DecorateCtx<'_, '_>, krate: Crate) -> HashMap<Module, Vec<String>> {
     let db = ctx.sema.db;
     let import_map = ImportMap::of(db, krate.base());
@@ -982,8 +981,8 @@ fn defining_crate(ctx: &DecorateCtx<'_, '_>, def: ModuleDef) -> Option<Crate> {
 ///
 /// rust-analyzer's import map of a dependency proves that the item is
 /// public there and names the module that exposes it. The map lists an
-/// enum variant under the module of its enum, without the enum, so a
-/// variant takes the path of its enum with its own name after it. An
+/// enum variant under the module of its enum, without the enum. A variant
+/// therefore takes the path of its enum, with its own name after it. An
 /// associated item has no path a `use` can name, so it gets none.
 fn public_paths(
     ctx: &DecorateCtx<'_, '_>,
