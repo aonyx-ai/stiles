@@ -2,6 +2,6 @@
 
 ```console
 $ stiles --version
-stiles 0.1.0
+stiles [..]
 
 ```
