@@ -43,16 +43,61 @@ pub struct PassPanic {
 
 impl PassPanic {
     /// Returns the kind of the node the pass was checking
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_core::PassPanic;
+    /// # use stiles_types::{Panic, Span};
+    /// # let panic = Panic::catch(|| -> () { panic!("no functions") }).expect_err("should catch");
+    /// # let error = PassPanic::builder()
+    /// #     .kind("function_item")
+    /// #     .span(Span::builder().file("src/lib.rs").start(3).end(9).build())
+    /// #     .panic(panic)
+    /// #     .build();
+    /// #
+    /// assert_eq!(error.kind(), "function_item");
+    /// ```
     pub fn kind(&self) -> &str {
         &self.kind
     }
 
     /// Returns where the node sits in its file
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_core::PassPanic;
+    /// # use stiles_types::{Panic, Span};
+    /// # let panic = Panic::catch(|| -> () { panic!("no functions") }).expect_err("should catch");
+    /// # let error = PassPanic::builder()
+    /// #     .kind("function_item")
+    /// #     .span(Span::builder().file("src/lib.rs").start(3).end(9).build())
+    /// #     .panic(panic)
+    /// #     .build();
+    /// #
+    /// assert_eq!(error.span().start(), 3);
+    /// ```
     pub fn span(&self) -> &Span {
         &self.span
     }
 
     /// Returns the panic the pass handed back
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_core::PassPanic;
+    /// # use stiles_types::{Panic, Span};
+    /// # let panic = Panic::catch(|| -> () { panic!("no functions") }).expect_err("should catch");
+    /// # let error = PassPanic::builder()
+    /// #     .kind("function_item")
+    /// #     .span(Span::builder().file("src/lib.rs").start(3).end(9).build())
+    /// #     .panic(panic)
+    /// #     .build();
+    /// #
+    /// assert_eq!(error.panic().message(), "no functions");
+    /// ```
     pub fn panic(&self) -> &Panic {
         &self.panic
     }

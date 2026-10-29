@@ -20,6 +20,27 @@ pub use self::run_pipeline_error::RunPipelineError;
 /// The pipeline reads a source file and parses it with the tree-sitter
 /// grammar of its language. It then runs the decoration providers, and
 /// walks the decorated tree through all enabled lint passes.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::Path;
+///
+/// use stiles_core::Pipeline;
+/// use stiles_types::Language;
+///
+/// let mut pipeline = Pipeline::builder()
+///     .language(Language::Rust)
+///     .grammar(&tree_sitter_rust::LANGUAGE.into())
+///     .build()?;
+///
+/// let error = pipeline
+///     .run_on_source("fn main() {}", Path::new("src/main.rs"), &[], &mut [])
+///     .expect_err("no provider claims the file");
+///
+/// assert!(error.to_string().contains("no decoration providers were configured"));
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 pub struct Pipeline {
     language: Language,
     parser: tree_sitter::Parser,
@@ -36,6 +57,20 @@ impl Pipeline {
     ///
     /// Returns [`BuildPipelineError::IncompatibleGrammar`] if tree-sitter
     /// refuses the grammar.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_core::Pipeline;
+    /// use stiles_types::Language;
+    ///
+    /// let pipeline = Pipeline::builder()
+    ///     .language(Language::Rust)
+    ///     .grammar(&tree_sitter_rust::LANGUAGE.into())
+    ///     .build();
+    ///
+    /// assert!(pipeline.is_ok());
+    /// ```
     #[builder]
     pub fn new(
         language: Language,
@@ -54,6 +89,42 @@ impl Pipeline {
     ///
     /// Returns [`RunPipelineError::UnreadableSource`] if the file cannot be
     /// read. Any other error comes from [`Pipeline::run_on_source`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use stiles_core::Pipeline;
+    /// use stiles_types::{
+    ///     Coverage, DecorateTreeError, DecoratedTree, DecorationMap, DecorationProvider, Language,
+    ///     ProviderName,
+    /// };
+    ///
+    /// /// Claims every file, and decorates nothing
+    /// struct Covering;
+    ///
+    /// impl DecorationProvider for Covering {
+    ///     fn name(&self) -> ProviderName {
+    ///         ProviderName::new("covering")
+    ///     }
+    ///
+    ///     fn decorate(&self, _tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
+    ///         Ok(Coverage::Covered(DecorationMap::new()))
+    ///     }
+    /// }
+    ///
+    /// let mut pipeline = Pipeline::builder()
+    ///     .language(Language::Rust)
+    ///     .grammar(&tree_sitter_rust::LANGUAGE.into())
+    ///     .build()?;
+    /// let file = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
+    ///
+    /// let diagnostics = pipeline.run(file, &[&Covering], &mut [])?;
+    ///
+    /// assert!(diagnostics.is_empty());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn run(
         &mut self,
         path: &Path,
@@ -86,6 +157,42 @@ impl Pipeline {
     /// claims the file, and an empty provider list counts as no claims.
     /// Returns [`RunPipelineError::LintsFailed`] if a pass panics or reports
     /// a rule it did not declare.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use stiles_core::Pipeline;
+    /// use stiles_types::{
+    ///     Coverage, DecorateTreeError, DecoratedTree, DecorationMap, DecorationProvider, Language,
+    ///     ProviderName,
+    /// };
+    ///
+    /// /// Claims every file, and decorates nothing
+    /// struct Covering;
+    ///
+    /// impl DecorationProvider for Covering {
+    ///     fn name(&self) -> ProviderName {
+    ///         ProviderName::new("covering")
+    ///     }
+    ///
+    ///     fn decorate(&self, _tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
+    ///         Ok(Coverage::Covered(DecorationMap::new()))
+    ///     }
+    /// }
+    ///
+    /// let mut pipeline = Pipeline::builder()
+    ///     .language(Language::Rust)
+    ///     .grammar(&tree_sitter_rust::LANGUAGE.into())
+    ///     .build()?;
+    ///
+    /// let diagnostics =
+    ///     pipeline.run_on_source("fn main() {}", Path::new("src/main.rs"), &[&Covering], &mut [])?;
+    ///
+    /// assert!(diagnostics.is_empty());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn run_on_source(
         &mut self,
         source: &str,
@@ -147,6 +254,19 @@ impl Pipeline {
 /// Returns [`DetectLanguageError::MissingExtension`] if the file has no
 /// extension, and [`DetectLanguageError::UnsupportedExtension`] if no
 /// language uses it.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::Path;
+///
+/// use stiles_types::Language;
+///
+/// let language = stiles_core::detect_language(Path::new("src/lib.rs"))?;
+///
+/// assert_eq!(language, Language::Rust);
+/// # Ok::<(), stiles_core::DetectLanguageError>(())
+/// ```
 pub fn detect_language(path: &Path) -> Result<Language, DetectLanguageError> {
     let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
         return Err(DetectLanguageError::MissingExtension {

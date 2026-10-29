@@ -26,6 +26,15 @@ pub use self::render_diagnostics_error::RenderDiagnosticsError;
 /// Returns [`PrintDiagnosticsError::UnreadableSource`] if a source file
 /// cannot be read. Returns [`PrintDiagnosticsError::Unemitted`] or
 /// [`PrintDiagnosticsError::Unflushed`] if writing to stderr fails.
+///
+/// # Examples
+///
+/// No diagnostics print nothing, and need no source file:
+///
+/// ```
+/// stiles_reporting::render(&[])?;
+/// # Ok::<(), stiles_reporting::PrintDiagnosticsError>(())
+/// ```
 pub fn render(diagnostics: &[Diagnostic]) -> Result<(), PrintDiagnosticsError> {
     if diagnostics.is_empty() {
         return Ok(());
@@ -130,6 +139,30 @@ fn to_codespan(
 /// Returns [`RenderDiagnosticsError::Unemitted`] if codespan-reporting
 /// fails to render a diagnostic, and [`RenderDiagnosticsError::NotUtf8`] if
 /// the rendered output is not valid UTF-8.
+///
+/// # Examples
+///
+/// ```
+/// use std::collections::HashMap;
+/// use std::path::Path;
+/// use std::sync::Arc;
+///
+/// use stiles_types::{Diagnostic, RuleId, Severity, Span};
+///
+/// let file: Arc<Path> = Arc::from(Path::new("src/lib.rs"));
+/// let sources = HashMap::from([(file.clone(), "fn main() {}\n".to_string())]);
+/// let diagnostic = Diagnostic::builder()
+///     .rule_id(RuleId::new("lint.example"))
+///     .severity(Severity::Warn)
+///     .message("a function named main")
+///     .span(Span::builder().file(file).start(3).end(7).build())
+///     .build();
+///
+/// let rendered = stiles_reporting::render_to_string(&[diagnostic], &sources)?;
+///
+/// assert!(rendered.contains("lint.example"));
+/// # Ok::<(), stiles_reporting::RenderDiagnosticsError>(())
+/// ```
 pub fn render_to_string(
     diagnostics: &[Diagnostic],
     sources: &HashMap<Arc<Path>, String>,

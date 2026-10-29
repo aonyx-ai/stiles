@@ -11,6 +11,17 @@ use stiles_types::{DecoratedTree, DecorationMap, Diagnostic, Language, LintPass,
 /// # Panics
 ///
 /// Panics if tree-sitter fails to parse.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_testing::parse;
+/// use stiles_types::Language;
+///
+/// let tree = parse("fn main() {}", Language::Rust);
+///
+/// assert_eq!(tree.root_node().kind(), "source_file");
+/// ```
 pub fn parse(source: &str, language: Language) -> DecoratedTree {
     let ts_language = match language {
         Language::Rust => tree_sitter_rust::LANGUAGE.into(),
@@ -39,6 +50,19 @@ pub fn parse(source: &str, language: Language) -> DecoratedTree {
 /// Replaces the tree's decoration map with the provided one. This
 /// allows testing rules that depend on semantic information without
 /// running a real language toolchain.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_testing::{decorate, parse};
+/// use stiles_types::{DecorationMap, Language};
+///
+/// let mut tree = parse("fn main() {}", Language::Rust);
+///
+/// decorate(&mut tree, DecorationMap::new());
+///
+/// assert_eq!(tree.root_node().kind(), "source_file");
+/// ```
 pub fn decorate(tree: &mut DecoratedTree, decorations: DecorationMap) {
     *tree.decorations_mut() = decorations;
 }
@@ -51,6 +75,40 @@ pub fn decorate(tree: &mut DecoratedTree, decorations: DecorationMap) {
 /// boundary and hands it back as a value, which this turns into a test
 /// failure. The message is the one stiles reports, and it names the file,
 /// the node, and the pass's own message.
+///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_testing::{execute, parse};
+/// use stiles_types::{
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions,
+/// };
+///
+/// /// Reports nothing
+/// struct Quiet;
+///
+/// impl LintPass for Quiet {
+///     extern "C" fn language(&self) -> Language {
+///         Language::Rust
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+///         Checked::Ok(vec::Vec::new())
+///     }
+/// }
+///
+/// let tree = parse("fn main() {}", Language::Rust);
+/// let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(Quiet)];
+///
+/// let diagnostics = execute(&tree, &mut passes);
+///
+/// assert!(diagnostics.is_empty());
+/// ```
 pub fn execute(tree: &DecoratedTree, passes: &mut [Box<dyn LintPass>]) -> Vec<Diagnostic> {
     stiles_core::walk(tree, passes).unwrap_or_else(|error| panic!("{error:#}"))
 }
@@ -75,6 +133,12 @@ pub fn assert_diagnostic(diagnostic: &Diagnostic) -> DiagnosticAssertion<'_> {
 /// # Panics
 ///
 /// Panics if `diagnostics` is not empty, printing all diagnostics.
+///
+/// # Examples
+///
+/// ```
+/// stiles_testing::assert_no_diagnostics(&[]);
+/// ```
 pub fn assert_no_diagnostics(diagnostics: &[Diagnostic]) {
     assert!(
         diagnostics.is_empty(),
@@ -92,6 +156,17 @@ pub fn assert_no_diagnostics(diagnostics: &[Diagnostic]) {
 /// # Panics
 ///
 /// Panics if the directory cannot be read.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_testing::fixtures;
+/// use stiles_types::Language;
+///
+/// let cases = fixtures(concat!(env!("CARGO_MANIFEST_DIR"), "/src"), Language::Rust);
+///
+/// assert_eq!(cases[0].0, "lib.rs");
+/// ```
 pub fn fixtures(dir: &str, language: Language) -> Vec<(String, String)> {
     let path = Path::new(dir);
     let mut cases = Vec::new();
@@ -117,6 +192,28 @@ pub fn fixtures(dir: &str, language: Language) -> Vec<(String, String)> {
 }
 
 /// Fluent assertion helper for [`Diagnostic`] values
+///
+/// [`assert_diagnostic`] starts one, and each method checks one property
+/// and hands the helper back for the next.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_testing::assert_diagnostic;
+/// use stiles_types::{Diagnostic, RuleId, Severity, Span};
+///
+/// let diagnostic = Diagnostic::builder()
+///     .rule_id(RuleId::new("lint.example"))
+///     .severity(Severity::Warn)
+///     .message("a wildcard arm")
+///     .span(Span::builder().file("<test>").start(3).end(7).build())
+///     .build();
+///
+/// assert_diagnostic(&diagnostic)
+///     .has_rule_id("lint.example")
+///     .has_severity(Severity::Warn)
+///     .message_contains("wildcard");
+/// ```
 pub struct DiagnosticAssertion<'a> {
     diagnostic: &'a Diagnostic,
 }
@@ -127,6 +224,22 @@ impl DiagnosticAssertion<'_> {
     /// # Panics
     ///
     /// Panics if the rule ID does not match `expected`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_testing::assert_diagnostic;
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # let span = Span::builder().file("<test>").start(3).end(7).build();
+    /// # let diagnostic = Diagnostic::builder()
+    /// #     .rule_id(RuleId::new("lint.example"))
+    /// #     .severity(Severity::Warn)
+    /// #     .message("a wildcard arm")
+    /// #     .span(span.clone())
+    /// #     .build();
+    /// #
+    /// assert_diagnostic(&diagnostic).has_rule_id("lint.example");
+    /// ```
     pub fn has_rule_id(self, expected: &str) -> Self {
         assert_eq!(
             self.diagnostic.rule_id().as_str(),
@@ -142,6 +255,22 @@ impl DiagnosticAssertion<'_> {
     /// # Panics
     ///
     /// Panics if the severity does not match `expected`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_testing::assert_diagnostic;
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # let span = Span::builder().file("<test>").start(3).end(7).build();
+    /// # let diagnostic = Diagnostic::builder()
+    /// #     .rule_id(RuleId::new("lint.example"))
+    /// #     .severity(Severity::Warn)
+    /// #     .message("a wildcard arm")
+    /// #     .span(span.clone())
+    /// #     .build();
+    /// #
+    /// assert_diagnostic(&diagnostic).has_severity(Severity::Warn);
+    /// ```
     pub fn has_severity(self, expected: Severity) -> Self {
         assert_eq!(
             self.diagnostic.severity(),
@@ -157,6 +286,22 @@ impl DiagnosticAssertion<'_> {
     /// # Panics
     ///
     /// Panics if the message does not contain `substring`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_testing::assert_diagnostic;
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # let span = Span::builder().file("<test>").start(3).end(7).build();
+    /// # let diagnostic = Diagnostic::builder()
+    /// #     .rule_id(RuleId::new("lint.example"))
+    /// #     .severity(Severity::Warn)
+    /// #     .message("a wildcard arm")
+    /// #     .span(span.clone())
+    /// #     .build();
+    /// #
+    /// assert_diagnostic(&diagnostic).message_contains("wildcard");
+    /// ```
     pub fn message_contains(self, substring: &str) -> Self {
         assert!(
             self.diagnostic.message().contains(substring),
@@ -171,6 +316,22 @@ impl DiagnosticAssertion<'_> {
     /// # Panics
     ///
     /// Panics if the span does not match the expected file, start, and end.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_testing::assert_diagnostic;
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # let span = Span::builder().file("<test>").start(3).end(7).build();
+    /// # let diagnostic = Diagnostic::builder()
+    /// #     .rule_id(RuleId::new("lint.example"))
+    /// #     .severity(Severity::Warn)
+    /// #     .message("a wildcard arm")
+    /// #     .span(span.clone())
+    /// #     .build();
+    /// #
+    /// assert_diagnostic(&diagnostic).has_span("<test>", 3, 7);
+    /// ```
     pub fn has_span(self, file: &str, start: usize, end: usize) -> Self {
         let expected = Span::builder()
             .file(PathBuf::from(file))
@@ -193,6 +354,24 @@ impl DiagnosticAssertion<'_> {
     /// # Panics
     ///
     /// Panics if the origin count does not match `expected`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_testing::assert_diagnostic;
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # let span = Span::builder().file("<test>").start(3).end(7).build();
+    /// # let diagnostic = Diagnostic::builder()
+    /// #     .rule_id(RuleId::new("lint.example"))
+    /// #     .severity(Severity::Warn)
+    /// #     .message("a wildcard arm")
+    /// #     .span(span.clone())
+    /// #     .build();
+    /// #
+    /// let origin = Location::builder().span(span).message("set here").build();
+    ///
+    /// assert_diagnostic(&diagnostic.with_origin(origin)).has_origin_count(1);
+    /// ```
     pub fn has_origin_count(self, expected: usize) -> Self {
         assert_eq!(
             self.diagnostic.origins().len(),
@@ -208,6 +387,24 @@ impl DiagnosticAssertion<'_> {
     /// # Panics
     ///
     /// Panics if the related location count does not match `expected`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_testing::assert_diagnostic;
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # let span = Span::builder().file("<test>").start(3).end(7).build();
+    /// # let diagnostic = Diagnostic::builder()
+    /// #     .rule_id(RuleId::new("lint.example"))
+    /// #     .severity(Severity::Warn)
+    /// #     .message("a wildcard arm")
+    /// #     .span(span.clone())
+    /// #     .build();
+    /// #
+    /// let related = Location::builder().span(span).message("used here").build();
+    ///
+    /// assert_diagnostic(&diagnostic.with_related(related)).has_related_count(1);
+    /// ```
     pub fn has_related_count(self, expected: usize) -> Self {
         assert_eq!(
             self.diagnostic.related().len(),
@@ -223,6 +420,28 @@ impl DiagnosticAssertion<'_> {
     /// # Panics
     ///
     /// Panics if the suggestion count does not match `expected`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_testing::assert_diagnostic;
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # let span = Span::builder().file("<test>").start(3).end(7).build();
+    /// # let diagnostic = Diagnostic::builder()
+    /// #     .rule_id(RuleId::new("lint.example"))
+    /// #     .severity(Severity::Warn)
+    /// #     .message("a wildcard arm")
+    /// #     .span(span.clone())
+    /// #     .build();
+    /// #
+    /// let suggestion = Suggestion::builder()
+    ///     .span(span)
+    ///     .replacement("Some(_)")
+    ///     .message("name the variant")
+    ///     .build();
+    ///
+    /// assert_diagnostic(&diagnostic.with_suggestion(suggestion)).has_suggestion_count(1);
+    /// ```
     pub fn has_suggestion_count(self, expected: usize) -> Self {
         assert_eq!(
             self.diagnostic.suggestions().len(),
