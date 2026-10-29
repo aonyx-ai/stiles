@@ -46,9 +46,9 @@ pub struct CheckArgs {
 
 /// Builds the lint passes the CLI runs
 ///
-/// Stiles links no rules of its own. Every rule is a plugin the project
-/// names in its configuration, which stiles builds and loads at the start
-/// of a run, so a rule that is not configured does not run however
+/// Stiles links no rules of its own. Every rule is a plugin that the
+/// project names in its configuration, and stiles builds and loads it at
+/// the start of a run. A rule that is not configured does not run, however
 /// complete its own tests are. Nothing is enabled by default, and the
 /// configuration is the whole answer to what a check does.
 fn create_lint_passes(

@@ -27,16 +27,17 @@ pub use self::prebuilt::PrebuiltNotice;
 
 /// The lint passes loaded from the project's configured custom lint crates
 ///
-/// Loading happens once per run, before the file walk: stiles compiles
-/// each configured path with the user's cargo, opens the dynamic library
-/// that build produced, and checks its declaration against this binary's
-/// own ABI identity before anything in it runs. What survives is a set of
-/// factories, because passes are stateful and the check command constructs
-/// a fresh set for every file.
+/// Loading happens once per run, before the file walk. Stiles compiles each
+/// configured path with the cargo of the user, and opens the dynamic
+/// library that the build produced. It checks the declaration of that
+/// library against the ABI identity of this binary before anything in it
+/// runs. What survives is a set of factories. Passes are stateful, and the
+/// check command constructs a fresh set for every file.
 ///
-/// A load failure is fatal rather than recoverable: configuration that
-/// silently does nothing looks exactly like configuration that works, and
-/// `--keep-going` governs per-file walk errors, not a broken setup.
+/// A load failure is fatal rather than recoverable. Configuration that
+/// silently does nothing looks exactly like configuration that works.
+/// `--keep-going` governs the walk errors of single files, not a broken
+/// setup.
 pub struct CustomLints {
     lints: Vec<LoadedLint>,
 }
@@ -52,8 +53,9 @@ impl CustomLints {
     /// # Errors
     ///
     /// Returns an error if a configured source cannot be resolved, is
-    /// configured twice, fails to build, does not export a plugin
-    /// declaration, fails the ABI handshake, or exports no lints. It also
+    /// configured twice, or fails to build. Returns an error too if it does
+    /// not export a plugin declaration, fails the ABI handshake, or exports
+    /// no lints. It also
     /// returns one if a lint declares no rule, or if two lints declare one
     /// rule for one language.
     #[builder]
@@ -127,8 +129,8 @@ impl CustomLints {
     ///
     /// This is what a configured rule name is checked against. A plugin
     /// declares its rules, so stiles knows them all before it walks a
-    /// single file, and a name matching none of them is a mistake it can
-    /// report rather than a filter that quietly admits everything.
+    /// single file. A name that matches none of them is a mistake that it
+    /// can report, not a filter that quietly admits everything.
     ///
     pub fn declared(&self) -> BTreeSet<String> {
         self.lints
@@ -189,8 +191,8 @@ struct LoadedLint {
 ///
 /// Stiles routes options, switches, and listings by rule id and language.
 /// Two lints under one id on one language would split each of those
-/// between them, and the cause is almost always a rule copied and renamed
-/// in one place only. The check spans every plugin, because two
+/// between them. The cause is almost always a rule that was copied, and
+/// renamed in one place only. The check spans every plugin, because two
 /// repositories of rules can collide as easily as one.
 ///
 /// # Errors
@@ -264,11 +266,11 @@ const STILES_CRATES: [&str; 5] = [
 
 /// Whether a build may change the lockfile it finds
 ///
-/// A path source belongs to the person running stiles, and cargo updating
-/// its lockfile is ordinary. A git source is pinned to a commit, and that
-/// pin is only worth as much as the dependency versions behind it, so its
-/// build refuses to resolve anything the committed lockfile did not
-/// already settle.
+/// A path source belongs to the person who runs stiles, and an update of
+/// its lockfile by cargo is ordinary. A git source is pinned to a commit.
+/// That pin is only worth as much as the dependency versions behind it. Its
+/// build therefore refuses to resolve anything new to the committed
+/// lockfile.
 ///
 /// A patched build is the exception. Replacing the stiles a package
 /// names changes the graph the lockfile settled, so cargo has to resolve
@@ -281,11 +283,11 @@ enum Locking {
 
 /// Resolves and validates the configured lint sources before any build runs
 ///
-/// Everything is resolved up front, so a typo in the second entry surfaces
-/// before the first entry's potentially long compilation, and a source
-/// configured twice is caught however it was spelled. A git source reaches
-/// the network here, which is also why it happens before the builds: a
-/// network failure should not arrive after five minutes of compiling.
+/// Everything is resolved up front. A typo in the second entry therefore
+/// surfaces before the potentially long compilation of the first entry. A
+/// source configured twice is caught however it was spelled. A git source
+/// reaches the network here, so this also happens before the builds. A
+/// network failure should not arrive after five minutes of compilation.
 ///
 /// Stiles looks for prebuilt libraries before it takes a git source. It
 /// fetches and compiles the source whenever it finds none. A project
@@ -294,8 +296,8 @@ enum Locking {
 /// # Errors
 ///
 /// Returns an error if an entry does not exist, is not a directory, holds
-/// no `Cargo.toml`, cannot be fetched, or resolves to the same directory
-/// as an earlier entry.
+/// no `Cargo.toml`, or cannot be fetched. Returns an error too if it
+/// resolves to the same directory as an earlier entry.
 fn configured_sources(
     config: &StilesConfig,
     tag: &AbiTag,
@@ -355,10 +357,11 @@ fn configured_sources(
 ///
 /// The order is by what each answer costs. Prebuilt libraries stiles
 /// already unpacked are the cheapest and win outright. A checkout that is
-/// already there comes next: stiles has to compile it, but cargo has
-/// compiled it before, so asking a release API first would put a network
-/// request in front of a run that needs none, and every check on a train
-/// would stop working. Only a machine holding neither asks anyone.
+/// already there comes next. Stiles has to compile it, but cargo has
+/// compiled it before. A question to a release API first would put a
+/// network request in front of a run that needs none. Every check on a
+/// train would then stop working. Only a machine that holds neither asks
+/// anyone.
 ///
 /// A project with a warm checkout therefore keeps compiling it, even
 /// after its rules start to publish archives. A person moves the pin or
@@ -460,9 +463,10 @@ struct Loaded {
 /// Compiles the packages at `directory` and returns every library built
 ///
 /// The build inherits stderr, so compiler errors and progress render to
-/// the terminal exactly as they would for a direct `cargo build`; stdout
-/// carries the JSON messages the artifact search reads. Release profile,
-/// because the plugin then runs over every file of every check.
+/// the terminal exactly as they would for a direct `cargo build`. Stdout
+/// carries the JSON messages that the artifact search reads. The build
+/// uses the release profile, because the plugin then runs over every file
+/// of every check.
 ///
 /// # Errors
 ///
@@ -515,27 +519,27 @@ fn build(
 /// Opens the built library, performs the handshake, and collects factories
 ///
 /// The loader never forms a `&PluginDeclaration`. A plugin built against
-/// an older protocol exports a shorter static, and a reference asserts
-/// that the whole of the current struct is there and holds a valid value
-/// of every field. Both claims are false for such a plugin, and `load`
-/// is a function pointer, so the compiler may assume it is not null. That
+/// an older protocol exports a shorter static. A reference asserts that
+/// the whole of the current struct is there, with a valid value in every
+/// field. Both claims are false for such a plugin. `load` is a function
+/// pointer, so the compiler may assume it is not null. That
 /// is undefined behavior whether or not the field is ever read.
 ///
-/// So each field is read through a raw pointer at its own offset, and a
-/// field is only projected once [`PluginDeclaration::abi_version`] says
-/// the plugin exported it. This is what makes an appended field cheap:
-/// the offsets of a `#[repr(C)]` struct are knowable per version, and no
-/// step of the read depends on the plugin agreeing about the struct's
-/// size. Stiles is before 1.0, where a plugin's version has to equal
-/// this binary's, so every field a plugin exports is one this version
-/// knows. The read stays field by field, because from 1.0 an older minor
-/// loads and ends sooner.
+/// So each field is read through a raw pointer at its own offset. A field
+/// is only projected once [`PluginDeclaration::abi_version`] says that the
+/// plugin exported it. This is what makes an appended field cheap. The
+/// offsets of a `#[repr(C)]` struct are knowable per version. No step of
+/// the read depends on the agreement of the plugin about the size of the
+/// struct. Stiles is before 1.0, where the version of a plugin has to equal
+/// the version of this binary. Every field that a plugin exports is
+/// therefore one this version knows. The read stays field by field,
+/// because from 1.0 an older minor loads and ends sooner.
 ///
-/// The loader deliberately leaks the library. The factories it hands over and
-/// the `&'static str` inside every [`RuleId`] a plugin lint mints point into
-/// the library's image, so unloading it would leave dangling references
-/// behind values that outlive this function. The leak is bounded by the
-/// number of configured plugins in a short-lived process.
+/// The loader deliberately leaks the library. The factories that it hands
+/// over point into the image of the library. So does the `&'static str`
+/// inside every [`RuleId`] that a plugin lint mints. An unload would leave
+/// dangling references behind values that outlive this function. The leak
+/// is bounded by the number of configured plugins in a short-lived process.
 ///
 /// # Errors
 ///
@@ -621,9 +625,9 @@ fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loade
 /// Reads the protocol version at the head of a plugin declaration
 ///
 /// This is the one field a plugin of any vintage can be trusted to hold,
-/// because it sits at offset zero of a `#[repr(C)]` struct. Everything
-/// past it, the struct's own size included, is what a matching version
-/// establishes, so the read goes through a raw pointer rather than a
+/// because it sits at offset zero of a `#[repr(C)]` struct. Only a
+/// matching version establishes everything past it, the size of the struct
+/// included. The read therefore goes through a raw pointer, not a
 /// reference to the whole declaration.
 ///
 /// # Safety

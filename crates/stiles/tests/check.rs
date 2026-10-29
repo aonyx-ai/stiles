@@ -53,9 +53,9 @@ fn package(source: &str) -> TempDir {
 /// Configures a package to run the example plugin's rule
 ///
 /// Stiles links no rules, so a fixture that expects a diagnostic has to
-/// name one. Pointing at a plugin in this repository rather than at a
-/// purpose-built stub means the test exercises the whole path a real
-/// project takes: stiles builds the package, loads the library, and
+/// name one. This points at a plugin in this repository, not at a
+/// purpose-built stub. The test therefore exercises the whole path that a
+/// real project takes. Stiles builds the package, loads the library, and
 /// completes the handshake before a single file is walked.
 fn with_no_todo(directory: TempDir) -> TempDir {
     write_lint_config(directory.path(), &example_lint());
@@ -86,12 +86,12 @@ fn decoration_probes() -> PathBuf {
 /// A fixture that expects a diagnostic needs one, because stiles links
 /// no rules of its own. A fixture inside this checkout needs one for a
 /// second reason. Its own file makes the fixture the project, so the
-/// search stops there instead of climbing to this repository and running
+/// search stops there. It does not climb to this repository and run
 /// whatever rules stiles names today.
 ///
-/// The path goes through a TOML value rather than into quotes of our own,
-/// so a checkout under a directory holding a quote still writes a
-/// configuration stiles can read.
+/// The path goes through a TOML value, not into quotes of our own. A
+/// checkout under a directory with a quote in its name therefore still
+/// writes a configuration that stiles can read.
 fn write_lint_config(directory: &Path, lint: &Path) {
     let lint = lint.to_str().expect("the lint path should be UTF-8");
     let lint = toml::Value::from(lint);
@@ -226,8 +226,8 @@ fn check_directory_without_sources_fails() {
 /// from the project root
 ///
 /// The configuration unit tests pin that the search climbs to the project
-/// root. This pins that the CLI gets the benefit, which is what a person
-/// relies on when they check the directory they happen to be standing in.
+/// root. This pins that the CLI gets the benefit. A person relies on that
+/// when they check the directory that they happen to stand in.
 ///
 /// The pattern names the only file in the package, so the two outcomes
 /// cannot be confused. A run that reads the configuration excludes the
@@ -269,9 +269,9 @@ fn check_from_a_subdirectory_applies_the_project_lints() {
 /// Pins that stiles refuses a file it has no grammar for
 ///
 /// The target is a fixture rather than this repository's own manifest.
-/// Stiles resolves the configuration governing its target before it looks
-/// at the file, so reading this repository's would mean fetching and
-/// building this repository's rules to reach an error about a `.toml`
+/// Stiles resolves the configuration that governs its target before it
+/// looks at the file. With the configuration of this repository, the test
+/// would fetch and build its rules, only to reach an error about a `.toml`
 /// extension.
 #[test]
 fn check_non_rust_file_fails() {
@@ -695,8 +695,9 @@ fn check_with_json_succeeds_on_a_warning() {
 
 /// Pins that `--json` writes each diagnostic as one JSON object per line
 ///
-/// A caller reads the report line by line from stdout, so every line must
-/// parse on its own and name the rule, the file, and the position.
+/// A caller reads the report line by line from stdout. Every line must
+/// therefore parse on its own, and name the rule, the file, and the
+/// position.
 #[test]
 fn check_with_json_writes_one_object_per_diagnostic() {
     let (_, findings) = json_check();

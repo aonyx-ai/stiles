@@ -33,9 +33,9 @@ const APPLICATION: &str = "stiles";
 /// The entry that identifies a project even without a configuration file
 ///
 /// A repository is a project whether or not anyone has configured stiles in
-/// it. It is also the boundary that a search must not cross: a run inside a
-/// repository never reads a file above it, which is what keeps one person's
-/// home directory out of another person's check.
+/// it. It is also the boundary that a search must not cross. A run inside a
+/// repository never reads a file above it. That keeps the home directory of
+/// one person out of the check of another.
 const REPOSITORY_MARKER: &str = ".git";
 
 /// Stiles's configuration for a single target project
@@ -111,7 +111,7 @@ impl StilesConfig {
     /// # Errors
     ///
     /// Returns an error if `path` cannot be resolved. A file that stiles
-    /// cannot read as an `ignore` list of strings is an error, and so is a
+    /// cannot read as an `ignore` list of strings is an error. So is a
     /// `[[lints]]` entry that does not describe exactly one source. An
     /// unrecognized key is an error too, because it is most likely a typo.
     ///

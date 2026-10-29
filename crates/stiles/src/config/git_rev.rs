@@ -1,9 +1,9 @@
 /// The full commit hash a git lint source is pinned to
 ///
 /// Stiles accepts only a complete, unabbreviated hash. A branch or tag
-/// names whatever the remote points it at today, so the same configuration
-/// would check the same code against different rules on different days,
-/// and a shortened hash can grow ambiguous as a repository gains objects.
+/// names whatever the remote points it at today. The same configuration
+/// would then check the same code against different rules on different
+/// days. A shortened hash can grow ambiguous as a repository gains objects.
 /// Neither is something a linter should leave open, so the pin is exact.
 ///
 /// # Examples
@@ -25,9 +25,9 @@ impl GitRev {
     /// # Errors
     ///
     /// Returns an error if `rev` is not exactly 40 lowercase hexadecimal
-    /// characters. The error names the rule the value broke, because a
-    /// branch name and an abbreviated hash are the likely mistakes and
-    /// each takes a different fix.
+    /// characters. The error names the rule that the value broke. A branch
+    /// name and an abbreviated hash are the likely mistakes, and each takes
+    /// a different fix.
     ///
     /// # Examples
     ///

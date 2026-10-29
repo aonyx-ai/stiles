@@ -1,9 +1,9 @@
 /// The remote a git lint source is fetched from
 ///
 /// Git accepts more forms than a general URL parser does. An `https://` or
-/// an `ssh://` remote, an scp-like `git@host:org/repo`, and the `file://`
-/// and plain local paths a test or a vendored checkout uses all name a
-/// repository.
+/// an `ssh://` remote and an scp-like `git@host:org/repo` all name a
+/// repository. So do the `file://` and plain local paths that a test or a
+/// vendored checkout uses.
 ///
 /// Stiles therefore reads a remote with gitoxide's parser, which the fetch
 /// uses later too. A remote the configuration accepts is a remote the
@@ -147,9 +147,9 @@ impl std::fmt::Display for GitUrl {
 
 /// Prints the remote the way [`Display`] does, credentials removed
 ///
-/// The derive would print the field as written, and a `{:?}` of a
-/// configuration reaches a panic message as easily as a `{}` reaches
-/// stderr, so both go through the same redaction.
+/// The derive would print the field as written. A `{:?}` of a configuration
+/// reaches a panic message as easily as a `{}` reaches stderr. Both
+/// therefore go through the same redaction.
 ///
 /// [`Display`]: std::fmt::Display
 impl std::fmt::Debug for GitUrl {

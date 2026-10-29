@@ -2,7 +2,7 @@
 //!
 //! The rule flags a macro invocation only when the project named that
 //! macro in `[rules.options]`. That makes the option observable from the
-//! outside: the same source and the same plugin report nothing or one
+//! outside. The same source and the same plugin report nothing or one
 //! diagnostic, and only the configuration file differs.
 
 use std::path::Path;

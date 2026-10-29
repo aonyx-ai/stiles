@@ -2,26 +2,25 @@
 //!
 //! A git lint source is a repository of cargo packages, and stiles turns
 //! it into loadable libraries by compiling it. That costs a toolchain and
-//! several minutes, and it costs them again in every project and on every
+//! several minutes. It costs them again in every project, and on every
 //! build agent that checks out the same pin.
 //!
-//! It is also the one step stiles cannot take on a machine that has no
-//! toolchain at all, which a machine running a released stiles binary
-//! may well not have.
+//! It is also the one step that stiles cannot take on a machine with no
+//! toolchain at all. A machine that runs a released stiles binary may well
+//! have none.
 //!
 //! So stiles looks for libraries that were built once, by whoever
-//! publishes the lints, against the stiles that is asking. The
-//! [`AbiTag`] is how it asks. This module owns the asking and everything
-//! that follows it: which remote to ask, what to call the archive it
-//! wants, how to tell that the archive arrived whole, where to keep what
-//! it unpacks, and which of those files are libraries.
+//! publishes the lints, against the stiles that is asking. The [`AbiTag`]
+//! is how it asks. This module owns the question and everything that
+//! follows it. It decides which remote to ask, and what to call the archive
+//! it wants. It checks that the archive arrived whole. It also decides
+//! where to keep what it unpacks, and which of those files are libraries.
 //!
 //! Nothing here is trusted for being prebuilt. Every library still goes
-//! through the same handshake as one stiles compiled itself, and a
-//! library that fails it is an error rather than a reason to fall back:
-//! the tag is derived from exactly what the handshake compares, so a
-//! mismatch means the archive was misnamed, and building from source
-//! instead would hide that.
+//! through the same handshake as one that stiles compiled itself. A library
+//! that fails it is an error, not a reason to fall back. The tag comes from
+//! exactly what the handshake compares, so a mismatch means that the
+//! archive was misnamed. A build from source would hide that.
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -72,11 +71,11 @@ pub(crate) fn cached(source: &GitLintSource, tag: &AbiTag) -> anyhow::Result<Opt
 /// This is the one path here that reaches the network, so a caller asks
 /// it only when the machine holds nothing that would serve instead.
 ///
-/// Everything it does is best effort. A remote that publishes no
-/// releases, a release with nothing named for this stiles, an API it
-/// cannot reach, an archive that fails its digest: each one answers with
-/// nothing, and the caller then compiles the source. That fallback is
-/// what stiles did before any of this existed, and it is never wrong.
+/// Everything it does is best effort. A remote may publish no releases, or
+/// a release may hold nothing named for this stiles. The API may be out of
+/// reach, or an archive may fail its digest. Each one answers with
+/// nothing, and the caller then compiles the source. That fallback is what
+/// stiles did before any of this existed, and it is never wrong.
 ///
 /// The cases differ in whether the reader hears about them. A failure and
 /// a release that holds no archive for this stiles each add a

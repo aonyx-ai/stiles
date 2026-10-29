@@ -5,11 +5,11 @@ use tempfile::TempDir;
 
 /// A git repository built for one test, and the commit it holds
 ///
-/// The fetch under test speaks the git wire protocol, so a fixture has to
-/// be a real repository rather than a directory that looks like one. The
+/// The fetch under test speaks the git wire protocol. A fixture therefore
+/// has to be a real repository, not a directory that looks like one. The
 /// repository is served over `file://`, which runs the same `upload-pack`
-/// conversation a remote would: a plain path would let git take a local
-/// shortcut and the test would stop covering the protocol.
+/// conversation that a remote would. A plain path would let git take a
+/// local shortcut, and the test would stop covering the protocol.
 pub struct FixtureRepository {
     directory: TempDir,
     rev: String,
@@ -119,8 +119,8 @@ pub fn git(directory: &Path, arguments: &[&str]) -> String {
 /// A plugin outside this repository writes git dependencies pinned to a
 /// stiles revision. A fixture cannot: the stiles under test is this
 /// working tree, including changes that are not committed anywhere. It
-/// uses absolute path dependencies for the same reason a plugin uses a
-/// pin, which is to be built against exactly the stiles that will load it.
+/// uses absolute path dependencies for the reason that a plugin uses a pin.
+/// It is built against exactly the stiles that will load it.
 ///
 /// # Panics
 ///
@@ -133,9 +133,9 @@ pub fn stiles_crates() -> PathBuf {
 
 /// Writes a lint package that flags one macro, and returns its manifest
 ///
-/// The package is a trimmed copy of the shipped example: the point of
-/// these tests is where a plugin comes from, so the plugin itself stays
-/// as small as it can be and still exercises the whole path.
+/// The package is a trimmed copy of the shipped example. The point of
+/// these tests is where a plugin comes from. The plugin itself therefore
+/// stays as small as it can be, and still exercises the whole path.
 ///
 /// # Panics
 ///

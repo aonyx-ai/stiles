@@ -5,7 +5,7 @@ use kawauso_project::project::ProjectRoot;
 /// The path of a custom lint crate configured in the stiles configuration
 ///
 /// The path names a directory holding a Cargo package that exports lint
-/// passes with `export_lints!`. The constructor does not validate it; the
+/// passes with `export_lints!`. The constructor does not validate it. The
 /// plugin loader resolves and checks the path when the run starts, so the
 /// error can say which configured entry is broken.
 ///

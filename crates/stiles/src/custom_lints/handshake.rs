@@ -38,9 +38,9 @@ impl AbiIdentity {
 
 /// Accepts a plugin only when its identity matches the host's
 ///
-/// The checks run in the order the declaration's fields become
-/// trustworthy, and the first mismatch wins, so the reported error is the
-/// one whose remedy applies.
+/// The checks run in the order in which the fields of the declaration
+/// become trustworthy. The first mismatch wins, so the reported error is
+/// the one whose remedy applies.
 ///
 /// # Errors
 ///
@@ -68,9 +68,9 @@ pub fn validate(host: &AbiIdentity, plugin: &AbiIdentity) -> Result<(), Handshak
 ///
 /// Every variant is a refusal to load: the two images may lay a type out
 /// differently, and acting on that difference is undefined behavior. The
-/// fingerprint variants carry no values: the hashes mean nothing to a
-/// reader, while the versions in the other variant tell the user which
-/// side to rebuild.
+/// fingerprint variants carry no values, because the hashes mean nothing to
+/// a reader. The versions in the other variant tell the user which side to
+/// rebuild.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum HandshakeMismatch {
     AbiVersion {
@@ -150,8 +150,8 @@ mod tests {
     }
 
     /// The host side names every protocol stiles reads, not just the
-    /// newest, because a plugin between the two is accepted and a reader
-    /// who saw only the newest would rebuild for no reason
+    /// newest. A plugin between the two is accepted, and a reader who saw
+    /// only the newest would rebuild for no reason
     #[test]
     fn an_abi_mismatch_names_the_range_stiles_reads() {
         let error = HandshakeMismatch::AbiVersion {
@@ -260,8 +260,8 @@ mod tests {
     }
 
     /// A version outside the supported range is reported before anything
-    /// else, because the fields the rest reads are only readable once the
-    /// declaration's shape is known
+    /// else. The fields that the rest reads are only readable once the shape
+    /// of the declaration is known
     #[test]
     fn validate_reports_an_unsupported_abi_version_first() {
         let mut plugin = identity();
