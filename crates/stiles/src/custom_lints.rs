@@ -21,6 +21,7 @@ mod digest;
 mod git_source;
 mod handshake;
 mod prebuilt;
+mod stiles_patch;
 
 pub(crate) use self::abi_tag::AbiTag;
 pub(crate) use self::prebuilt::PrebuiltNotice;
@@ -246,24 +247,6 @@ enum Contents {
     Libraries,
 }
 
-/// The git URL a lint package names when it depends on stiles
-///
-/// A patch entry is keyed by the source it replaces, so this must be
-/// spelled the way a lint package spells it.
-const STILES_GIT_URL: &str = "https://github.com/aonyx-ai/stiles.git";
-
-/// The stiles crates a lint package can depend on
-///
-/// Each one is patched to the local source, so a package that names any
-/// of them builds against the stiles that loads it.
-const STILES_CRATES: [&str; 5] = [
-    "stiles-types",
-    "stiles-plugin",
-    "stiles-rust",
-    "stiles-typescript",
-    "stiles-testing",
-];
-
 /// Whether a build may change the lockfile it finds
 ///
 /// A path source belongs to the person who runs stiles, and an update of
@@ -479,7 +462,7 @@ fn build(
 ) -> anyhow::Result<Vec<PathBuf>> {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
 
-    let mut command = Command::new(cargo);
+    let mut command = Command::new(&cargo);
     command.args([
         "build",
         "--release",
@@ -494,11 +477,10 @@ fn build(
     }
 
     if let Some(source) = stiles_source {
-        for crate_name in STILES_CRATES {
-            command.arg("--config").arg(format!(
-                "patch.'{STILES_GIT_URL}'.{crate_name}.path='{}'",
-                source.join("crates").join(crate_name).display()
-            ));
+        let patches = self::stiles_patch::load_patches(&cargo, directory)
+            .context("failed to find the stiles crates that the lints depend on")?;
+        for patch in patches {
+            command.arg("--config").arg(patch.config(source));
         }
     }
 
