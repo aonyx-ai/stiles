@@ -36,12 +36,17 @@ impl ListedRule {
     /// Describes `declared` under the project's `config`
     #[builder]
     fn new(declared: &DeclaredRule, config: &StilesConfig) -> Self {
-        let DeclaredRule { rule, languages } = declared;
+        let rule = declared.rule();
 
         Self {
             rule: rule.as_str(),
-            languages: languages.iter().copied().map(language_name).collect(),
-            enabled: config.rules().admits(rule),
+            languages: declared
+                .languages()
+                .iter()
+                .copied()
+                .map(language_name)
+                .collect(),
+            enabled: config.rules().admits(&rule),
         }
     }
 }

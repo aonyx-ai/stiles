@@ -30,7 +30,7 @@ use anyhow::Context as _;
 
 use self::archive::Sha256Digest;
 use self::asset_name::AssetName;
-use self::github_release::{AssetSearch, GitHubApi, PrebuiltAsset};
+use self::github_release::{AssetSearch, GitHubApi};
 use self::github_repository::GitHubRepository;
 use super::abi_tag::AbiTag;
 use super::cache;
@@ -178,7 +178,7 @@ fn install(
     name: &AssetName,
     destination: &Path,
 ) -> anyhow::Result<Installed> {
-    let PrebuiltAsset { archive, sidecar } = match api.find_asset(repository, name)? {
+    let asset = match api.find_asset(repository, name)? {
         AssetSearch::Found(asset) => asset,
         AssetSearch::NoMatch => return Ok(Installed::Absent),
         AssetSearch::Unlisted => return Ok(Installed::Unlisted),
@@ -211,7 +211,7 @@ fn install(
     std::fs::create_dir_all(&staging)
         .with_context(|| format!("failed to create {}", staging.display()))?;
 
-    let outcome = unpack(api, &archive, &sidecar, &staging);
+    let outcome = unpack(api, asset.archive(), asset.sidecar(), &staging);
 
     if outcome.is_err() {
         let _ = std::fs::remove_dir_all(&staging);

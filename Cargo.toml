@@ -51,6 +51,9 @@ codespan-reporting = "0.13"
 # platform: a cache under `~/Library/Caches` on macOS would sit apart from the
 # one a container or a continuous integration job restores.
 etcetera = "0.11"
+# Derives the getters of a struct whose fields stay private, so a caller reads
+# a field without being able to change it.
+getset = "0.1"
 # Fetches git-sourced lint plugins. Gitoxide rather than the git CLI so that
 # stiles's own behavior does not depend on which git a machine has, or on
 # whether it has one; the fetch asks the remote for the single pinned commit

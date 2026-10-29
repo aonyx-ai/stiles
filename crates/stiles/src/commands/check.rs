@@ -337,11 +337,11 @@ mod tests {
         let gap = CoverageGap::Unreachable { root: root() };
         let first = UncoveredFile::builder()
             .file(PathBuf::from("one.rs"))
-            .gaps(vec![(ProviderName("rust"), gap.clone())])
+            .gaps(vec![(ProviderName::new("rust"), gap.clone())])
             .build();
         let second = UncoveredFile::builder()
             .file(PathBuf::from("two.rs"))
-            .gaps(vec![(ProviderName("rust"), gap)])
+            .gaps(vec![(ProviderName::new("rust"), gap)])
             .build();
         let mut remedies = CoverageRemedies::default();
 
@@ -360,10 +360,10 @@ mod tests {
             .file(PathBuf::from("stray.rs"))
             .gaps(vec![
                 (
-                    ProviderName("rust"),
+                    ProviderName::new("rust"),
                     CoverageGap::Unreachable { root: root() },
                 ),
-                (ProviderName("other"), CoverageGap::StaleSource),
+                (ProviderName::new("other"), CoverageGap::StaleSource),
             ])
             .build();
         let mut remedies = CoverageRemedies::default();

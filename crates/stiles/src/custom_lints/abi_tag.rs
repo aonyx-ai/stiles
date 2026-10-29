@@ -66,13 +66,9 @@ impl AbiTag {
     /// its own archives.
     #[builder]
     pub(super) fn new(identity: &AbiIdentity, target: &str) -> Self {
-        let AbiIdentity {
-            abi_version,
-            types_fingerprint,
-            language_fingerprint,
-        } = identity;
-
-        let floor = abi_version.floor();
+        let floor = identity.abi_version().floor();
+        let types_fingerprint = identity.types_fingerprint();
+        let language_fingerprint = identity.language_fingerprint();
 
         let key = digest(&format!(
             "{floor}\n{types_fingerprint:016x}\n{language_fingerprint:016x}"
@@ -97,11 +93,11 @@ mod tests {
     /// An identity from after 1.0, where a minor and a major differ in
     /// what they strand
     fn identity() -> AbiIdentity {
-        AbiIdentity {
-            abi_version: AbiVersion { major: 1, minor: 4 },
-            types_fingerprint: 0x0123_4567_89ab_cdef,
-            language_fingerprint: 0xfedc_ba98_7654_3210,
-        }
+        AbiIdentity::builder()
+            .abi_version(AbiVersion { major: 1, minor: 4 })
+            .types_fingerprint(0x0123_4567_89ab_cdef)
+            .language_fingerprint(0xfedc_ba98_7654_3210)
+            .build()
     }
 
     #[test]
@@ -118,10 +114,11 @@ mod tests {
     /// must therefore not strand what a publisher already built.
     #[test]
     fn new_ignores_a_minor_from_one_point_zero_onward() {
-        let other = AbiIdentity {
-            abi_version: AbiVersion { major: 1, minor: 9 },
-            ..identity()
-        };
+        let other = AbiIdentity::builder()
+            .abi_version(AbiVersion { major: 1, minor: 9 })
+            .types_fingerprint(0x0123_4567_89ab_cdef)
+            .language_fingerprint(0xfedc_ba98_7654_3210)
+            .build();
 
         assert_eq!(
             AbiTag::builder()
@@ -152,10 +149,11 @@ mod tests {
 
     #[test]
     fn new_separates_identities_that_differ_in_the_language_fingerprint() {
-        let other = AbiIdentity {
-            language_fingerprint: 1,
-            ..identity()
-        };
+        let other = AbiIdentity::builder()
+            .abi_version(AbiVersion { major: 1, minor: 4 })
+            .types_fingerprint(0x0123_4567_89ab_cdef)
+            .language_fingerprint(1)
+            .build();
 
         assert_ne!(
             AbiTag::builder()
@@ -171,10 +169,11 @@ mod tests {
 
     #[test]
     fn new_separates_identities_that_differ_in_the_major() {
-        let other = AbiIdentity {
-            abi_version: AbiVersion { major: 2, minor: 4 },
-            ..identity()
-        };
+        let other = AbiIdentity::builder()
+            .abi_version(AbiVersion { major: 2, minor: 4 })
+            .types_fingerprint(0x0123_4567_89ab_cdef)
+            .language_fingerprint(0xfedc_ba98_7654_3210)
+            .build();
 
         assert_ne!(
             AbiTag::builder()
@@ -190,10 +189,11 @@ mod tests {
 
     #[test]
     fn new_separates_identities_that_differ_in_the_types_fingerprint() {
-        let other = AbiIdentity {
-            types_fingerprint: 1,
-            ..identity()
-        };
+        let other = AbiIdentity::builder()
+            .abi_version(AbiVersion { major: 1, minor: 4 })
+            .types_fingerprint(1)
+            .language_fingerprint(0xfedc_ba98_7654_3210)
+            .build();
 
         assert_ne!(
             AbiTag::builder()
@@ -213,16 +213,16 @@ mod tests {
     /// identities would then share one tag.
     #[test]
     fn new_separates_identities_whose_fingerprints_are_shifted() {
-        let first = AbiIdentity {
-            types_fingerprint: 0x0000_0000_0000_0001,
-            language_fingerprint: 0x0000_0000_0000_0023,
-            ..identity()
-        };
-        let second = AbiIdentity {
-            types_fingerprint: 0x0000_0000_0000_0012,
-            language_fingerprint: 0x0000_0000_0000_0003,
-            ..identity()
-        };
+        let first = AbiIdentity::builder()
+            .abi_version(AbiVersion { major: 1, minor: 4 })
+            .types_fingerprint(0x0000_0000_0000_0001)
+            .language_fingerprint(0x0000_0000_0000_0023)
+            .build();
+        let second = AbiIdentity::builder()
+            .abi_version(AbiVersion { major: 1, minor: 4 })
+            .types_fingerprint(0x0000_0000_0000_0012)
+            .language_fingerprint(0x0000_0000_0000_0003)
+            .build();
 
         assert_ne!(
             AbiTag::builder()
@@ -242,14 +242,16 @@ mod tests {
     /// it was built for.
     #[test]
     fn new_separates_minors_before_one_point_zero() {
-        let first = AbiIdentity {
-            abi_version: AbiVersion { major: 0, minor: 1 },
-            ..identity()
-        };
-        let second = AbiIdentity {
-            abi_version: AbiVersion { major: 0, minor: 2 },
-            ..identity()
-        };
+        let first = AbiIdentity::builder()
+            .abi_version(AbiVersion { major: 0, minor: 1 })
+            .types_fingerprint(0x0123_4567_89ab_cdef)
+            .language_fingerprint(0xfedc_ba98_7654_3210)
+            .build();
+        let second = AbiIdentity::builder()
+            .abi_version(AbiVersion { major: 0, minor: 2 })
+            .types_fingerprint(0x0123_4567_89ab_cdef)
+            .language_fingerprint(0xfedc_ba98_7654_3210)
+            .build();
 
         assert_ne!(
             AbiTag::builder()

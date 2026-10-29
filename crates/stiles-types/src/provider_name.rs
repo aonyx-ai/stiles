@@ -8,14 +8,32 @@
 /// ```
 /// use stiles_types::ProviderName;
 ///
-/// assert_eq!(ProviderName("rust").to_string(), "rust");
+/// assert_eq!(ProviderName::new("rust").to_string(), "rust");
 /// ```
 ///
 /// [`RuleId`]: crate::RuleId
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct ProviderName(pub &'static str);
+pub struct ProviderName(&'static str);
 
 impl ProviderName {
+    /// Creates the name of a provider from a static string
+    ///
+    /// The function is `const`, so a provider can hold its name in a
+    /// constant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::ProviderName;
+    ///
+    /// const NAME: ProviderName = ProviderName::new("rust");
+    ///
+    /// assert_eq!(NAME.as_str(), "rust");
+    /// ```
+    pub const fn new(name: &'static str) -> Self {
+        Self(name)
+    }
+
     /// Returns the string representation of this provider name
     ///
     /// # Examples
@@ -23,7 +41,7 @@ impl ProviderName {
     /// ```
     /// use stiles_types::ProviderName;
     ///
-    /// assert_eq!(ProviderName("rust").as_str(), "rust");
+    /// assert_eq!(ProviderName::new("rust").as_str(), "rust");
     /// ```
     pub fn as_str(&self) -> &'static str {
         self.0
@@ -42,7 +60,7 @@ mod tests {
 
     #[test]
     fn as_str_returns_inner_str() {
-        let name = ProviderName("rust");
+        let name = ProviderName::new("rust");
 
         let result = name.as_str();
 
@@ -51,7 +69,7 @@ mod tests {
 
     #[test]
     fn display_writes_name() {
-        let name = ProviderName("rust");
+        let name = ProviderName::new("rust");
 
         let result = name.to_string();
 

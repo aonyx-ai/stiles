@@ -186,7 +186,7 @@ mod tests {
 
     impl DecorationProvider for Covering {
         fn name(&self) -> ProviderName {
-            ProviderName("covering")
+            ProviderName::new("covering")
         }
 
         fn decorate(&self, _tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
@@ -199,7 +199,7 @@ mod tests {
 
     impl DecorationProvider for Declining {
         fn name(&self) -> ProviderName {
-            ProviderName("declining")
+            ProviderName::new("declining")
         }
 
         fn decorate(&self, _tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
@@ -212,7 +212,7 @@ mod tests {
 
     impl DecorationProvider for Decorating {
         fn name(&self) -> ProviderName {
-            ProviderName("decorating")
+            ProviderName::new("decorating")
         }
 
         fn decorate(&self, tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {
@@ -384,7 +384,7 @@ mod tests {
 
         assert_eq!(
             uncovered.gaps(),
-            [(ProviderName("declining"), CoverageGap::StaleSource)]
+            [(ProviderName::new("declining"), CoverageGap::StaleSource)]
         );
     }
 

@@ -70,11 +70,13 @@ mod tests {
 
     fn tag() -> AbiTag {
         AbiTag::builder()
-            .identity(&AbiIdentity {
-                abi_version: AbiVersion { major: 0, minor: 1 },
-                types_fingerprint: 0,
-                language_fingerprint: 0,
-            })
+            .identity(
+                &AbiIdentity::builder()
+                    .abi_version(AbiVersion { major: 0, minor: 1 })
+                    .types_fingerprint(0)
+                    .language_fingerprint(0)
+                    .build(),
+            )
             .target("aarch64-apple-darwin")
             .build()
     }

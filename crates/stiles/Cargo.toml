@@ -22,6 +22,7 @@ bon.workspace = true
 clawless = "0.8.0"
 etcetera.workspace = true
 flate2.workspace = true
+getset.workspace = true
 gix.workspace = true
 hex.workspace = true
 ignore.workspace = true

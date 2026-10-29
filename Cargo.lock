@@ -4621,6 +4621,7 @@ dependencies = [
  "clawless",
  "etcetera",
  "flate2",
+ "getset",
  "gix",
  "hex",
  "ignore",

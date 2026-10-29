@@ -40,7 +40,7 @@ mod tests {
 
     impl DecorationProvider for Stub {
         fn name(&self) -> ProviderName {
-            ProviderName("stub")
+            ProviderName::new("stub")
         }
 
         fn decorate(&self, _tree: &DecoratedTree) -> Result<Coverage, DecorateTreeError> {

@@ -13,7 +13,7 @@ mod fixture_repository;
 #[path = "support/mismatched_plugin.rs"]
 mod mismatched_plugin;
 
-use self::fake_github::{Answer, FakeGitHub};
+use self::fake_github::{Answer, FakeGitHub, Seen};
 use self::fixture_repository::{
     FixtureRepository, Standalone, git, write_lint_package, write_lockfile,
 };
@@ -221,7 +221,7 @@ fn check_with_a_checkout_already_present_asks_nothing() {
         server.seen().len(),
         asked,
         "the run should have asked nothing: {:?}",
-        server.seen()
+        asked_paths(&server)
     );
 }
 
@@ -388,6 +388,11 @@ fn archive_of(libraries: &[PathBuf]) -> Vec<u8> {
         .expect("the archive should be flushed")
 }
 
+/// Returns the path of every request that `server` saw, in order
+fn asked_paths(server: &FakeGitHub) -> Vec<String> {
+    server.seen().iter().map(Seen::path).cloned().collect()
+}
+
 /// Returns the SHA-256 of `bytes` in the spelling a sidecar uses
 fn digest_of(bytes: &[u8]) -> String {
     let mut hasher = sha2::Sha256::new();
@@ -447,7 +452,7 @@ fn check_with_a_remote_the_api_does_not_serve_asks_nothing() {
         .success()
         .stdout(predicate::str::contains(format!("warning[{RULE}]")));
 
-    assert!(server.seen().is_empty(), "{:?}", server.seen());
+    assert!(server.seen().is_empty(), "{:?}", asked_paths(&server));
 }
 
 /// Pins that a repository stiles cannot see stays quiet
@@ -493,7 +498,7 @@ fn check_with_a_token_sends_it_to_the_api() {
         .filter(|seen| seen.header("authorization") == Some("Bearer a-secret"))
         .count();
 
-    assert_eq!(carried, server.seen().len(), "{:?}", server.seen());
+    assert_eq!(carried, server.seen().len(), "{:?}", asked_paths(&server));
 }
 
 /// An archive that does not match its digest is not unpacked, and is said

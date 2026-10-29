@@ -213,11 +213,13 @@ mod tests {
     /// reaches these paths too.
     fn tag(types: u64, target: &str) -> AbiTag {
         AbiTag::builder()
-            .identity(&AbiIdentity {
-                abi_version: AbiVersion { major: 0, minor: 1 },
-                types_fingerprint: types,
-                language_fingerprint: 0,
-            })
+            .identity(
+                &AbiIdentity::builder()
+                    .abi_version(AbiVersion { major: 0, minor: 1 })
+                    .types_fingerprint(types)
+                    .language_fingerprint(0)
+                    .build(),
+            )
             .target(target)
             .build()
     }

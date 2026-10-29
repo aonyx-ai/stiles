@@ -2,12 +2,14 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
+use getset::Getters;
+
 /// One answer the fake server is prepared to give
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Answer {
-    pub status: u16,
-    pub content_type: &'static str,
-    pub body: Vec<u8>,
+    status: u16,
+    content_type: &'static str,
+    body: Vec<u8>,
 }
 
 impl Answer {
@@ -49,10 +51,13 @@ impl Answer {
 }
 
 /// What one request carried, as the server saw it
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Getters)]
 pub struct Seen {
-    pub path: String,
-    pub headers: Vec<(String, String)>,
+    /// The path of the request, without its query
+    #[getset(get = "pub")]
+    path: String,
+
+    headers: Vec<(String, String)>,
 }
 
 impl Seen {
