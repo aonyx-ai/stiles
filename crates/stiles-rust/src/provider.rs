@@ -72,6 +72,17 @@ impl RustDecorationProvider {
     /// be read, if `workspace_root` is not valid UTF-8, or if discovery finds
     /// no Cargo project. The load also fails when workspace resolution, the
     /// build scripts, or the analysis database build fails.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::Path;
+    ///
+    /// use stiles_rust::RustDecorationProvider;
+    ///
+    /// let provider = RustDecorationProvider::load(Path::new("."))?;
+    /// # Ok::<(), stiles_rust::LoadRustWorkspaceError>(())
+    /// ```
     pub fn load(workspace_root: &Path) -> Result<Self, LoadRustWorkspaceError> {
         let cargo_config = CargoConfig {
             sysroot: Some(ra_ap_project_model::RustLibSource::Discover),

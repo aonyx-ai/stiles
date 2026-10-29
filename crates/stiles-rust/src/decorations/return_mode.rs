@@ -8,6 +8,16 @@
 /// discriminant is a byte. That is a layout that holds from one compiler
 /// to the next.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_rust::decorations::{FnSignature, ReturnMode};
+///
+/// let signature = FnSignature::builder().return_mode(ReturnMode::Awaited).build();
+///
+/// assert_eq!(signature.return_mode(), ReturnMode::Awaited);
+/// ```
+///
 /// [`FnSignature`]: crate::decorations::FnSignature
 #[stabby::stabby]
 #[repr(u8)]

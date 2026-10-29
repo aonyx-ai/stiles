@@ -9,6 +9,16 @@ use stiles_macros::Decoration;
 /// A rule reads it out of memory the host allocated, so stabby lays it
 /// out.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_rust::decorations::AdtFlags;
+///
+/// let flags = AdtFlags::new(false);
+///
+/// assert!(!flags.non_exhaustive_external());
+/// ```
+///
 /// [`ResolvedType`]: crate::decorations::ResolvedType
 #[stabby::stabby]
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Decoration)]
@@ -19,6 +29,16 @@ pub struct AdtFlags {
 
 impl AdtFlags {
     /// Creates ADT flags
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::AdtFlags;
+    ///
+    /// let flags = AdtFlags::new(true);
+    ///
+    /// assert!(flags.non_exhaustive_external());
+    /// ```
     pub fn new(non_exhaustive_external: bool) -> Self {
         Self {
             non_exhaustive_external,
@@ -26,6 +46,16 @@ impl AdtFlags {
     }
 
     /// Returns whether the enum is `#[non_exhaustive]` from an external crate
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_rust::decorations::AdtFlags;
+    ///
+    /// let flags = AdtFlags::new(false);
+    ///
+    /// assert!(!flags.non_exhaustive_external());
+    /// ```
     pub fn non_exhaustive_external(&self) -> bool {
         self.non_exhaustive_external
     }

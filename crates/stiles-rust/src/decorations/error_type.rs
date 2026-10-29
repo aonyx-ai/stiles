@@ -11,6 +11,19 @@ use crate::decorations::{TypePath, TypePathRef};
 /// A rule reads it out of a [`FnSignature`] the host recorded, so the
 /// discriminant is a byte and stabby lays the payload out.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_rust::decorations::{ErrorType, FnSignature, ReturnMode};
+///
+/// let signature = FnSignature::builder()
+///     .error_type(ErrorType::Generic)
+///     .return_mode(ReturnMode::Direct)
+///     .build();
+///
+/// assert_eq!(signature.error_type(), Some(&ErrorType::Generic));
+/// ```
+///
 /// [`FnSignature`]: crate::decorations::FnSignature
 /// [`Result<T, E>`]: std::result::Result
 /// [`TypePath`]: crate::decorations::TypePath
