@@ -15,7 +15,7 @@ use crate::DecorationKey;
 /// [`Any`]: stabby::Any
 /// [`Box<dyn Any>`]: std::any::Any
 /// [`TypeId`]: std::any::TypeId
-pub type Erased = stabby::dynptr!(Box<dyn stabby::Any + Send + Sync>);
+pub(crate) type Erased = stabby::dynptr!(Box<dyn stabby::Any + Send + Sync>);
 
 /// One decoration, with the node it sits on and the key it went in under
 ///
@@ -25,9 +25,10 @@ pub type Erased = stabby::dynptr!(Box<dyn stabby::Any + Send + Sync>);
 ///
 /// The type is public because [`DecorationLookup`] names it in the layout
 /// stabby records. Its module is not, so nothing outside this crate can
-/// name it.
+/// name it, and it stays out of the documentation.
 ///
 /// [`DecorationLookup`]: crate::DecorationLookup
+#[doc(hidden)]
 #[stabby::stabby]
 pub struct Entry {
     node_id: usize,
