@@ -119,10 +119,10 @@ impl FakeGitHub {
                     let headers = request
                         .headers()
                         .iter()
-                        .map(|header| {
+                        .map(|tiny_http::Header { field, value }| {
                             (
-                                header.field.as_str().as_str().to_owned(),
-                                header.value.as_str().to_owned(),
+                                field.as_str().as_str().to_owned(),
+                                value.as_str().to_owned(),
                             )
                         })
                         .collect();
@@ -134,7 +134,11 @@ impl FakeGitHub {
                             headers,
                         });
 
-                    let answer = routes
+                    let Answer {
+                        status,
+                        content_type,
+                        body,
+                    } = routes
                         .lock()
                         .expect("the routes should be available")
                         .get(&path)
@@ -143,13 +147,13 @@ impl FakeGitHub {
 
                     let header = tiny_http::Header::from_bytes(
                         &b"Content-Type"[..],
-                        answer.content_type.as_bytes(),
+                        content_type.as_bytes(),
                     )
                     .expect("the content type should be a header");
 
                     let _ = request.respond(
-                        tiny_http::Response::from_data(answer.body)
-                            .with_status_code(answer.status)
+                        tiny_http::Response::from_data(body)
+                            .with_status_code(status)
                             .with_header(header),
                     );
                 }

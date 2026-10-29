@@ -4,10 +4,10 @@ use crate::{DecoratedNode, DecorationKey};
 
 /// A semantic annotation that a provider can attach to syntax nodes
 ///
-/// Decorations carry information a syntax tree cannot supply on its own —
-/// resolved types, signatures, trait memberships — which a
-/// [`DecorationProvider`] obtains from a language toolchain and records
-/// against individual nodes.
+/// Decorations carry information that a syntax tree cannot supply on its
+/// own: resolved types, signatures, and trait memberships. A
+/// [`DecorationProvider`] obtains them from a language toolchain and records
+/// them against individual nodes.
 ///
 /// Implementations fix their own cardinality through [`Ref`]. A decoration a
 /// provider records at most once per node reads back as [`Option`]; one it may

@@ -3,7 +3,7 @@ use std::ops::Range;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use ra_ap_hir::import_map::ImportMap;
+use ra_ap_hir::import_map::{ImportInfo, ImportMap};
 use ra_ap_hir::{
     Adt, AsAssocItem as _, Crate, CrateDependency, Enum, Function, HasAttrs, HirDisplay, ItemInNs,
     Module, ModuleDef, PathResolution, ScopeDef, Semantics, Type, attach_db,
@@ -727,7 +727,10 @@ fn resolve_match_scrutinee(
     let ty_info = ctx.sema.type_of_expr(&expr_node)?;
 
     let ty = ty_info.original;
-    let is_enum = ty.as_adt().is_some_and(|adt| matches!(adt, Adt::Enum(_)));
+    let is_enum = match ty.as_adt() {
+        Some(Adt::Enum(_)) => true,
+        Some(Adt::Struct(_) | Adt::Union(_)) | None => false,
+    };
 
     let func = find_enclosing_fn(ctx, scrutinee_range);
     let display = match &func {
@@ -737,14 +740,15 @@ fn resolve_match_scrutinee(
 
     let resolved = ResolvedType::new(display).with_enum(is_enum);
 
-    let flags = if let Some(Adt::Enum(e)) = ty.as_adt() {
-        let krate = e.module(ctx.sema.db).krate(ctx.sema.db);
-        let local_krate = func.map(|f| f.module(ctx.sema.db).krate(ctx.sema.db));
-        let is_external = local_krate.is_some_and(|lk| lk != krate);
-        let has_non_exhaustive = e.attrs(ctx.sema.db).is_non_exhaustive();
-        Some(AdtFlags::new(has_non_exhaustive && is_external))
-    } else {
-        None
+    let flags = match ty.as_adt() {
+        Some(Adt::Enum(e)) => {
+            let krate = e.module(ctx.sema.db).krate(ctx.sema.db);
+            let local_krate = func.map(|f| f.module(ctx.sema.db).krate(ctx.sema.db));
+            let is_external = local_krate.is_some_and(|lk| lk != krate);
+            let has_non_exhaustive = e.attrs(ctx.sema.db).is_non_exhaustive();
+            Some(AdtFlags::new(has_non_exhaustive && is_external))
+        }
+        Some(Adt::Struct(_) | Adt::Union(_)) | None => None,
     };
 
     Some((resolved, flags))
@@ -895,11 +899,16 @@ fn public_module_paths(ctx: &DecorateCtx<'_, '_>, krate: Crate) -> HashMap<Modul
                 continue;
             };
             let offered = import_map.import_info_for(key).is_some_and(|infos| {
-                infos.iter().any(|info| {
-                    Module::from(info.container) == module
-                        && info.name == name
-                        && !info.is_doc_hidden
-                })
+                infos.iter().any(
+                    |ImportInfo {
+                         container,
+                         name: exported,
+                         is_doc_hidden,
+                         ..
+                     }| {
+                        Module::from(*container) == module && *exported == name && !is_doc_hidden
+                    },
+                )
             });
             if !offered {
                 continue;

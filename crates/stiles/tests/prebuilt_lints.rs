@@ -3,6 +3,7 @@ use std::process::Command;
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
+use sha2::Digest as _;
 use tempfile::TempDir;
 
 #[path = "support/fake_github.rs"]
@@ -185,6 +186,10 @@ fn strand(cache: &TempDir, rules: FixtureRepository) {
 /// Stiles once asked a release API before it looked at what it held. A
 /// project whose lints publish nothing then spent a request on every
 /// check, and stopped working away from a network.
+///
+/// The first run cannot reach the remote, and fails. It leaves behind the
+/// directory in which stiles keeps the checkouts of that remote, and the
+/// run that matters needs a checkout there.
 #[test]
 fn check_with_a_checkout_already_present_asks_nothing() {
     let server = FakeGitHub::start();
@@ -193,9 +198,6 @@ fn check_with_a_checkout_already_present_asks_nothing() {
     let target = package(TODO_SOURCE);
     configure_git_lint(target.path(), REMOTE, rules.rev());
 
-    // The first run cannot reach the remote, and fails. It leaves behind
-    // the directory stiles keeps that remote's checkouts in, and the
-    // run that matters needs a checkout there.
     stiles_asking(&cache, server.url())
         .arg("check")
         .arg(target.path())
@@ -388,8 +390,6 @@ fn archive_of(libraries: &[PathBuf]) -> Vec<u8> {
 
 /// Returns the SHA-256 of `bytes` in the spelling a sidecar uses
 fn digest_of(bytes: &[u8]) -> String {
-    use sha2::Digest as _;
-
     let mut hasher = sha2::Sha256::new();
     hasher.update(bytes);
 
