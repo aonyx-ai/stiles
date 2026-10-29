@@ -20,6 +20,28 @@ use crate::plugin::{AbiVersion, Loaded};
 /// this struct is a wire format. The exporting macro constructs it in a
 /// `const` context, and the loader consumes it field by field.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_types::plugin::{ABI_VERSION, Loaded, Plugin, PluginDeclaration, TYPES_FINGERPRINT};
+///
+/// /// Exports no lints
+/// extern "C" fn load() -> Loaded {
+///     Loaded::Ok(Plugin {
+///         lints: std::iter::empty().collect(),
+///     })
+/// }
+///
+/// static DECLARATION: PluginDeclaration = PluginDeclaration {
+///     abi_version: ABI_VERSION,
+///     types_fingerprint: TYPES_FINGERPRINT,
+///     language_fingerprint: 0,
+///     load,
+/// };
+///
+/// assert_eq!(DECLARATION.abi_version, ABI_VERSION);
+/// ```
+///
 /// [`abi_version`]: PluginDeclaration::abi_version
 /// [`language_fingerprint`]: PluginDeclaration::language_fingerprint
 /// [`load`]: PluginDeclaration::load

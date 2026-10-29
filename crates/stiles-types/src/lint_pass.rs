@@ -15,6 +15,32 @@ use crate::{DecoratedNode, Diagnostic, Language, Panic, RuleOptions};
 /// build for a trait object. Each method hands back a result whose error
 /// is a [`Panic`]. A plugin catches a panic at its edge, because an unwind
 /// must not cross the boundary, and the host reports what it caught.
+///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_types::{Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions};
+///
+/// /// Reports nothing, on Rust trees only
+/// struct Quiet;
+///
+/// impl LintPass for Quiet {
+///     extern "C" fn language(&self) -> Language {
+///         Language::Rust
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+///         Checked::Ok(vec::Vec::new())
+///     }
+/// }
+///
+/// assert_eq!(Quiet.language(), Language::Rust);
+/// ```
 #[stabby::stabby]
 pub trait LintPass: Send + Sync {
     /// Returns the language whose trees this pass inspects
@@ -45,6 +71,17 @@ pub trait LintPass: Send + Sync {
 }
 
 /// What [`LintPass::configure`] hands back: nothing, or the panic that stopped it
+///
+/// # Examples
+///
+/// ```
+/// use stiles_types::{Configured, Panic};
+///
+/// let configured: Configured = Configured::Ok(());
+/// let configured: Result<(), Panic> = configured.into();
+///
+/// assert!(configured.is_ok());
+/// ```
 pub type Configured = result::Result<(), Panic>;
 
 /// What [`LintPass::check_node`] hands back: diagnostics, or the panic that stopped it
@@ -52,6 +89,18 @@ pub type Configured = result::Result<(), Panic>;
 /// The list is stabby's, because it crosses the boundary. The plugin
 /// allocates it and stiles frees it, which is sound because every
 /// allocation stabby makes carries its own release function.
+///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_types::{Checked, Diagnostic, Panic};
+///
+/// let checked: Checked = Checked::Ok(vec::Vec::new());
+/// let checked: Result<vec::Vec<Diagnostic>, Panic> = checked.into();
+///
+/// assert!(checked.is_ok_and(|diagnostics| diagnostics.is_empty()));
+/// ```
 pub type Checked = result::Result<vec::Vec<Diagnostic>, Panic>;
 
 /// A pass boxed for the boundary: a stabby box with a stabby vtable
@@ -61,6 +110,37 @@ pub type Checked = result::Result<vec::Vec<Diagnostic>, Panic>;
 /// [`LintPass`] of its own, because this type implements the trait by
 /// forwarding through the vtable. The rest of stiles therefore keeps its
 /// `Box<dyn LintPass>`.
+///
+/// # Examples
+///
+/// ```
+/// use stabby::vec;
+/// use stiles_types::{
+///     BoxedLintPass, Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions,
+///     boxed_lint_pass,
+/// };
+///
+/// /// Reports nothing, on TypeScript trees only
+/// struct Quiet;
+///
+/// impl LintPass for Quiet {
+///     extern "C" fn language(&self) -> Language {
+///         Language::TypeScript
+///     }
+///
+///     extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+///         Configured::Ok(())
+///     }
+///
+///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+///         Checked::Ok(vec::Vec::new())
+///     }
+/// }
+///
+/// let pass: BoxedLintPass = boxed_lint_pass(Quiet);
+///
+/// assert_eq!(pass.language(), Language::TypeScript);
+/// ```
 pub type BoxedLintPass = stabby::dynptr!(stabby::boxed::Box<dyn LintPass + Send + Sync + 'static>);
 
 /// Boxes a pass for the boundary

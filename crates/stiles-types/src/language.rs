@@ -9,6 +9,14 @@
 /// the answer to [`LintPass::language`]. An undeclared representation has
 /// no layout that holds from one compiler to the next.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_types::Language;
+///
+/// assert_eq!(Language::from_extension("ts"), Some(Language::TypeScript));
+/// ```
+///
 /// [`LintPass::language`]: crate::LintPass::language
 #[stabby::stabby]
 #[repr(u8)]

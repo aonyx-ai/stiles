@@ -12,6 +12,17 @@ use crate::Span;
 /// A location crosses the plugin boundary inside a [`Diagnostic`], so
 /// stabby lays it out and the message is stabby's `String`.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_types::{Location, Span};
+///
+/// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+/// let location = Location::builder().span(span.clone()).message("the value is set here").build();
+///
+/// assert_eq!(location.message(), "the value is set here");
+/// ```
+///
 /// [`Diagnostic`]: crate::Diagnostic
 #[stabby::stabby]
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -23,6 +34,17 @@ pub struct Location {
 #[bon]
 impl Location {
     /// Creates a location with the given span and descriptive message
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Location, Span};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let location = Location::builder().span(span.clone()).message("the value is set here").build();
+    ///
+    /// assert_eq!(location.span(), &span);
+    /// ```
     #[builder]
     pub fn new(span: Span, #[builder(into)] message: String) -> Self {
         Self {
@@ -32,11 +54,33 @@ impl Location {
     }
 
     /// Returns the span of this location
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Location, Span};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let location = Location::builder().span(span.clone()).message("the value is set here").build();
+    ///
+    /// assert_eq!(location.span().start(), 3);
+    /// ```
     pub fn span(&self) -> &Span {
         &self.span
     }
 
     /// Returns the descriptive message for this location
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Location, Span};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
+    /// let location = Location::builder().span(span.clone()).message("the value is set here").build();
+    ///
+    /// assert_eq!(location.message(), "the value is set here");
+    /// ```
     pub fn message(&self) -> &str {
         &self.message
     }

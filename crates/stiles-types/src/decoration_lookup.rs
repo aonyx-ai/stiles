@@ -16,6 +16,16 @@ use crate::decoration_entry::Entry;
 /// is [`Copy`] and carries one. It borrows the map, so a decoration it
 /// finds lives as long as the map does.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_types::DecorationLookup;
+///
+/// let width = std::mem::size_of::<DecorationLookup<'static>>();
+///
+/// assert_eq!(width, 4 * std::mem::size_of::<usize>());
+/// ```
+///
 /// [`DecoratedNode`]: crate::DecoratedNode
 #[stabby::stabby]
 #[derive(Copy, Clone)]

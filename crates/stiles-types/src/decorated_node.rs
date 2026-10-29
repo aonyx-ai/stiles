@@ -28,6 +28,25 @@ use crate::{Decoration, DecorationLookup, FilePath, Span};
 /// that struct's layout. A plugin reads decorations through a
 /// [`DecorationLookup`], two borrowed slices it searches itself.
 ///
+/// # Examples
+///
+/// ```
+/// # use stiles_types::{DecoratedTree, Language};
+/// # let source = "fn main() { let x = 1; }";
+/// # let mut parser = tree_sitter::Parser::new();
+/// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+/// # let tree = DecoratedTree::builder()
+/// #     .tree(parser.parse(source, None).expect("the source should parse"))
+/// #     .language(Language::Rust)
+/// #     .source(source.to_string())
+/// #     .file("src/main.rs")
+/// #     .build();
+/// let root = tree.root_node();
+/// let function = root.named_child(0).expect("the file should hold a function");
+///
+/// assert_eq!(function.kind(), "function_item");
+/// ```
+///
 /// [`StableLike`]: stabby::abi::StableLike
 #[stabby::stabby]
 #[derive(Copy, Clone)]
@@ -42,7 +61,7 @@ pub struct DecoratedNode<'a> {
 impl<'a> DecoratedNode<'a> {
     /// Creates a decorated node wrapping a tree-sitter node
     #[builder]
-    pub fn new(
+    pub(crate) fn new(
         node: tree_sitter::Node<'a>,
         source: &'a str,
         file: &'a FilePath,
@@ -78,16 +97,73 @@ impl<'a> DecoratedNode<'a> {
     }
 
     /// Returns the tree-sitter node kind (e.g. `"function_item"`)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// assert_eq!(function.kind(), "function_item");
+    /// ```
     pub fn kind(&self) -> &'a str {
         self.inner().kind()
     }
 
     /// Returns the source text covered by this node
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// assert_eq!(function.text(), source);
+    /// ```
     pub fn text(&self) -> &'a str {
         &self.source.as_str()[self.inner().byte_range()]
     }
 
     /// Returns the tree-sitter node ID, used as the decoration map key
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// assert_ne!(function.id(), root.id());
+    /// ```
     pub fn id(&self) -> usize {
         self.inner().id()
     }
@@ -95,6 +171,25 @@ impl<'a> DecoratedNode<'a> {
     /// Returns a [`Span`] covering this node's byte range
     ///
     /// The file path is reference-counted, so this is a cheap operation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// assert_eq!(function.span().end(), source.len());
+    /// ```
     pub fn span(&self) -> Span {
         let node = self.inner();
 
@@ -106,11 +201,49 @@ impl<'a> DecoratedNode<'a> {
     }
 
     /// Returns the number of named children
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// assert_eq!(root.named_child_count(), 1);
+    /// ```
     pub fn named_child_count(&self) -> usize {
         self.inner().named_child_count()
     }
 
     /// Returns the named child at the given index, if it exists
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// assert!(root.named_child(1).is_none());
+    /// ```
     pub fn named_child(&self, index: u32) -> Option<DecoratedNode<'a>> {
         self.inner()
             .named_child(index)
@@ -118,6 +251,27 @@ impl<'a> DecoratedNode<'a> {
     }
 
     /// Returns a child node by its field name, if it exists
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// let name = function.child_by_field_name("name").expect("a function has a name");
+    ///
+    /// assert_eq!(name.text(), "main");
+    /// ```
     pub fn child_by_field_name(&self, name: &str) -> Option<DecoratedNode<'a>> {
         self.inner()
             .child_by_field_name(name)
@@ -125,31 +279,183 @@ impl<'a> DecoratedNode<'a> {
     }
 
     /// Returns the total number of children (named and anonymous)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// assert_eq!(function.child_count(), 4);
+    /// ```
     pub fn child_count(&self) -> usize {
         self.inner().child_count() as usize
     }
 
     /// Returns the child at the given index (named or anonymous)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// let keyword = function.child(0).expect("a function starts with a keyword");
+    ///
+    /// assert_eq!(keyword.kind(), "fn");
+    /// ```
     pub fn child(&self, index: u32) -> Option<DecoratedNode<'a>> {
         self.inner().child(index).map(|child| self.sibling(child))
     }
 
     /// Returns whether this is a named node (as opposed to an anonymous one)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// let keyword = function.child(0).expect("a function starts with a keyword");
+    ///
+    /// assert!(!keyword.is_named());
+    /// ```
     pub fn is_named(&self) -> bool {
         self.inner().is_named()
     }
 
     /// Returns the parent node, if this is not the root
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// assert!(root.parent().is_none());
+    /// ```
     pub fn parent(&self) -> Option<DecoratedNode<'a>> {
         self.inner().parent().map(|parent| self.sibling(parent))
     }
 
     /// Retrieves the first decoration of type `T` from this node
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedNode, DecoratedTree, Decoration, DecorationKey, Language};
+    ///
+    /// /// The number of bindings in a block
+    /// #[stabby::stabby]
+    /// struct Bindings(u32);
+    ///
+    /// impl Decoration for Bindings {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Bindings"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let mut tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    /// let id = tree.root_node().id();
+    /// tree.decorations_mut().insert(id, Bindings(1));
+    /// tree.decorations_mut().insert(id, Bindings(2));
+    /// let root = tree.root_node();
+    ///
+    /// assert_eq!(root.decoration::<Bindings>().map(|Bindings(count)| *count), Some(1));
+    /// ```
     pub fn decoration<T: Decoration>(&self) -> Option<&'a T> {
         self.decorations.get::<T>(self.id(), 0)
     }
 
     /// Retrieves all decorations of type `T` from this node
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedNode, DecoratedTree, Decoration, DecorationKey, Language};
+    ///
+    /// /// The number of bindings in a block
+    /// #[stabby::stabby]
+    /// struct Bindings(u32);
+    ///
+    /// impl Decoration for Bindings {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Bindings"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let mut tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    /// let id = tree.root_node().id();
+    /// tree.decorations_mut().insert(id, Bindings(1));
+    /// tree.decorations_mut().insert(id, Bindings(2));
+    /// let root = tree.root_node();
+    ///
+    /// assert_eq!(root.decorations_of_type::<Bindings>().len(), 2);
+    /// ```
     pub fn decorations_of_type<T: Decoration>(&self) -> Vec<&'a T> {
         self.decorations.get_all::<T>(self.id())
     }
@@ -163,6 +469,44 @@ impl<'a> DecoratedNode<'a> {
     /// catch a rule that reads a repeated decoration as though it were
     /// singular.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedNode, DecoratedTree, Decoration, DecorationKey, Language};
+    ///
+    /// /// The number of bindings in a block
+    /// #[stabby::stabby]
+    /// struct Bindings(u32);
+    ///
+    /// impl Decoration for Bindings {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Bindings"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let mut tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    /// let id = tree.root_node().id();
+    /// tree.decorations_mut().insert(id, Bindings(1));
+    /// tree.decorations_mut().insert(id, Bindings(2));
+    /// let root = tree.root_node();
+    ///
+    /// let first: Option<&Bindings> = root.get::<Bindings>();
+    ///
+    /// assert_eq!(first.map(|Bindings(count)| *count), Some(1));
+    /// ```
+    ///
     /// [`decoration`]: DecoratedNode::decoration
     /// [`decorations_of_type`]: DecoratedNode::decorations_of_type
     pub fn get<D: Decoration>(&self) -> D::Ref<'a> {
@@ -170,6 +514,27 @@ impl<'a> DecoratedNode<'a> {
     }
 
     /// Returns all named children of this node as a collected vec
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// let kinds: Vec<&str> = function.named_children().iter().map(|child| child.kind()).collect();
+    ///
+    /// assert_eq!(kinds, ["identifier", "parameters", "block"]);
+    /// ```
     pub fn named_children(&self) -> Vec<DecoratedNode<'a>> {
         let node = self.inner();
         let count: u32 = node.named_child_count() as u32;
@@ -179,6 +544,25 @@ impl<'a> DecoratedNode<'a> {
     }
 
     /// Returns the underlying tree-sitter node
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let root = tree.root_node();
+    /// let function = root.named_child(0).expect("the file should hold a function");
+    ///
+    /// assert_eq!(function.raw().start_byte(), 0);
+    /// ```
     pub fn raw(&self) -> tree_sitter::Node<'a> {
         self.inner()
     }

@@ -5,6 +5,24 @@ use crate::{CoverageGap, DecorationMap};
 /// An empty [`DecorationMap`] inside [`Coverage::Covered`] is a valid
 /// verdict: coverage is a claim about the file, not about individual
 /// nodes. A file with nothing to decorate is still covered.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_types::{Coverage, CoverageGap, DecorationMap};
+///
+/// let verdicts = [Coverage::Covered(DecorationMap::new()), Coverage::NotCovered(CoverageGap::StaleSource)];
+///
+/// let claimed = verdicts
+///     .iter()
+///     .filter(|verdict| match verdict {
+///         Coverage::Covered(_) => true,
+///         Coverage::NotCovered(_) => false,
+///     })
+///     .count();
+///
+/// assert_eq!(claimed, 1);
+/// ```
 #[must_use]
 #[derive(Debug)]
 pub enum Coverage {

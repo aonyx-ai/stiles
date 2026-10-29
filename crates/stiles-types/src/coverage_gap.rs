@@ -9,6 +9,21 @@ use std::sync::Arc;
 ///
 /// The enum is not `#[non_exhaustive]`: a new variant must break every
 /// match that renders a gap.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::Path;
+/// use std::sync::Arc;
+///
+/// use stiles_types::CoverageGap;
+///
+/// let gap = CoverageGap::OutsideRoot {
+///     root: Arc::from(Path::new("/work/project")),
+/// };
+///
+/// assert!(gap.to_string().contains("/work/project"));
+/// ```
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum CoverageGap {
     /// The file is outside the root the provider loaded

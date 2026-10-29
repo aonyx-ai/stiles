@@ -4,6 +4,14 @@
 /// inside every [`Diagnostic`], and an undeclared representation has no
 /// layout that holds from one compiler to the next.
 ///
+/// # Examples
+///
+/// ```
+/// use stiles_types::Severity;
+///
+/// assert!(Severity::Error > Severity::Warn);
+/// ```
+///
 /// [`Diagnostic`]: crate::Diagnostic
 #[stabby::stabby]
 #[repr(u8)]
