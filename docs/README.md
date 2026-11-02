@@ -11,7 +11,7 @@ npm ci
 npm run start
 ```
 
-The site is built on every pull request. It is deployed to GitHub Pages when a
+The site is built on every pull request. It is deployed to Cloudflare when a
 release is published.
 
 [docusaurus]: https://docusaurus.io/

@@ -6,7 +6,7 @@ const config: Config = {
   title: "Stiles",
   tagline: "A linting platform built on tree-sitter",
 
-  url: "https://aonyx-ai.github.io",
+  url: "https://opensource.aonyx.ai",
   baseUrl: "/stiles/",
 
   organizationName: "aonyx-ai",
