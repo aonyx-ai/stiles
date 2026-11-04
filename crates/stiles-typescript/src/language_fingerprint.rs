@@ -1,5 +1,5 @@
 use stabby::IStable;
-use stiles_types::plugin::stable_fingerprint;
+use stiles_types::plugin::{decoration_fingerprint, stable_fingerprint};
 
 use crate::decorations::{
     FnSignature, ImportSource, Parameter, Primitive, ResolvedType, StringUnion, TypeText,
@@ -18,9 +18,13 @@ include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 /// never fire, so `VISITOR_FINGERPRINT` hashes the generated source. The
 /// decoration types are the other. A plugin reads them out of a node the
 /// host decorated, and reading them at another layout is unsound rather
-/// than merely quiet. Each contributes the
-/// identity stabby derives from its report. The list names every type
-/// that implements [`Decoration`], and a new one belongs on it.
+/// than merely quiet. Each contributes [`decoration_fingerprint`]: the
+/// identity stabby derives from its report, joined with the key a plugin
+/// looks it up by. A plugin that holds another key is therefore refused
+/// rather than left to find nothing. [`Primitive`] and [`Parameter`] are
+/// not decorations, so they contribute their stabby identity alone. The
+/// list names every type that implements [`Decoration`], and a new one
+/// belongs on it.
 ///
 /// Everything else in this crate is deliberately absent. Hashing the
 /// whole crate refuses every plugin in the tree whenever any source file
@@ -37,13 +41,13 @@ include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 /// [`Decoration`]: stiles_types::Decoration
 pub const LANGUAGE_FINGERPRINT: u64 = stable_fingerprint(&[
     VISITOR_FINGERPRINT,
-    <TypeText as IStable>::ID,
-    <ResolvedType as IStable>::ID,
+    decoration_fingerprint::<TypeText>(),
+    decoration_fingerprint::<ResolvedType>(),
     <Primitive as IStable>::ID,
-    <FnSignature as IStable>::ID,
+    decoration_fingerprint::<FnSignature>(),
     <Parameter as IStable>::ID,
-    <ImportSource as IStable>::ID,
-    <StringUnion as IStable>::ID,
+    decoration_fingerprint::<ImportSource>(),
+    decoration_fingerprint::<StringUnion>(),
 ]);
 
 #[cfg(test)]

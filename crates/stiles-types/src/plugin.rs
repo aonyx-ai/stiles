@@ -56,7 +56,7 @@ pub use self::declaration::PluginDeclaration;
 pub use self::factory::{
     Constructed, ExportedLint, LintPassFactory, Loaded, Plugin, construct, factory,
 };
-pub use self::fingerprint::stable_fingerprint;
+pub use self::fingerprint::{decoration_fingerprint, stable_fingerprint};
 
 /// The version of the plugin declaration protocol this crate speaks
 ///
@@ -76,9 +76,9 @@ pub use self::fingerprint::stable_fingerprint;
 /// ```
 /// use stiles_types::plugin::{ABI_VERSION, AbiVersion};
 ///
-/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 7 });
+/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 8 });
 /// ```
-pub const ABI_VERSION: AbiVersion = AbiVersion { major: 0, minor: 7 };
+pub const ABI_VERSION: AbiVersion = AbiVersion { major: 0, minor: 8 };
 
 /// A fingerprint of how this crate lays out the plugin boundary
 ///

@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{DeriveInput, Error, LitStr, Result};
+use syn::{Attribute, Data, DeriveInput, Error, Fields, LitStr, Result};
 
 const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
@@ -84,13 +84,21 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream> {
 /// compile one source derive the same digits. That is what lets a key
 /// travel across the plugin boundary at all.
 ///
-/// Two byte-identical definitions in two scopes of one module remain
-/// indistinguishable. They describe the same layout, so reading one as
-/// the other cannot misread a field. The plugin handshake already rests on
-/// one compiler that lays identical definitions out identically.
+/// The hash leaves out the documentation, which [`without_docs`] removes.
+/// A doc comment moves no field, so it moves no fingerprint either, and the
+/// plugin handshake accepts a plugin built before the edit. A key that
+/// followed the prose would make every lookup of that plugin miss, and its
+/// rules would stop reporting without an error.
+///
+/// Two definitions in two scopes of one module that differ only in their
+/// documentation remain indistinguishable. They describe the same layout,
+/// so reading one as the other cannot misread a field. The plugin
+/// handshake already rests on one compiler that lays identical definitions
+/// out identically.
 ///
 /// [`module_path!`]: std::module_path
 fn definition_hash(input: &DeriveInput) -> String {
+    let input = without_docs(input);
     let mut hash = FNV_OFFSET_BASIS;
 
     for byte in quote!(#input).to_string().as_bytes() {
@@ -99,6 +107,50 @@ fn definition_hash(input: &DeriveInput) -> String {
     }
 
     format!("{hash:016x}")
+}
+
+/// Returns a copy of a definition without its `doc` attributes
+///
+/// The copy loses every `doc` attribute: on the type, on each variant, and
+/// on each field. That covers the `#[doc = "..."]` that a `///` comment
+/// becomes, and an explicit `#[doc(...)]` such as `#[doc(hidden)]`. Both
+/// only feed rustdoc. Every other attribute stays, because one such as
+/// `repr` or `decoration` can change what the type means, and the key must
+/// follow every such change. The compiler expands a `cfg_attr` before it
+/// hands the item to a derive, so a `doc` behind a `cfg_attr` arrives here
+/// as a plain `doc` attribute and leaves too.
+fn without_docs(input: &DeriveInput) -> DeriveInput {
+    let mut input = input.clone();
+    strip_docs(&mut input.attrs);
+
+    match &mut input.data {
+        Data::Struct(data) => strip_field_docs(&mut data.fields),
+        Data::Enum(data) => {
+            for variant in &mut data.variants {
+                strip_docs(&mut variant.attrs);
+                strip_field_docs(&mut variant.fields);
+            }
+        }
+        Data::Union(data) => {
+            for field in &mut data.fields.named {
+                strip_docs(&mut field.attrs);
+            }
+        }
+    }
+
+    input
+}
+
+/// Removes the `doc` attributes of every field in a list of fields
+fn strip_field_docs(fields: &mut Fields) {
+    for field in fields.iter_mut() {
+        strip_docs(&mut field.attrs);
+    }
+}
+
+/// Removes every `doc` attribute from a list of attributes
+fn strip_docs(attrs: &mut Vec<Attribute>) {
+    attrs.retain(|attr| !attr.path().is_ident("doc"));
 }
 
 /// Reads the cardinality declared by the type's `decoration` attribute
@@ -150,6 +202,86 @@ mod tests {
 
     fn parse(source: &str) -> DeriveInput {
         syn::parse_str(source).expect("should parse as a derive input")
+    }
+
+    #[test]
+    fn definition_hash_ignores_doc_comments_on_the_type_and_fields() {
+        let plain = parse(r#"#[decoration(cardinality = "one")] struct Flag { count: u32, }"#);
+        let documented = parse(
+            r#"
+            /// Marks a node
+            #[decoration(cardinality = "one")]
+            struct Flag {
+                /// How often
+                count: u32,
+            }
+            "#,
+        );
+
+        let documented = definition_hash(&documented);
+
+        assert_eq!(documented, definition_hash(&plain));
+    }
+
+    #[test]
+    fn definition_hash_ignores_doc_comments_on_variants_and_their_fields() {
+        let plain =
+            parse(r#"#[decoration(cardinality = "one")] enum Flag { On { level: u8, }, Off, }"#);
+        let documented = parse(
+            r#"
+            #[decoration(cardinality = "one")]
+            enum Flag {
+                /// Switched on
+                On {
+                    /// How far
+                    level: u8,
+                },
+                /// Switched off
+                Off,
+            }
+            "#,
+        );
+
+        let documented = definition_hash(&documented);
+
+        assert_eq!(documented, definition_hash(&plain));
+    }
+
+    #[test]
+    fn definition_hash_ignores_explicit_doc_attributes() {
+        let plain = parse(r#"#[decoration(cardinality = "one")] struct Flag(u32);"#);
+        let documented = parse(
+            r#"#[doc = "Marks a node"] #[doc(hidden)] #[decoration(cardinality = "one")] struct Flag(#[doc(alias = "n")] u32);"#,
+        );
+
+        let documented = definition_hash(&documented);
+
+        assert_eq!(documented, definition_hash(&plain));
+    }
+
+    #[test]
+    fn definition_hash_with_another_attribute_differs() {
+        let plain = parse(r#"#[decoration(cardinality = "one")] enum Flag { On, Off }"#);
+        let represented =
+            parse(r#"#[decoration(cardinality = "one")] #[repr(u8)] enum Flag { On, Off }"#);
+
+        let represented = definition_hash(&represented);
+
+        assert_ne!(represented, definition_hash(&plain));
+    }
+
+    #[test]
+    fn definition_hash_with_another_field_type_differs() {
+        let plain = parse(
+            r#"#[doc = "Counts"] #[decoration(cardinality = "one")] struct Flag { count: u32 }"#,
+        );
+        let widened = parse(
+            r#"#[doc = "Counts"] #[decoration(cardinality = "one")] struct Flag { count: u64 }"#,
+        );
+
+        let widened = definition_hash(&widened);
+
+        assert_ne!(widened, definition_hash(&plain));
     }
 
     #[test]
