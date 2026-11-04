@@ -200,6 +200,10 @@ impl StilesConfig {
     /// Only a project that holds stiles's own source sets this. A project
     /// that does not leaves it unset and pins a lint source that names a
     /// stiles revision, which is what the handshake checks.
+    ///
+    /// A git lint source always compiles while this is set, even where
+    /// prebuilt libraries exist for its pin. Their publisher built them
+    /// against the stiles that the pin names, not against this source.
     pub(crate) fn stiles_source(&self) -> Option<&Path> {
         self.stiles_source.as_deref()
     }
