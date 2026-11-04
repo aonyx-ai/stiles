@@ -140,6 +140,13 @@ tree-sitter-rust = "0.24"
 # TypeScript grammar and `.tsx` files with the TSX grammar, whose JSX
 # syntax conflicts with TypeScript's angle-bracket type assertions.
 tree-sitter-typescript = "0.23"
+# Stiles uses no Unicode properties itself. The entry holds back the crate
+# for ra-ap-rustc_lexer, which fails to compile unless unicode-properties and
+# unicode-ident carry the same Unicode version. ra_ap_hir_def 0.0.358 pins
+# unicode-ident at 1.0.24, which carries Unicode 17, and unicode-properties
+# 0.1.5 moves to Unicode 18. ra_ap_hir_def 0.0.360 no longer depends on
+# unicode-ident, so the entry goes when stiles moves to rust-analyzer 0.0.360.
+unicode-properties = { version = "=0.1.4", default-features = false }
 stiles-core = { path = "crates/stiles-core", version = "=0.3.0" }
 stiles-macros = { path = "crates/stiles-macros", version = "=0.3.0" }
 stiles-codegen = { path = "crates/stiles-codegen", version = "=0.3.0" }

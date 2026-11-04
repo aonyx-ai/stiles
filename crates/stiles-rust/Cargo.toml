@@ -21,6 +21,7 @@ provider = [
   "dep:ra_ap_syntax",
   "dep:ra_ap_vfs",
   "dep:thiserror",
+  "dep:unicode-properties",
 ]
 
 [dependencies]
@@ -36,6 +37,8 @@ stabby.workspace = true
 thiserror = { workspace = true, optional = true }
 tree-sitter.workspace = true
 tree-sitter-rust.workspace = true
+# The root manifest says why the provider holds this crate back.
+unicode-properties = { workspace = true, optional = true }
 stiles-macros.workspace = true
 stiles-types.workspace = true
 
