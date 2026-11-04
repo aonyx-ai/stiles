@@ -18,7 +18,7 @@ mod mismatched_plugin;
 
 use self::fake_github::{Answer, FakeGitHub, Seen};
 use self::fixture_repository::{
-    FixtureRepository, Standalone, git, write_lint_package, write_lockfile,
+    FixtureRepository, Standalone, git, stiles_crates, write_lint_package, write_lockfile,
 };
 use self::git_pin::GitPin;
 use self::mismatched_plugin::write_mismatched_lint_package;
@@ -515,6 +515,98 @@ fn check_with_a_repository_the_api_does_not_know_says_nothing() {
         .code(1)
         .stderr(predicate::str::contains("note: no prebuilt lints").not())
         .stderr(predicate::str::contains("warning: stiles cannot use").not());
+}
+
+/// Pins that a project with a stiles source asks no release for lints
+///
+/// A release publishes an archive for the pin, and the API would hand it
+/// over. Its libraries were built against the stiles of the publisher,
+/// not against the configured source, so stiles must not even ask. The
+/// host serves no git, so the run then fails to fetch the source.
+#[test]
+fn check_with_a_stiles_source_asks_no_release() {
+    let server = FakeGitHub::start();
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let target = package(TODO_SOURCE);
+    configure_git_lint_against_source(
+        target.path(),
+        GitPin {
+            url: REMOTE,
+            rev: REV,
+        },
+        &stiles_source(),
+    );
+    publish(&server, &[fixture_library("sourced_published_lint")]);
+
+    stiles_asking(&cache, server.url())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1);
+
+    assert!(server.seen().is_empty(), "{:?}", asked_paths(&server));
+}
+
+/// Pins that a project with a stiles source compiles over cached libraries
+///
+/// The cache holds libraries for the pin that fail the handshake, so a
+/// run that loaded them would fail. The run succeeds and reports the lint
+/// only if stiles passed them over and compiled the checkout against the
+/// configured source.
+#[test]
+fn check_with_a_stiles_source_compiles_over_cached_prebuilt_lints() {
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let rules = repository_with_one_lint("sourced_lint", RULE);
+    let target = package(TODO_SOURCE);
+    configure_git_lint_against_source(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: rules.rev(),
+        },
+        &stiles_source(),
+    );
+
+    stiles(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success();
+
+    let remote = fetched_remote(&cache);
+    let mismatched = tempfile::tempdir().expect("temporary directory should be created");
+    write_mismatched_lint_package(mismatched.path(), "sourced_mismatched_lint");
+    let built = build_cdylib(mismatched.path(), "sourced_mismatched_lint");
+    seed_prebuilt(&cache, &remote, rules.rev(), &[built]);
+
+    stiles(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(format!("warning[{RULE}]")));
+}
+
+/// Points the package at one git lint source, built against `source`
+fn configure_git_lint_against_source(package: &Path, pin: GitPin<'_>, source: &Path) {
+    configure_git_lint(package, pin);
+
+    let source = toml::Value::from(source.to_str().expect("the source path should be UTF-8"));
+    let config = package.join(".config").join("stiles.toml");
+    let lints = std::fs::read_to_string(&config).expect("configuration should be readable");
+    std::fs::write(&config, format!("stiles-source = {source}\n\n{lints}"))
+        .expect("configuration should be written");
+}
+
+/// Returns the stiles tree these tests run, as a stiles source
+///
+/// The fixture lints name the crates of this tree by path, so the source
+/// patches nothing. What it changes is where stiles takes the lints from.
+fn stiles_source() -> PathBuf {
+    stiles_crates()
+        .parent()
+        .expect("the crates should sit in the repository")
+        .to_path_buf()
 }
 
 /// A private repository answers only a request that carries a token

@@ -264,6 +264,24 @@ enum Locking {
     Unlocked,
 }
 
+/// Whether a git source may come from prebuilt libraries
+///
+/// A publisher builds a prebuilt library against the stiles that the
+/// manifest of the lints names. A project that sets `stiles-source` asks
+/// for every lint to build against that source instead, and a prebuilt
+/// library cannot honor that. Loading one would run the rules against the
+/// stiles of the publisher, not against the source the project named.
+/// The handshake does not catch this while the two lay out the plugin
+/// interface alike, so nothing would say that the source went unused.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum Prebuilt {
+    /// Prebuilt libraries serve before a compile of the source
+    Allowed,
+
+    /// Stiles compiles the source, whatever prebuilt libraries exist
+    Refused,
+}
+
 /// Resolves and validates the configured lint sources before any build runs
 ///
 /// Everything is resolved up front. A typo in the second entry therefore
@@ -274,7 +292,9 @@ enum Locking {
 ///
 /// Stiles looks for prebuilt libraries before it takes a git source. It
 /// fetches and compiles the source whenever it finds none. A project
-/// that no publisher builds for therefore behaves as it did before.
+/// that no publisher builds for therefore behaves as it did before. A
+/// project that sets `stiles-source` takes no prebuilt libraries, for the
+/// reason [`Prebuilt::Refused`] gives.
 ///
 /// # Errors
 ///
@@ -288,6 +308,10 @@ fn configured_sources(
 ) -> anyhow::Result<Vec<Resolved>> {
     let mut sources = Vec::new();
     let mut seen = HashSet::new();
+    let prebuilt = match config.stiles_source() {
+        Some(_) => Prebuilt::Refused,
+        None => Prebuilt::Allowed,
+    };
 
     for entry in config.lints() {
         let (directory, contents) = match entry {
@@ -295,7 +319,7 @@ fn configured_sources(
                 path.resolve(config.root()),
                 Contents::Sources(Locking::Unlocked),
             ),
-            LintSource::Git(git) => resolve_git(git, tag, notices)
+            LintSource::Git(git) => resolve_git(git, tag, prebuilt, notices)
                 .with_context(|| format!("failed to resolve the lint source {entry}"))?,
         };
 
@@ -350,6 +374,10 @@ fn configured_sources(
 /// after its rules start to publish archives. A person moves the pin or
 /// clears the cache to pick those up.
 ///
+/// When `prebuilt` refuses libraries, both prebuilt steps drop out. Stiles
+/// reads none that it unpacked earlier and asks no release, so only a
+/// missing checkout reaches the network.
+///
 /// # Errors
 ///
 /// Returns an error if no cache location can be determined, or if the
@@ -357,12 +385,18 @@ fn configured_sources(
 fn resolve_git(
     source: &GitLintSource,
     tag: &AbiTag,
+    prebuilt: Prebuilt,
     notices: &mut Vec<PrebuiltNotice>,
 ) -> anyhow::Result<(PathBuf, Contents)> {
-    if let Some(directory) =
-        self::prebuilt::cached(source, tag).context("failed to look for cached prebuilt lints")?
-    {
-        return Ok((directory, Contents::Libraries));
+    match prebuilt {
+        Prebuilt::Allowed => {
+            if let Some(directory) = self::prebuilt::cached(source, tag)
+                .context("failed to look for cached prebuilt lints")?
+            {
+                return Ok((directory, Contents::Libraries));
+            }
+        }
+        Prebuilt::Refused => {}
     }
 
     if let Some(directory) =
@@ -371,10 +405,15 @@ fn resolve_git(
         return Ok((directory, Contents::Sources(Locking::Locked)));
     }
 
-    if let Some(directory) =
-        self::prebuilt::fetch(source, tag, notices).context("failed to fetch prebuilt lints")?
-    {
-        return Ok((directory, Contents::Libraries));
+    match prebuilt {
+        Prebuilt::Allowed => {
+            if let Some(directory) = self::prebuilt::fetch(source, tag, notices)
+                .context("failed to fetch prebuilt lints")?
+            {
+                return Ok((directory, Contents::Libraries));
+            }
+        }
+        Prebuilt::Refused => {}
     }
 
     Ok((
@@ -896,6 +935,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_send_prebuilt() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Prebuilt>();
+    }
+
+    #[test]
     fn trait_send_resolved() {
         fn assert_send<T: Send>() {}
         assert_send::<Resolved>();
@@ -938,6 +983,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_sync_prebuilt() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Prebuilt>();
+    }
+
+    #[test]
     fn trait_sync_resolved() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<Resolved>();
@@ -977,6 +1028,12 @@ mod tests {
     fn trait_unpin_locking() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Locking>();
+    }
+
+    #[test]
+    fn trait_unpin_prebuilt() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Prebuilt>();
     }
 
     #[test]

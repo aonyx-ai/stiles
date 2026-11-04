@@ -134,11 +134,17 @@ For Stiles's own development we need to patch `stiles-types`,
 `stiles-plugin`, `stiles-testing`, and every language crate.
 Lints will be built against these libraries instead of their crates.io
 versions. This utilizes the `stiles-source` property. You probably shouldn't
-need this option. define
+need this option.
 
 ```toml
 stiles-source = "."
 ```
+
+When `stiles-source` is set, Stiles compiles every Git lint source against it,
+and does not use [prebuilt archives][prebuilt-archives]. It neither loads
+archives it unpacked earlier nor looks for new ones on GitHub. A publisher
+built those archives against the Stiles crates the lints name, not against
+your source.
 
 ## Config file location
 
@@ -147,5 +153,6 @@ Stiles will look for the first parent directory containing this path, but stops
 looking at a directory containing a `.git` directory.
 
 [adopt-rules-gradually]: /docs/how-to/adopt-rules-gradually
+[prebuilt-archives]: /docs/reference/prebuilt-archives
 [shared-rules]: /docs/how-to/shared-rules
 [writing-a-rule]: /authoring/how-to/write-a-rule

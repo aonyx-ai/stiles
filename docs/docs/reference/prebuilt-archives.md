@@ -20,5 +20,10 @@ might lead to unexpected recompilation of rules.
 To resolve this, deleting the [Stiles cache][cache-layout] in
 `<cache>/prebuilt/<remote>/<rev>/` will make Stiles look for archives.
 
+A configuration that sets [`stiles-source`][stiles-source] uses no prebuilt
+archives at all. Stiles then compiles every Git lint source against that
+source.
+
 [shared-rules]: /docs/how-to/shared-rules
 [cache-layout]: /docs/reference/cache-layout
+[stiles-source]: /docs/reference/configuration#stiles-source

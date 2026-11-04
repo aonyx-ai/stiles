@@ -16,12 +16,12 @@ ignore = [
   "crates/stiles-rust/tests/fixtures/",
 ]
 
-# Every lint that stiles compiles builds against the stiles in this directory,
-# not against the stiles its own manifest names. The rules repository depends
-# on the stiles crates from crates.io at one exact version so that it can build
-# on its own, and this patches those crates to this tree, so a check here runs
-# the rules against the working tree. Stiles compiles nothing when it finds
-# prebuilt libraries for the pin, and those run as their publisher built them.
+# Every lint builds against the stiles in this directory, not against the
+# stiles its own manifest names. The rules repository depends on the stiles
+# crates from crates.io at one exact version so that it can build on its own,
+# and this patches those crates to this tree, so a check here runs the rules
+# against the working tree. Stiles therefore compiles the rules here, even
+# when it finds prebuilt libraries for the pin.
 stiles-source = "."
 
 # Stiles's rules live in their own repository, pinned to one commit. Bumping
