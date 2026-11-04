@@ -16,10 +16,12 @@ ignore = [
   "crates/stiles-rust/tests/fixtures/",
 ]
 
-# Every lint builds against the stiles in this directory, not against the
-# stiles its own manifest names. The rules repository pins a stiles commit
-# so that it can build on its own, and this overrides that pin, so a check
-# here runs the rules against the working tree.
+# Every lint that stiles compiles builds against the stiles in this directory,
+# not against the stiles its own manifest names. The rules repository depends
+# on the stiles crates from crates.io at one exact version so that it can build
+# on its own, and this patches those crates to this tree, so a check here runs
+# the rules against the working tree. Stiles compiles nothing when it finds
+# prebuilt libraries for the pin, and those run as their publisher built them.
 stiles-source = "."
 
 # Stiles's rules live in their own repository, pinned to one commit. Bumping
@@ -27,4 +29,4 @@ stiles-source = "."
 # check here runs exactly the rules it ran yesterday.
 [[lints]]
 git = "https://github.com/aonyx-ai/stiles-aonyx-rules"
-rev = "4d401f8ca0950ad2112948eba5e9889e240bcd0e"
+rev = "1b57f833d3a20bce5dedd9fb51b8f202fe3daa25"
