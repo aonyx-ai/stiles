@@ -196,9 +196,9 @@ receives an `Option` or a `Vec` as the type dictates. The plain
 `decoration` accessor stays available and checks nothing.
 
 The decoration map recovers a value by a name-based key: the type's module
-path, its name, and a hash of its definition. `TypeId` cannot serve,
-because it differs between separately compiled crate graphs, and a plugin
-is one.
+path, its name, and a hash of its definition without its documentation.
+`TypeId` cannot serve, because it differs between separately compiled crate
+graphs, and a plugin is one.
 
 ## Lint rules
 
@@ -368,7 +368,10 @@ A node reaches the host's decorations through a call rather than a
 reference to the map, so no std collection crosses the boundary. The host
 compares the key and hands back a pointer to the value; the plugin casts
 it under the `Decoration` contract, which the language fingerprint backs
-by refusing a plugin whose decoration types differ from the host's.
+by refusing a plugin whose decoration types differ from the host's. Each
+decoration's share of that fingerprint joins its layout with its key. A
+plugin that would look a decoration up under another key is therefore
+refused, rather than loaded to find nothing.
 
 The factory's identity reaches the pass's vtable and names its methods
 in order, so a method added or moved is refused. It records each method
@@ -409,17 +412,15 @@ release asks for archives of its own.
 
 The fingerprints stop at stiles's own layout. A contributor maintains
 each list of types by hand. A fieldless enum keeps its size and alignment
-when its variants reorder, so the fingerprint does not see that change. A
-decoration's key hashes its definition text, so an edit to that text
-changes the key without changing any fingerprint. The plugin's lockfile
-resolves its own `tree-sitter`. Its `Node` is a `#[repr(transparent)]`
-wrapper around a `#[repr(C)]` struct of the C library, so a version
-difference moves no field. Each image still carries its own copy of that
-library. A pass catches its own panics at the boundary and hands them
-back as values, because an unwind must not cross between two panic
-runtimes. That catch rests on the plugin unwinding: a plugin built with
-`panic = "abort"` still takes the process down, and nothing checks the
-strategy. Every allocation that crosses is stabby's and carries the
+when its variants reorder, so the fingerprint does not see that change.
+The plugin's lockfile resolves its own `tree-sitter`. Its `Node` is a
+`#[repr(transparent)]` wrapper around a `#[repr(C)]` struct of the C
+library, so a version difference moves no field. Each image still carries
+its own copy of that library. A pass catches its own panics at the boundary
+and hands them back as values, because an unwind must not cross between two
+panic runtimes. That catch rests on the plugin unwinding: a plugin built
+with `panic = "abort"` still takes the process down, and nothing checks
+the strategy. Every allocation that crosses is stabby's and carries the
 function that frees it, so a plugin may set its own `#[global_allocator]`.
 
 The loader keeps every library loaded for the life of the process. The

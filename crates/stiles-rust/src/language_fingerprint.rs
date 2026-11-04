@@ -1,5 +1,4 @@
-use stabby::IStable;
-use stiles_types::plugin::stable_fingerprint;
+use stiles_types::plugin::{decoration_fingerprint, stable_fingerprint};
 
 use crate::decorations::{AdtFlags, FnSignature, ImportSource, Reexports, ResolvedType};
 
@@ -18,11 +17,14 @@ include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 /// node that the host decorated. To read them at a layout that the host did
 /// not write is unsound, not merely quiet.
 ///
-/// Each decoration contributes the identity stabby derives from its
-/// report, which covers the name and type of every field, recursively. A
-/// type a decoration holds, such as [`TypePath`] inside [`FnSignature`],
-/// is therefore covered without being named here. The list names every
-/// type that implements [`Decoration`], and a new one belongs on it.
+/// Each decoration contributes [`decoration_fingerprint`]: the identity
+/// stabby derives from its report, joined with its key. The report covers
+/// the name and type of every field, recursively. A type a decoration
+/// holds, such as [`TypePath`] inside [`FnSignature`], is therefore
+/// covered without being named here. The key is what a plugin looks the
+/// decoration up by, so a plugin that holds another key is refused rather
+/// than left to find nothing. The list names every type that implements
+/// [`Decoration`], and a new one belongs on it.
 ///
 /// Everything else in this crate is deliberately absent. Hashing the
 /// whole crate refuses every plugin in the tree whenever any source file
@@ -40,11 +42,11 @@ include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 /// [`TypePath`]: crate::decorations::TypePath
 pub const LANGUAGE_FINGERPRINT: u64 = stable_fingerprint(&[
     VISITOR_FINGERPRINT,
-    <AdtFlags as IStable>::ID,
-    <FnSignature as IStable>::ID,
-    <ImportSource as IStable>::ID,
-    <Reexports as IStable>::ID,
-    <ResolvedType as IStable>::ID,
+    decoration_fingerprint::<AdtFlags>(),
+    decoration_fingerprint::<FnSignature>(),
+    decoration_fingerprint::<ImportSource>(),
+    decoration_fingerprint::<Reexports>(),
+    decoration_fingerprint::<ResolvedType>(),
 ]);
 
 #[cfg(test)]

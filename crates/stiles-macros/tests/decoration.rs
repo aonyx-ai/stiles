@@ -20,6 +20,71 @@ struct ResolvedType(Str<'static>);
 #[decoration(cardinality = "many")]
 struct TraitImpl(Str<'static>);
 
+/// Defines `Counter` without documentation, the baseline the modules
+/// below compare their keys against
+mod undocumented {
+    use stiles_macros::Decoration;
+
+    #[stabby::stabby]
+    #[derive(Decoration)]
+    #[decoration(cardinality = "one")]
+    pub struct Counter {
+        pub count: u32,
+    }
+}
+
+/// Defines `Counter` with the fields of the baseline and documentation on
+/// the type and on its field
+mod documented {
+    use stiles_macros::Decoration;
+
+    /// Counts what a provider saw on a node
+    #[stabby::stabby]
+    #[derive(Decoration)]
+    #[decoration(cardinality = "one")]
+    #[doc(alias = "Tally")]
+    pub struct Counter {
+        /// How many times the provider saw it
+        pub count: u32,
+    }
+}
+
+/// Defines `Counter` with the fields of the baseline and documentation
+/// behind a `cfg_attr`
+mod documented_behind_cfg_attr {
+    use stiles_macros::Decoration;
+
+    #[stabby::stabby]
+    #[derive(Decoration)]
+    #[decoration(cardinality = "one")]
+    #[cfg_attr(all(), doc = "Counts what a provider saw on a node")]
+    pub struct Counter {
+        #[cfg_attr(all(), doc = "How many times the provider saw it")]
+        pub count: u32,
+    }
+}
+
+/// Defines `Counter` with the field name of the baseline and a wider type
+mod widened {
+    use stiles_macros::Decoration;
+
+    #[stabby::stabby]
+    #[derive(Decoration)]
+    #[decoration(cardinality = "one")]
+    pub struct Counter {
+        pub count: u64,
+    }
+}
+
+/// Returns the part of a key that the derive hashes from the definition
+fn definition_digits<T: Decoration>() -> &'static str {
+    T::KEY
+        .as_str()
+        .rsplit_once('#')
+        .expect("a derived key should end in its definition hash")
+        .1
+}
+
 fn parse(source: &str) -> DecoratedTree {
     let mut parser = tree_sitter::Parser::new();
     parser
@@ -57,6 +122,33 @@ fn decorations_are_read_back_on_their_node() {
         .expect("root should be decorated");
 
     assert_eq!(found.0.as_str(), "root");
+}
+
+#[test]
+fn key_follows_a_changed_field_type() {
+    let baseline = definition_digits::<undocumented::Counter>();
+
+    let widened = definition_digits::<widened::Counter>();
+
+    assert_ne!(widened, baseline);
+}
+
+#[test]
+fn key_ignores_documentation() {
+    let baseline = definition_digits::<undocumented::Counter>();
+
+    let documented = definition_digits::<documented::Counter>();
+
+    assert_eq!(documented, baseline);
+}
+
+#[test]
+fn key_ignores_documentation_behind_cfg_attr() {
+    let baseline = definition_digits::<undocumented::Counter>();
+
+    let documented = definition_digits::<documented_behind_cfg_attr::Counter>();
+
+    assert_eq!(documented, baseline);
 }
 
 #[test]
