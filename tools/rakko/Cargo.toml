@@ -30,7 +30,17 @@ rakko-rust-binary = { git = "https://github.com/aonyx-ai/rakko", rev = "aab280bc
 rakko-test-rust = { git = "https://github.com/aonyx-ai/rakko", rev = "aab280bc11c111ef9b9341302112652bcf2877a0" }
 rakko-test-rust-docs = { git = "https://github.com/aonyx-ai/rakko", rev = "aab280bc11c111ef9b9341302112652bcf2877a0" }
 rakko-tool = { git = "https://github.com/aonyx-ai/rakko", rev = "aab280bc11c111ef9b9341302112652bcf2877a0" }
+# Read the exports of hyperfine and the records of `stiles check --timings`,
+# and write the results of the benchmarks.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 thiserror = "2"
+# Reads the lint source that the configuration of stiles pins, and writes the
+# configuration of each project of the corpus.
+toml = "1"
+
+[dev-dependencies]
+tempfile = "3"
 
 [workspace.lints.clippy]
 # Require documentation on private items as well, since that helps with long-term maintainability.

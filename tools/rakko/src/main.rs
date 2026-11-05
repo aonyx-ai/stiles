@@ -19,7 +19,7 @@
 //! supplies the shortcut.
 
 use harness::{
-    BundleTsrs, CheckAbi, CheckBundleTsrs, CheckFeatures, CheckSelf, InDirectory,
+    Bench, BundleTsrs, CheckAbi, CheckBundleTsrs, CheckFeatures, CheckSelf, InDirectory,
     TestPluginToolchain,
 };
 use rakko_action::{ErasedAction, action_name};
@@ -66,6 +66,7 @@ fn main() {
 /// Returns the actions that only this repository mounts
 fn stiles() -> Vec<Box<dyn ErasedAction>> {
     vec![
+        Box::new(Bench),
         Box::new(BundleTsrs),
         Box::new(CheckAbi),
         Box::new(CheckBundleTsrs),

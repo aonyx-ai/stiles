@@ -30,11 +30,65 @@ pub enum HarnessError {
         source: IoError,
     },
 
-    /// Mise reported no cargo for the project
+    /// A file that the run reads could not be read
+    #[error("failed to read {}", path.display())]
+    Unreadable {
+        /// The path that the run tried to read
+        path: PathBuf,
+        /// The cause of the failure
+        source: IoError,
+    },
+
+    /// An export of hyperfine holds no result
+    #[error("{} holds no result", path.display())]
+    EmptyExport {
+        /// The export that the run read
+        path: PathBuf,
+    },
+
+    /// A JSON file that a tool of the run wrote holds something else
+    #[error("failed to parse {} as JSON", path.display())]
+    UnparsableJson {
+        /// The file that the run read
+        path: PathBuf,
+        /// The cause of the failure
+        source: serde_json::Error,
+    },
+
+    /// A TOML file that the run reads holds something else
+    #[error("failed to parse {} as TOML", path.display())]
+    UnparsableToml {
+        /// The file that the run read
+        path: PathBuf,
+        /// The cause of the failure
+        source: toml::de::Error,
+    },
+
+    /// A value that the run writes as TOML could not be serialized
+    #[error("failed to serialize {} as TOML", path.display())]
+    UnserializableToml {
+        /// The file that the run was about to write
+        path: PathBuf,
+        /// The cause of the failure
+        source: toml::ser::Error,
+    },
+
+    /// A value that the run writes as JSON could not be serialized
+    #[error("failed to serialize {} as JSON", path.display())]
+    UnserializableJson {
+        /// The file that the run was about to write
+        path: PathBuf,
+        /// The cause of the failure
+        source: serde_json::Error,
+    },
+
+    /// Mise reported no program of a tool that the run needs
     ///
     /// The action installs nothing, so the run stops here.
-    #[error("failed to resolve cargo")]
+    #[error("failed to resolve {tool}")]
     UnresolvedTool {
+        /// The name of the tool that mise did not report
+        tool: &'static str,
         /// The cause of the failure
         source: ResolveToolError,
     },
