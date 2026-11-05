@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-11-05
+
+### Changed
+
+- The plugin ABI moves to 0.8, because the language fingerprint now covers decoration keys ([#576])
+
+### Fixed
+
+- Stiles refuses a plugin built against other decoration keys, instead of loading it and finding no decorations ([#576])
+- A decoration's key no longer changes when only its documentation changes ([#576])
+- `stiles-source` builds Git lint sources against the configured source even when prebuilt archives exist ([#577])
+- `stiles-source` builds a Git lint source against the source when the lints require another version of the Stiles crates ([#590])
+
 ## [0.3.0] - 2026-10-30
 
 ### Added
@@ -53,3 +66,7 @@ and this project adheres to
 [#548]: https://github.com/aonyx-ai/stiles/pull/548
 [0.3.0]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.3.0
 [#558]: https://github.com/aonyx-ai/stiles/pull/558
+[0.4.0]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.4.0
+[#576]: https://github.com/aonyx-ai/stiles/pull/576
+[#577]: https://github.com/aonyx-ai/stiles/pull/577
+[#590]: https://github.com/aonyx-ai/stiles/pull/590
