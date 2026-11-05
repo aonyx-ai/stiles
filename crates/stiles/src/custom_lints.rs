@@ -21,6 +21,7 @@ mod digest;
 mod git_source;
 mod handshake;
 mod prebuilt;
+mod source_requirements;
 mod stiles_patch;
 
 pub(crate) use self::abi_tag::AbiTag;
@@ -490,10 +491,16 @@ struct Loaded {
 /// uses the release profile, because the plugin then runs over every file
 /// of every check.
 ///
+/// With a stiles source, a checkout of a git source first requires the
+/// version that the source holds, so that the patch applies. The checkout
+/// gets its files back once cargo exits. A path source is a tree of the
+/// project, which stiles never writes.
+///
 /// # Errors
 ///
 /// Returns an error if cargo cannot be run, exits unsuccessfully, or
-/// produces no dynamic library.
+/// produces no dynamic library. Returns an error too if the requirements
+/// of a checkout cannot be rewritten or restored.
 fn build(
     directory: &Path,
     locking: Locking,
@@ -523,12 +530,27 @@ fn build(
         }
     }
 
+    let rewritten = match (locking, stiles_source) {
+        (Locking::Locked, Some(source)) => Some(
+            self::source_requirements::rewrite(&cargo, directory, source)
+                .context("failed to require the version of the stiles source")?,
+        ),
+        (Locking::Locked, None) | (Locking::Unlocked, _) => None,
+    };
+
     let output = command
         .current_dir(directory)
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
-        .output()
-        .context("failed to run cargo build")?;
+        .output();
+
+    if let Some(rewritten) = rewritten {
+        rewritten
+            .restore()
+            .context("failed to restore the manifests of the lints")?;
+    }
+
+    let output = output.context("failed to run cargo build")?;
 
     anyhow::ensure!(output.status.success(), "cargo build failed");
 

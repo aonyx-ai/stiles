@@ -146,6 +146,12 @@ archives it unpacked earlier nor looks for new ones on GitHub. A publisher
 built those archives against the Stiles crates the lints name, not against
 your source.
 
+A Git lint source may require another version of the Stiles crates than your
+source holds, such as `=0.3.0` while your source is at 0.4.0. Stiles then sets
+those requirements to the version of your source for the build, so the lints
+still build against it. It puts the manifests of the checkout back afterward.
+A path lint source is left as it is.
+
 ## Config file location
 
 In your Git repository root, create a file called `.config/stiles.toml`.
