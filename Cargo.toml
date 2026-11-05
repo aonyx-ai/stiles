@@ -20,7 +20,7 @@ exclude = [
 resolver = "3"
 
 [workspace.package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 
 license = "Apache-2.0 OR MIT"
@@ -150,17 +150,17 @@ tree-sitter-typescript = "0.23"
 # 0.1.5 moves to Unicode 18. ra_ap_hir_def 0.0.360 no longer depends on
 # unicode-ident, so the entry goes when stiles moves to rust-analyzer 0.0.360.
 unicode-properties = { version = "=0.1.4", default-features = false }
-stiles-core = { path = "crates/stiles-core", version = "=0.3.0" }
-stiles-macros = { path = "crates/stiles-macros", version = "=0.3.0" }
-stiles-codegen = { path = "crates/stiles-codegen", version = "=0.3.0" }
-stiles-reporting = { path = "crates/stiles-reporting", version = "=0.3.0" }
-stiles-rust = { path = "crates/stiles-rust", version = "=0.3.0" }
-stiles-types = { path = "crates/stiles-types", version = "=0.3.0" }
-stiles-testing = { path = "crates/stiles-testing", version = "=0.3.0" }
+stiles-core = { path = "crates/stiles-core", version = "=0.4.0" }
+stiles-macros = { path = "crates/stiles-macros", version = "=0.4.0" }
+stiles-codegen = { path = "crates/stiles-codegen", version = "=0.4.0" }
+stiles-reporting = { path = "crates/stiles-reporting", version = "=0.4.0" }
+stiles-rust = { path = "crates/stiles-rust", version = "=0.4.0" }
+stiles-types = { path = "crates/stiles-types", version = "=0.4.0" }
+stiles-testing = { path = "crates/stiles-testing", version = "=0.4.0" }
 # The TypeScript provider type-checks with tsrs, a Rust port of the
 # TypeScript 7 checker, so analysis runs in stiles's process with no
 # Node.js or Go toolchain. tsrs publishes no crates, and crates.io refuses a
 # dependency on a repository, so `mise run rakko -- bundle-tsrs` repackages the tsrs crates
 # that stiles uses as one crate. The `vendor/tsrs` submodule pins the commit;
 # a bump is a deliberate change to the checker.
-stiles-tsrs = { path = "crates/stiles-tsrs", version = "=0.3.0" }
+stiles-tsrs = { path = "crates/stiles-tsrs", version = "=0.4.0" }
