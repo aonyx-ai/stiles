@@ -791,6 +791,64 @@ fn check_with_quiet_hides_the_remedy() {
         .stderr(predicate::str::contains("stray.rs"));
 }
 
+/// Runs `stiles check --timings` over a package that holds `source`, with
+/// `extra` arguments, and returns the record it wrote
+///
+/// The package runs the example plugin, so the run loads, configures, and
+/// walks a real pass, and every phase gets a span.
+fn timings(source: &str, extra: &[&str]) -> serde_json::Value {
+    let package = with_no_todo(package(source));
+    let record = package.path().join("timings.json");
+
+    stiles()
+        .arg("check")
+        .args(extra)
+        .arg("--timings")
+        .arg(&record)
+        .arg(package.path())
+        .output()
+        .expect("stiles should run");
+
+    let record = std::fs::read_to_string(record).expect("the record should be written");
+    serde_json::from_str(&record).expect("the record should be JSON")
+}
+
+/// Returns the names of the phases of a record, in its order
+fn phase_names(record: &serde_json::Value) -> Vec<&str> {
+    record["phases"]
+        .as_array()
+        .expect("the phases should be a list")
+        .iter()
+        .map(|phase| phase["name"].as_str().expect("a phase should have a name"))
+        .collect()
+}
+
+#[test]
+fn check_with_timings_and_a_failing_run_still_writes_the_record() {
+    let record = timings(WARNING_SOURCE, &["--deny-warnings"]);
+
+    assert!(phase_names(&record).contains(&"walk"));
+}
+
+#[test]
+fn check_with_timings_records_each_phase_in_the_order_of_the_run() {
+    let record = timings(CLEAN_SOURCE, &[]);
+
+    assert_eq!(
+        phase_names(&record),
+        [
+            "plugins",
+            "discover",
+            "load",
+            "configure",
+            "parse",
+            "decorate",
+            "walk",
+            "report"
+        ]
+    );
+}
+
 /// Pins that without `--keep-going` the walk stops at the first unreadable
 /// file
 ///

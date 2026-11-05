@@ -4,6 +4,7 @@ mod failure_threshold;
 mod file_failure;
 mod finding;
 mod grammar;
+mod phase_timings;
 mod providers;
 
 use std::collections::HashMap;
@@ -13,7 +14,7 @@ use std::sync::Arc;
 
 use clawless::exit::Exit;
 use clawless::prelude::*;
-use stiles_core::{Lint, Pipeline, RunPipelineError};
+use stiles_core::{Lint, PHASE_TARGET, Pipeline, RunPipelineError};
 use stiles_types::{Diagnostic, RuleOptions, UncoveredFile};
 
 use self::check_outcome::CheckOutcome;
@@ -22,6 +23,7 @@ use self::failure_threshold::FailureThreshold;
 use self::file_failure::FileFailure;
 use self::finding::Finding;
 use self::grammar::Grammar;
+use self::phase_timings::PhaseTimings;
 use self::providers::Providers;
 use super::closing_text::ClosingText;
 use crate::config::StilesConfig;
@@ -42,6 +44,12 @@ pub(crate) struct CheckArgs {
     /// Treat warnings as errors
     #[arg(long)]
     deny_warnings: bool,
+
+    /// Write the time of each phase of the run to FILE as JSON
+    ///
+    /// The flag serves the benchmarks of stiles, so the help leaves it out.
+    #[arg(long, value_name = "FILE", hide = true)]
+    timings: Option<PathBuf>,
 }
 
 /// Builds the lint passes the CLI runs
@@ -112,9 +120,37 @@ impl CoverageRemedies {
 pub(crate) async fn check(args: CheckArgs, context: Context) -> CommandResult<Exit> {
     let mut closing = ClosingText::default();
 
-    match run(args, &context, &mut closing).await {
+    match timed(args, &context, &mut closing).await {
         Ok(code) => Ok(closing.into_exit(code)),
         Err(error) => Ok(closing.into_failure(&error)),
+    }
+}
+
+/// Runs the check, and records its phases when `--timings` asks for it
+///
+/// The record covers a run that fails as well, because a benchmark of a
+/// project with findings still wants to know where the time went. An error
+/// of the run outranks an error of the record.
+///
+/// # Errors
+///
+/// Returns an error if the run fails, or if the record cannot be written.
+async fn timed(
+    args: CheckArgs,
+    context: &Context,
+    closing: &mut ClosingText,
+) -> anyhow::Result<ExitCode> {
+    let Some(path) = args.timings.clone() else {
+        return run(args, context, closing).await;
+    };
+
+    let timings = PhaseTimings::install().context("failed to record the phases of the run")?;
+    let code = run(args, context, closing).await;
+    let written = timings.write(&path);
+
+    match (code, written) {
+        (Ok(code), Ok(())) => Ok(code),
+        (Err(error), _) | (Ok(_), Err(error)) => Err(error),
     }
 }
 
@@ -138,6 +174,7 @@ async fn run(
         path,
         keep_going,
         deny_warnings,
+        timings: _,
     } = args;
 
     let threshold = match deny_warnings {
@@ -155,10 +192,12 @@ async fn run(
     let config = StilesConfig::load(&path).context("failed to load the stiles configuration")?;
 
     let mut notices = Vec::new();
-    let custom_lints = CustomLints::load()
-        .config(&config)
-        .notices(&mut notices)
-        .call();
+    let custom_lints = tracing::info_span!(target: PHASE_TARGET, "plugins").in_scope(|| {
+        CustomLints::load()
+            .config(&config)
+            .notices(&mut notices)
+            .call()
+    });
     closing.extend(notices);
     let custom_lints = custom_lints.context("failed to load the project's custom lints")?;
 
@@ -179,11 +218,14 @@ async fn run(
         false => WalkErrorPolicy::Fail,
     };
 
-    let discovery = Discovery::run()
-        .path(&path)
-        .config(&config)
-        .on_error(on_error)
-        .call()
+    let discovery = tracing::info_span!(target: PHASE_TARGET, "discover")
+        .in_scope(|| {
+            Discovery::run()
+                .path(&path)
+                .config(&config)
+                .on_error(on_error)
+                .call()
+        })
         .context("failed to discover source files")?;
 
     let mut outcome = CheckOutcome::Success;
@@ -203,7 +245,8 @@ async fn run(
         path.display()
     );
 
-    let providers = Providers::load().path(&path).files(files).call()?;
+    let providers = tracing::info_span!(target: PHASE_TARGET, "load")
+        .in_scope(|| Providers::load().path(&path).files(files).call())?;
     let mut pipelines: HashMap<Grammar, Pipeline> = HashMap::new();
 
     let mut all_diagnostics = Vec::new();
@@ -226,7 +269,8 @@ async fn run(
             },
         };
 
-        let mut passes = create_lint_passes(&custom_lints, config.options())
+        let mut passes = tracing::info_span!(target: PHASE_TARGET, "configure")
+            .in_scope(|| create_lint_passes(&custom_lints, config.options()))
             .context("failed to configure the custom lints")?;
 
         let Some(grammar) = Grammar::of(file) else {
@@ -277,6 +321,8 @@ async fn run(
         outcome = CheckOutcome::Failure;
     }
 
+    let report = tracing::info_span!(target: PHASE_TARGET, "report");
+
     remedies
         .report(context)
         .await
@@ -298,6 +344,8 @@ async fn run(
             .await
             .context("failed to report a diagnostic")?;
     }
+
+    drop(report);
 
     let outcome = outcome.combine(
         CheckOutcome::from_diagnostics()

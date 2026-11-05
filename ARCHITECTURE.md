@@ -60,6 +60,13 @@ The pipeline is synchronous and handles one file at a time. The command
 loads the provider once per run and constructs a fresh set of lint passes
 for every file, because passes hold state.
 
+Each phase runs in a `tracing` span of one target, `stiles::phase`. The run
+opens `plugins`, `discover`, `load`, and `report` once, and every file opens
+`configure`, `parse`, `decorate`, and `walk`. The hidden flag
+`stiles check --timings <FILE>` sums the spans of each phase and writes the
+sums to the file as JSON. The benchmarks read that file to say which phase a
+change moved.
+
 ### Coverage
 
 A file that no provider covers is an error. Stiles runs no rule on it,

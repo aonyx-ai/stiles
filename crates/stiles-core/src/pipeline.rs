@@ -5,7 +5,7 @@ use stiles_types::{
     Coverage, DecoratedTree, DecorationProvider, Diagnostic, Language, UncoveredFile,
 };
 
-use crate::{Lint, tree_walker};
+use crate::{Lint, PHASE_TARGET, tree_walker};
 
 mod build_pipeline_error;
 mod detect_language_error;
@@ -149,6 +149,9 @@ impl Pipeline {
     /// Decorations merge in provider order. The first decoration of a
     /// type on a node is the one lint rules see.
     ///
+    /// The parse, the decoration, and the walk each run in a span of
+    /// [`PHASE_TARGET`], named `parse`, `decorate`, and `walk`.
+    ///
     /// # Errors
     ///
     /// Returns [`RunPipelineError::NoSyntaxTree`] if parsing fails, and
@@ -200,9 +203,8 @@ impl Pipeline {
         providers: &[&dyn DecorationProvider],
         lints: &mut [Lint<'_>],
     ) -> Result<Vec<Diagnostic>, RunPipelineError> {
-        let tree = self
-            .parser
-            .parse(source, None)
+        let tree = tracing::info_span!(target: PHASE_TARGET, "parse")
+            .in_scope(|| self.parser.parse(source, None))
             .ok_or(RunPipelineError::NoSyntaxTree)?;
 
         let mut decorated = DecoratedTree::builder()
@@ -212,6 +214,7 @@ impl Pipeline {
             .file(path.to_path_buf())
             .build();
 
+        let decorate = tracing::info_span!(target: PHASE_TARGET, "decorate").entered();
         let mut covered = Vec::new();
         let mut gaps = Vec::new();
 
@@ -241,8 +244,10 @@ impl Pipeline {
         for decorations in covered {
             decorated.merge_decorations(decorations);
         }
+        drop(decorate);
 
-        tree_walker::walk_lints(&decorated, lints)
+        tracing::info_span!(target: PHASE_TARGET, "walk")
+            .in_scope(|| tree_walker::walk_lints(&decorated, lints))
             .map_err(|source| RunPipelineError::LintsFailed { source })
     }
 }
