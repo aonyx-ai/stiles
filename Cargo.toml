@@ -134,6 +134,9 @@ thiserror = "2"
 # tests exercise the HTTP client stiles ships rather than a stand-in.
 tiny_http = "0.12"
 toml = "1"
+# Rewrites the stiles requirements of a cached lint checkout and keeps the
+# rest of each manifest as it was written.
+toml_edit = "0.25"
 tree-sitter = "0.27"
 tree-sitter-rust = "0.24"
 # Both grammars come from the one crate: `.ts` files parse with the

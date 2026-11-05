@@ -33,6 +33,7 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 tar.workspace = true
+toml_edit.workspace = true
 stiles-core = { path = "../stiles-core", version = "=0.3.0" }
 stiles-reporting = { path = "../stiles-reporting", version = "=0.3.0" }
 stiles-plugin = { path = "../stiles-plugin", version = "=0.3.0" }

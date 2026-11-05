@@ -10,7 +10,7 @@ use serde::Deserialize;
 ///
 /// Stiles patches each one that a package names to the local source. The
 /// package then builds against the stiles that loads it.
-const STILES_CRATES: [&str; 5] = [
+pub(super) const STILES_CRATES: [&str; 5] = [
     "stiles-types",
     "stiles-plugin",
     "stiles-rust",

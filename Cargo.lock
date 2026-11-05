@@ -4642,6 +4642,7 @@ dependencies = [
  "tempfile",
  "tiny_http",
  "toml",
+ "toml_edit",
  "trycmd",
 ]
 
