@@ -71,10 +71,10 @@ tree:
 mise run rakko -- bench --project stiles --runs 10
 ```
 
-Without `--project`, the run measures the whole corpus. A warm-up run first builds the rules and downloads
-what each project needs. One run with `stiles check --timings` then records
-the time of each phase, and hyperfine times the runs that follow, with their
-peak memory.
+Without `--project`, the run measures the whole corpus. A warm-up run first
+builds the rules and downloads what each project needs. One run with
+`stiles check --timings` then records the time of each phase, and hyperfine
+times the runs that follow, with their peak memory.
 
 `target/bench/<project>` holds the checkout, the export of hyperfine, and
 the record of the phases. `target/bench/results.json` holds the measures of
