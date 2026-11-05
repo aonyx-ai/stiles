@@ -116,8 +116,8 @@ fn definition_hash(input: &DeriveInput) -> String {
 /// becomes, and an explicit `#[doc(...)]` such as `#[doc(hidden)]`. Both
 /// only feed rustdoc. Every other attribute stays, because one such as
 /// `repr` or `decoration` can change what the type means, and the key must
-/// follow every such change. The compiler expands a `cfg_attr` before it
-/// hands the item to a derive, so a `doc` behind a `cfg_attr` arrives here
+/// follow every such change. The compiler expands a `cfg_attr` before a
+/// derive sees the item. A `doc` behind a `cfg_attr` therefore arrives here
 /// as a plain `doc` attribute and leaves too.
 fn without_docs(input: &DeriveInput) -> DeriveInput {
     let mut input = input.clone();
