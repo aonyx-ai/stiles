@@ -126,27 +126,27 @@ fn decorations_are_read_back_on_their_node() {
 
 #[test]
 fn key_follows_a_changed_field_type() {
-    let baseline = definition_digits::<undocumented::Counter>();
+    let baseline = definition_digits::<self::undocumented::Counter>();
 
-    let widened = definition_digits::<widened::Counter>();
+    let widened = definition_digits::<self::widened::Counter>();
 
     assert_ne!(widened, baseline);
 }
 
 #[test]
 fn key_ignores_documentation() {
-    let baseline = definition_digits::<undocumented::Counter>();
+    let baseline = definition_digits::<self::undocumented::Counter>();
 
-    let documented = definition_digits::<documented::Counter>();
+    let documented = definition_digits::<self::documented::Counter>();
 
     assert_eq!(documented, baseline);
 }
 
 #[test]
 fn key_ignores_documentation_behind_cfg_attr() {
-    let baseline = definition_digits::<undocumented::Counter>();
+    let baseline = definition_digits::<self::undocumented::Counter>();
 
-    let documented = definition_digits::<documented_behind_cfg_attr::Counter>();
+    let documented = definition_digits::<self::documented_behind_cfg_attr::Counter>();
 
     assert_eq!(documented, baseline);
 }

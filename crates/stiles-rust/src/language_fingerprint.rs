@@ -21,9 +21,9 @@ include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 /// stabby derives from its report, joined with its key. The report covers
 /// the name and type of every field, recursively. A type a decoration
 /// holds, such as [`TypePath`] inside [`FnSignature`], is therefore
-/// covered without being named here. The key is what a plugin looks the
-/// decoration up by, so a plugin that holds another key is refused rather
-/// than left to find nothing. The list names every type that implements
+/// covered without being named here. A plugin looks a decoration up by its
+/// key. A plugin that holds another key is therefore refused rather than
+/// left to find nothing. The list names every type that implements
 /// [`Decoration`], and a new one belongs on it.
 ///
 /// Everything else in this crate is deliberately absent. Hashing the
