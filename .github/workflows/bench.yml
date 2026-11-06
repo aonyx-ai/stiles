@@ -23,12 +23,9 @@ jobs:
     name: Run the benchmarks
     runs-on: codspeed-macro
 
-    # The repository variable switches the workflow on once CodSpeed is
-    # enabled for the repository. Without it, no job reaches the runner, and
-    # no minute is spent.
     if: >-
-      vars.CODSPEED_BENCHMARKS == 'true' && (github.event_name != 'pull_request'
-      || contains(github.event.pull_request.labels.*.name, 'bench'))
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'bench')
 
     permissions:
       contents: read # The checkout reads the repository.

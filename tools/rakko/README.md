@@ -85,8 +85,7 @@ shared machine, so CI does not run the action on every pull request.
 The `Benchmarks` workflow runs the corpus on a macro runner of [CodSpeed]
 once a week, and on a pull request with the `bench` label. The action
 prepares the corpus there, and CodSpeed times the checks that `codspeed.yml`
-lists. The workflow stays off until the repository variable
-`CODSPEED_BENCHMARKS` is `true`.
+lists.
 
 ## Commands
 
