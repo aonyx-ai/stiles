@@ -47,6 +47,9 @@ rust = [
 "cargo:cargo-deny" = "0.20.2"
 "cargo:cargo-nextest" = "0.9.151"
 "cargo:cargo-udeps" = "0.1.61"
+# The `bench` action times `stiles check` with hyperfine, which also reports
+# the peak memory of each run.
+hyperfine = "2.0.0"
 jq = "1.8.2"
 "npm:markdownlint-cli" = "0.50.0"
 # The release of pre-commit is a Python zipapp, and the registry maps that

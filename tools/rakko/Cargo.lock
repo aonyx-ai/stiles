@@ -381,7 +381,11 @@ dependencies = [
  "rakko-test-rust",
  "rakko-test-rust-docs",
  "rakko-tool",
+ "serde",
+ "serde_json",
+ "tempfile",
  "thiserror",
+ "toml",
 ]
 
 [[package]]

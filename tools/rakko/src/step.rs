@@ -13,11 +13,27 @@ use crate::HarnessError;
 ///
 /// [unresolved]: HarnessError::UnresolvedTool
 pub(crate) async fn cargo(context: &Context) -> Result<Invocation, HarnessError> {
-    let cargo = Tool::resolve(ToolName::new("cargo"), context.root().clone())
-        .await
-        .map_err(|source| HarnessError::UnresolvedTool { source })?;
+    tool(context, "cargo").await
+}
 
-    Ok(cargo.invocation().in_directory(context.root().get()))
+/// Returns a command that runs a tool that mise installed for the project
+///
+/// The command runs in the project root.
+///
+/// # Errors
+///
+/// Returns [`UnresolvedTool`][unresolved] when mise reports no such tool.
+///
+/// [unresolved]: HarnessError::UnresolvedTool
+pub(crate) async fn tool(
+    context: &Context,
+    name: &'static str,
+) -> Result<Invocation, HarnessError> {
+    let tool = Tool::resolve(ToolName::new(name), context.root().clone())
+        .await
+        .map_err(|source| HarnessError::UnresolvedTool { tool: name, source })?;
+
+    Ok(tool.invocation().in_directory(context.root().get()))
 }
 
 /// Runs one command of an action and waits for it to end

@@ -36,6 +36,8 @@ documentation, so the harness mounts `test-rust-docs` on its own.
 
 The library of this package defines the checks that no bundle covers:
 
+- `bench` measures stiles on a corpus of large projects, each pinned to one
+  commit, and writes the results to `target/bench`. See [Benchmarks].
 - `check-abi` compares the record of the plugin boundary with the one on
   `main`, and fails when a fingerprint moved and `ABI_VERSION` did not rise.
 - `check-features` checks each language crate without its default features,
@@ -51,6 +53,34 @@ The library of this package defines the checks that no bundle covers:
 
 The two plugins in `examples` declare a workspace of their own, so the Rust
 actions of the bundles reach them without help.
+
+## Benchmarks
+
+`bench` builds stiles in release mode and checks each project of the corpus
+with the rules that `.config/stiles.toml` pins, built against the working
+tree:
+
+| Project         | What it exercises                                     |
+| --------------- | ----------------------------------------------------- |
+| `stiles`        | This repository at 0.4.0, the small and fast baseline |
+| `rust-analyzer` | A large Rust workspace, with build scripts            |
+| `typescript`    | A large TypeScript project with one `tsconfig.json`   |
+| `trpc`          | A TypeScript monorepo with one `tsconfig.json` each   |
+
+```console
+mise run rakko -- bench --project stiles --runs 10
+```
+
+Without `--project`, the run measures the whole corpus. A warm-up run first
+builds the rules and downloads what each project needs. One run with
+`stiles check --timings` then records the time of each phase, and hyperfine
+times the runs that follow, with their peak memory.
+
+`target/bench/<project>` holds the checkout, the export of hyperfine, and
+the record of the phases. `target/bench/results.json` holds the measures of
+every project in the [Bencher Metric Format]: the wall time, the peak memory,
+and one measure per phase. The numbers vary by a third between runs on a
+shared machine, so CI does not run the action on every pull request.
 
 ## Commands
 
@@ -74,6 +104,8 @@ again, such as `check-latest-deps`. They reach the network and take minutes,
 which belongs in a job and not in front of every commit. A contributor runs
 them by name, and CI runs them on every pull request.
 
+[benchmarks]: #benchmarks
+[bencher metric format]: https://bencher.dev/docs/reference/bencher-metric-format/
 [rakko-baseline]: https://github.com/aonyx-ai/rakko/tree/main/bundles/rakko-baseline
 [rakko-pre-commit]: https://github.com/aonyx-ai/rakko/tree/main/commands/rakko-pre-commit
 [rakko-rust-binary]: https://github.com/aonyx-ai/rakko/tree/main/bundles/rakko-rust-binary
