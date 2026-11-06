@@ -127,6 +127,13 @@ impl CustomLints {
             .collect()
     }
 
+    /// Returns the languages that at least one loaded pass inspects
+    ///
+    /// A provider computes decorations only for these languages.
+    pub(crate) fn languages(&self) -> HashSet<Language> {
+        self.lints.iter().map(|lint| lint.language).collect()
+    }
+
     /// Returns every rule the loaded plugins declare
     ///
     /// This is what a configured rule name is checked against. A plugin

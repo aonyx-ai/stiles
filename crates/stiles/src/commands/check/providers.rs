@@ -1,12 +1,12 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use anyhow::Context as _;
 use bon::bon;
 use stiles_rust::RustDecorationProvider;
 use stiles_types::{
-    Coverage, CoverageGap, DecorateTreeError, DecoratedTree, DecorationProvider, Language,
-    ProviderName,
+    Coverage, CoverageGap, DecorateTreeError, DecoratedTree, DecorationKey, DecorationProvider,
+    DecorationSet, Language, ProviderName,
 };
 use stiles_typescript::TypeScriptDecorationProvider;
 
@@ -30,6 +30,10 @@ use super::grammar::Grammar;
 /// project. It gets a [`CoverageGap::NoProject`] like any file a provider
 /// cannot analyze, so one stray script does not stop the check of every
 /// other file.
+///
+/// A provider computes decorations only for a language that a loaded pass
+/// inspects. For any other language it still decides coverage, because a
+/// file that no toolchain covers is an error whether or not a rule reads it.
 pub(super) struct Providers {
     rust: Option<RustDecorationProvider>,
     typescript: HashMap<PathBuf, TypeScriptDecorationProvider>,
@@ -40,6 +44,10 @@ impl Providers {
     /// Loads the providers for every language among `files`, for a check
     /// of `path`
     ///
+    /// `inspected` holds the languages that at least one loaded pass
+    /// inspects. A provider of any other language answers for coverage
+    /// alone.
+    ///
     /// # Errors
     ///
     /// Returns an error if a needed project cannot be loaded. The context
@@ -47,7 +55,11 @@ impl Providers {
     /// the project files. A TypeScript file with no `tsconfig.json` is not
     /// an error here: [`Providers::for_file`] reports its gap.
     #[builder]
-    pub(super) fn load(path: &Path, files: &[PathBuf]) -> anyhow::Result<Self> {
+    pub(super) fn load(
+        path: &Path,
+        files: &[PathBuf],
+        inspected: &HashSet<Language>,
+    ) -> anyhow::Result<Self> {
         let mut has_rust = false;
         let mut typescript = HashMap::new();
 
@@ -57,15 +69,27 @@ impl Providers {
             };
             match grammar.language() {
                 Language::Rust => has_rust = true,
-                Language::TypeScript => load_typescript_project(file, &mut typescript)
-                    .context("failed to load the TypeScript project for analysis")?,
+                Language::TypeScript => {
+                    let wanted = wanted(
+                        inspected,
+                        Language::TypeScript,
+                        TypeScriptDecorationProvider::DECORATIONS,
+                    );
+                    load_typescript_project(file, &wanted, &mut typescript)
+                        .context("failed to load the TypeScript project for analysis")?;
+                }
             }
         }
 
         let rust = match has_rust {
             true => Some(
                 RustDecorationProvider::load(path)
-                    .context("failed to load the target project for analysis")?,
+                    .context("failed to load the target project for analysis")?
+                    .wanting(wanted(
+                        inspected,
+                        Language::Rust,
+                        RustDecorationProvider::DECORATIONS,
+                    )),
             ),
             false => None,
         };
@@ -124,6 +148,7 @@ impl DecorationProvider for NoTypeScriptProject {
 /// Returns an error if the project that holds `file` cannot be loaded.
 fn load_typescript_project(
     file: &Path,
+    wanted: &DecorationSet,
     projects: &mut HashMap<PathBuf, TypeScriptDecorationProvider>,
 ) -> anyhow::Result<()> {
     let Some(root) = TypeScriptDecorationProvider::project_root(file) else {
@@ -134,9 +159,26 @@ fn load_typescript_project(
     }
 
     let provider = TypeScriptDecorationProvider::load(&root)
-        .with_context(|| format!("load the TypeScript project at {}", root.display()))?;
+        .with_context(|| format!("load the TypeScript project at {}", root.display()))?
+        .wanting(wanted.clone());
     projects.insert(root, provider);
     Ok(())
+}
+
+/// Returns the decoration types that a provider of `language` computes
+///
+/// A language that a loaded pass inspects gets every type of its provider,
+/// because a pass does not yet declare which of them it reads. Any other
+/// language gets none.
+fn wanted(
+    inspected: &HashSet<Language>,
+    language: Language,
+    every: impl IntoIterator<Item = DecorationKey>,
+) -> DecorationSet {
+    match inspected.contains(&language) {
+        true => every.into_iter().collect(),
+        false => DecorationSet::default(),
+    }
 }
 
 #[cfg(test)]
@@ -170,6 +212,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(&[page.clone(), index])
+            .inspected(&HashSet::new())
             .call()
             .expect("both projects should load");
 
@@ -197,6 +240,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(std::slice::from_ref(&file))
+            .inspected(&HashSet::new())
             .call()
             .expect("a file without a project should not stop the load");
         let mut pipeline = Grammar::of(&file)
@@ -230,6 +274,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(&files)
+            .inspected(&HashSet::new())
             .call()
             .expect("the project should load");
 
@@ -244,6 +289,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(std::slice::from_ref(&file))
+            .inspected(&HashSet::new())
             .call()
             .expect("a file without a project should not stop the load");
 
@@ -257,6 +303,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(&[])
+            .inspected(&HashSet::new())
             .call()
             .expect("nothing should load");
 
@@ -270,6 +317,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(&[])
+            .inspected(&HashSet::new())
             .call()
             .expect("nothing should load");
 
@@ -284,6 +332,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(std::slice::from_ref(&file))
+            .inspected(&HashSet::new())
             .call()
             .expect("the TypeScript project should load");
 
@@ -298,6 +347,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(std::slice::from_ref(&file))
+            .inspected(&HashSet::new())
             .call()
             .expect("the TypeScript project should load");
 
@@ -318,6 +368,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(&[page, index])
+            .inspected(&HashSet::new())
             .call()
             .expect("both projects should load");
 
@@ -358,5 +409,34 @@ mod tests {
     fn trait_unpin_providers() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Providers>();
+    }
+
+    #[test]
+    fn wanted_for_a_language_no_pass_inspects_is_empty() {
+        let inspected = HashSet::from([Language::Rust]);
+
+        let wanted = wanted(
+            &inspected,
+            Language::TypeScript,
+            TypeScriptDecorationProvider::DECORATIONS,
+        );
+
+        assert!(wanted.is_empty());
+    }
+
+    #[test]
+    fn wanted_for_an_inspected_language_wants_every_type() {
+        let inspected = HashSet::from([Language::Rust]);
+
+        let wanted = wanted(
+            &inspected,
+            Language::Rust,
+            RustDecorationProvider::DECORATIONS,
+        );
+
+        assert_eq!(
+            wanted,
+            DecorationSet::from_iter(RustDecorationProvider::DECORATIONS)
+        );
     }
 }
