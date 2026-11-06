@@ -7,7 +7,7 @@
 //! which no action of Rakko knows how to do. The actions of this crate cover
 //! both, and the harness mounts them next to the bundles.
 
-/// Types for the action that measures stiles on large codebases
+/// Types for the action that prepares large codebases for the benchmarks
 pub mod bench;
 /// Types for the actions that generate the tsrs bundle and check it
 pub mod bundle_tsrs;
