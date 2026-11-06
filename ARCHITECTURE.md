@@ -56,16 +56,19 @@ flowchart LR
    stdout, rendered with its span, its supporting annotations, and its
    suggested fixes, or as one JSON object per line with `--json`.
 
-The pipeline is synchronous and handles one file at a time. The command
-loads the provider once per run and constructs a fresh set of lint passes
-for every file, because passes hold state.
+The pipeline handles one file at a time, and the command runs one pipeline
+per core. The command loads the providers once per run, and every thread
+decorates through them. It constructs a fresh set of lint passes for every
+file, because passes hold state. The command reports the files in the order
+of discovery, whichever thread finished first.
 
 Each phase runs in a `tracing` span of one target, `stiles::phase`. The run
 opens `plugins`, `discover`, `load`, and `report` once, and every file opens
 `configure`, `parse`, `decorate`, and `walk`. The hidden flag
 `stiles check --timings <FILE>` sums the spans of each phase and writes the
 sums to the file as JSON. The benchmarks read that file to say which phase a
-change moved.
+change moved. The per-file phases run on several threads, so their sums can
+exceed the wall time of the run.
 
 ### Coverage
 

@@ -254,6 +254,11 @@ impl DecorationProvider for RustDecorationProvider {
     /// `give_text_to_files_that_have_none` repairs the database at load
     /// time, and the read here needs no careful order.
     ///
+    /// The provider decorates each file on a clone of the database. A clone
+    /// shares the storage of the original, so it answers from the caches that
+    /// the load filled. The lock guards only the clone, so several threads
+    /// decorate files at the same time.
+    ///
     /// # Errors
     ///
     /// Returns an error if the file path cannot be made absolute or the
@@ -286,13 +291,14 @@ impl DecorationProvider for RustDecorationProvider {
         let db = self
             .db
             .lock()
-            .map_err(|_| DecorateTreeError::PoisonedDatabase)?;
+            .map_err(|_| DecorateTreeError::PoisonedDatabase)?
+            .clone();
 
         let mut targets = Vec::new();
         collect_targets(&tree.root_node(), &mut targets);
 
-        let coverage = attach_db(&*db, || {
-            let sema = Semantics::new(&*db);
+        let coverage = attach_db(&db, || {
+            let sema = Semantics::new(&db);
 
             let Some(module) = sema.file_to_module_def(file_id) else {
                 return Coverage::NotCovered(CoverageGap::Unreachable {
@@ -300,7 +306,7 @@ impl DecorationProvider for RustDecorationProvider {
                 });
             };
 
-            let db_text: &str = db.file_text(file_id).text(&*db);
+            let db_text: &str = db.file_text(file_id).text(&db);
             if db_text != tree.source() {
                 return Coverage::NotCovered(CoverageGap::StaleSource);
             }

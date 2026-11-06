@@ -1,6 +1,7 @@
 mod check_outcome;
 mod error_recovery;
 mod failure_threshold;
+mod file_checks;
 mod file_failure;
 mod finding;
 mod grammar;
@@ -8,21 +9,20 @@ mod phase_timings;
 mod providers;
 
 use std::collections::HashMap;
-use std::collections::hash_map::Entry;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use clawless::exit::Exit;
 use clawless::prelude::*;
-use stiles_core::{Lint, PHASE_TARGET, Pipeline, RunPipelineError};
-use stiles_types::{Diagnostic, RuleOptions, UncoveredFile};
+use stiles_core::{PHASE_TARGET, RunPipelineError};
+use stiles_types::{Diagnostic, UncoveredFile};
 
 use self::check_outcome::CheckOutcome;
 use self::error_recovery::{ErrorRecovery, Walk};
 use self::failure_threshold::FailureThreshold;
+use self::file_checks::{FileCheck, FileChecks};
 use self::file_failure::FileFailure;
 use self::finding::Finding;
-use self::grammar::Grammar;
 use self::phase_timings::PhaseTimings;
 use self::providers::Providers;
 use super::closing_text::ClosingText;
@@ -50,20 +50,6 @@ pub(crate) struct CheckArgs {
     /// The flag serves the benchmarks of stiles, so the help leaves it out.
     #[arg(long, value_name = "FILE", hide = true)]
     timings: Option<PathBuf>,
-}
-
-/// Builds the lint passes the CLI runs
-///
-/// Stiles links no rules of its own. Every rule is a plugin that the
-/// project names in its configuration, and stiles builds and loads it at
-/// the start of a run. A rule that is not configured does not run, however
-/// complete its own tests are. Nothing is enabled by default, and the
-/// configuration is the whole answer to what a check does.
-fn create_lint_passes(
-    custom_lints: &CustomLints,
-    options: &RuleOptions,
-) -> anyhow::Result<Vec<Lint<'static>>> {
-    custom_lints.instantiate(options)
 }
 
 /// The distinct remedies for the files this run could not analyze
@@ -247,72 +233,62 @@ async fn run(
 
     let providers = tracing::info_span!(target: PHASE_TARGET, "load")
         .in_scope(|| Providers::load().path(&path).files(files).call())?;
-    let mut pipelines: HashMap<Grammar, Pipeline> = HashMap::new();
+    let checks = FileChecks::run()
+        .files(files)
+        .providers(&providers)
+        .custom_lints(&custom_lints)
+        .options(config.options())
+        .call()?;
 
     let mut all_diagnostics = Vec::new();
     let mut sources: HashMap<Arc<Path>, String> = HashMap::new();
     let mut remedies = CoverageRemedies::default();
     let mut failures: Vec<FileFailure> = Vec::new();
 
-    for file in files {
+    for (file, check) in files.iter().zip(checks) {
         context
             .output()
             .detail(format!("checking {}", file.display()))
             .await
             .context("failed to report progress")?;
 
-        let source = match std::fs::read_to_string(file) {
-            Ok(source) => source,
-            Err(e) => match recovery.record(&mut failures, file, anyhow::Error::new(e)) {
-                Walk::Continue => continue,
-                Walk::Stop => break,
-            },
-        };
-
-        let mut passes = tracing::info_span!(target: PHASE_TARGET, "configure")
-            .in_scope(|| create_lint_passes(&custom_lints, config.options()))
-            .context("failed to configure the custom lints")?;
-
-        let Some(grammar) = Grammar::of(file) else {
-            let error = anyhow::anyhow!("stiles has no grammar for {}", file.display());
-            match recovery.record(&mut failures, file, error) {
-                Walk::Continue => continue,
-                Walk::Stop => break,
+        let error = match check {
+            FileCheck::Unreadable { source } => anyhow::Error::new(source),
+            FileCheck::NoGrammar => {
+                anyhow::anyhow!("stiles has no grammar for {}", file.display())
             }
-        };
-        let pipeline = match pipelines.entry(grammar) {
-            Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => entry.insert(
-                grammar
-                    .pipeline()
-                    .context("failed to initialize pipeline")?,
-            ),
-        };
-        let providers = providers.for_file(file, grammar.language());
-
-        match pipeline.run_on_source(&source, file, &providers, &mut passes) {
-            Ok(diagnostics) => {
+            FileCheck::Checked {
+                text,
+                result: Ok(diagnostics),
+            } => {
                 let diagnostics: Vec<_> = diagnostics
                     .into_iter()
                     .filter(|diagnostic| config.rules().admits(&diagnostic.rule_id()))
                     .collect();
 
-                if !diagnostics.is_empty() {
+                if let Some(text) = text
+                    && !diagnostics.is_empty()
+                {
                     let arc_path: Arc<Path> = file.clone().into();
-                    sources.insert(arc_path, source);
+                    sources.insert(arc_path, text);
                     all_diagnostics.extend(diagnostics);
                 }
+                continue;
             }
-            Err(error) => {
+            FileCheck::Checked {
+                text: _,
+                result: Err(error),
+            } => {
                 if let RunPipelineError::Uncovered { source } = &error {
                     remedies.record(source);
                 }
-
-                match recovery.record(&mut failures, file, anyhow::Error::new(error)) {
-                    Walk::Continue => {}
-                    Walk::Stop => break,
-                }
+                anyhow::Error::new(error)
             }
+        };
+
+        match recovery.record(&mut failures, file, error) {
+            Walk::Continue => {}
+            Walk::Stop => break,
         }
     }
 
