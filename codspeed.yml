@@ -1,0 +1,28 @@
+---
+# CodSpeed reads this file in the `Benchmarks` workflow. Each benchmark checks
+# one project of the corpus that `mise run rakko -- bench` fetches and warms
+# up, so the checkouts below exist and the rules are built before a round
+# runs. The harness warms up each project, so CodSpeed does not. A run of a
+# large project takes minutes, so three rounds bound the minutes that a run
+# of the workflow spends on the runner.
+options:
+  warmup-time: 0s
+  max-rounds: 3
+
+benchmarks:
+  - name: stiles
+    exec: >-
+      target/release/stiles check --keep-going
+      target/bench/stiles/checkout
+  - name: rust-analyzer
+    exec: >-
+      target/release/stiles check --keep-going
+      target/bench/rust-analyzer/checkout
+  - name: typescript
+    exec: >-
+      target/release/stiles check --keep-going
+      target/bench/typescript/checkout/src/compiler
+  - name: trpc
+    exec: >-
+      target/release/stiles check --keep-going
+      target/bench/trpc/checkout/packages

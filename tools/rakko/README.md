@@ -82,6 +82,12 @@ every project in the [Bencher Metric Format]: the wall time, the peak memory,
 and one measure per phase. The numbers vary by a third between runs on a
 shared machine, so CI does not run the action on every pull request.
 
+The `Benchmarks` workflow runs the corpus on a macro runner of [CodSpeed]
+once a week, and on a pull request with the `bench` label. The action
+prepares the corpus there, and CodSpeed times the checks that `codspeed.yml`
+lists. The workflow stays off until the repository variable
+`CODSPEED_BENCHMARKS` is `true`.
+
 ## Commands
 
 ### `pre-commit`
@@ -105,6 +111,7 @@ which belongs in a job and not in front of every commit. A contributor runs
 them by name, and CI runs them on every pull request.
 
 [benchmarks]: #benchmarks
+[codspeed]: https://codspeed.io
 [bencher metric format]: https://bencher.dev/docs/reference/bencher-metric-format/
 [rakko-baseline]: https://github.com/aonyx-ai/rakko/tree/main/bundles/rakko-baseline
 [rakko-pre-commit]: https://github.com/aonyx-ai/rakko/tree/main/commands/rakko-pre-commit
