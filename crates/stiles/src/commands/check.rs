@@ -245,8 +245,13 @@ async fn run(
         path.display()
     );
 
-    let providers = tracing::info_span!(target: PHASE_TARGET, "load")
-        .in_scope(|| Providers::load().path(&path).files(files).call())?;
+    let providers = tracing::info_span!(target: PHASE_TARGET, "load").in_scope(|| {
+        Providers::load()
+            .path(&path)
+            .files(files)
+            .inspected(&custom_lints.languages())
+            .call()
+    })?;
     let mut pipelines: HashMap<Grammar, Pipeline> = HashMap::new();
 
     let mut all_diagnostics = Vec::new();

@@ -11,8 +11,8 @@ use stiles_rust::decorations::{
 };
 use stiles_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter};
 use stiles_types::{
-    Coverage, CoverageGap, DecoratedNode, DecoratedTree, DecorationProvider, Diagnostic, Language,
-    LintPass, Severity, Span,
+    Coverage, CoverageGap, DecoratedNode, DecoratedTree, Decoration as _, DecorationProvider,
+    DecorationSet, Diagnostic, Language, LintPass, Severity, Span,
 };
 
 static PROVIDER: OnceLock<RustDecorationProvider> = OnceLock::new();
@@ -1376,6 +1376,59 @@ fn try_operand_on_method_call_is_typed_as_the_call_result() {
 ///
 /// The old start-offset lookup only resolved scrutinees that are a bare
 /// name. This test pins a shape that lookup used to miss.
+/// Loads the fixture with a provider that computes only `wanted`
+///
+/// Each test loads its own provider, because the shared one computes every
+/// decoration type.
+fn load_provider_wanting(wanted: DecorationSet) -> RustDecorationProvider {
+    RustDecorationProvider::load(&fixture_path())
+        .expect("should load fixture")
+        .wanting(wanted)
+}
+
+/// Returns the scrutinee of the first match in `match_on_enum`
+fn match_on_enum_scrutinee<'a>(root: &DecoratedNode<'a>) -> DecoratedNode<'a> {
+    let func = find_function_by_name(root, "match_on_enum").expect("should find the function");
+    let match_expr =
+        find_first_node_of_kind(&func, "match_expression").expect("should find match_expression");
+    match_expr
+        .child_by_field_name("value")
+        .expect("match should have value field")
+}
+
+#[test]
+fn wanting_no_decorations_attaches_no_signature() {
+    let provider = load_provider_wanting(DecorationSet::default());
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let func = find_function_by_name(&root, "match_on_enum").expect("should find the function");
+
+    assert!(func.decoration::<FnSignature>().is_none());
+}
+
+#[test]
+fn wanting_only_signatures_leaves_a_scrutinee_untyped() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([FnSignature::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let scrutinee = match_on_enum_scrutinee(&root);
+
+    assert!(scrutinee.decoration::<ResolvedType>().is_none());
+}
+
+#[test]
+fn wanting_only_signatures_signs_a_function() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([FnSignature::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let func = find_function_by_name(&root, "match_on_enum").expect("should find the function");
+
+    assert!(func.decoration::<FnSignature>().is_some());
+}
+
 #[test]
 fn wildcard_match_arm_flags_a_scrutinee_reached_through_a_field() {
     let provider = load_provider();

@@ -16,8 +16,8 @@ use ra_ap_project_model::{CargoConfig, ProjectManifest, ProjectWorkspace};
 use ra_ap_syntax::{AstNode, Edition, NodeOrToken, SyntaxNode, TextRange, TextSize, ast};
 use ra_ap_vfs::{AbsPathBuf, FileExcluded, Vfs};
 use stiles_types::{
-    Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, DecorationMap,
-    DecorationProvider, ProviderName,
+    Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, Decoration as _,
+    DecorationKey, DecorationMap, DecorationProvider, DecorationSet, ProviderName,
 };
 
 use crate::decorations::{
@@ -49,11 +49,63 @@ pub struct RustDecorationProvider {
     db: Mutex<RootDatabase>,
     vfs: Vfs,
     root: Arc<Path>,
+    wanted: DecorationSet,
 }
 
 impl RustDecorationProvider {
     /// Identifies this provider in diagnostics
     const NAME: ProviderName = ProviderName::new("rust");
+
+    /// The decoration types that this provider attaches to nodes
+    ///
+    /// A provider computes all of them unless [`wanting`] narrows the set.
+    /// The other decoration types of this crate are fields of these.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::DecorationSet;
+    /// use stiles_rust::RustDecorationProvider;
+    ///
+    /// let every = DecorationSet::from_iter(RustDecorationProvider::DECORATIONS);
+    ///
+    /// assert!(!every.is_empty());
+    /// ```
+    ///
+    /// [`wanting`]: RustDecorationProvider::wanting
+    pub const DECORATIONS: [DecorationKey; 5] = [
+        FnSignature::KEY,
+        ResolvedType::KEY,
+        AdtFlags::KEY,
+        ImportSource::KEY,
+        Reexports::KEY,
+    ];
+
+    /// Returns the provider, computing only the decoration types of `wanted`
+    ///
+    /// Each kind of target yields some of [`DECORATIONS`], and the provider
+    /// skips a target whose types `wanted` leaves out. With an empty set,
+    /// the provider still decides whether it covers a file, and attaches
+    /// nothing to it.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::Path;
+    ///
+    /// use stiles_rust::RustDecorationProvider;
+    /// use stiles_types::DecorationSet;
+    ///
+    /// let provider =
+    ///     RustDecorationProvider::load(Path::new("."))?.wanting(DecorationSet::default());
+    /// # Ok::<(), stiles_rust::LoadRustWorkspaceError>(())
+    /// ```
+    ///
+    /// [`DECORATIONS`]: RustDecorationProvider::DECORATIONS
+    #[must_use]
+    pub fn wanting(self, wanted: DecorationSet) -> Self {
+        Self { wanted, ..self }
+    }
 
     /// Loads a Cargo workspace for semantic analysis
     ///
@@ -140,6 +192,7 @@ impl RustDecorationProvider {
             db: Mutex::new(db),
             vfs,
             root,
+            wanted: Self::DECORATIONS.into_iter().collect(),
         })
     }
 
@@ -161,6 +214,7 @@ impl RustDecorationProvider {
             db: Mutex::new(RootDatabase::default()),
             vfs: Vfs::default(),
             root: Arc::from(Path::new(".")),
+            wanted: Self::DECORATIONS.into_iter().collect(),
         }
     }
 
@@ -289,7 +343,7 @@ impl DecorationProvider for RustDecorationProvider {
             .map_err(|_| DecorateTreeError::PoisonedDatabase)?;
 
         let mut targets = Vec::new();
-        collect_targets(&tree.root_node(), &mut targets);
+        collect_targets(&tree.root_node(), &self.wanted, &mut targets);
 
         let coverage = attach_db(&*db, || {
             let sema = Semantics::new(&*db);
@@ -305,7 +359,10 @@ impl DecorationProvider for RustDecorationProvider {
                 return Coverage::NotCovered(CoverageGap::StaleSource);
             }
 
-            Coverage::Covered(resolve_targets(&sema, file_id, module, &targets))
+            match targets.is_empty() {
+                true => Coverage::Covered(DecorationMap::new()),
+                false => Coverage::Covered(resolve_targets(&sema, file_id, module, &targets)),
+            }
         });
 
         Ok(coverage)
@@ -451,10 +508,12 @@ fn text_range_of(node: &DecoratedNode<'_>) -> Option<TextRange> {
     text_range_from(node.raw().byte_range())
 }
 
-fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
+fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &mut Vec<Target>) {
     match node.kind() {
         "function_item" | "function_signature_item" => {
-            if let Some(range) = text_range_of(node) {
+            if wanted.contains_any(&[FnSignature::KEY])
+                && let Some(range) = text_range_of(node)
+            {
                 targets.push(Target::Function {
                     node_id: node.id(),
                     range,
@@ -462,7 +521,8 @@ fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
             }
         }
         "match_expression" => {
-            if let Some(scrutinee) = node.child_by_field_name("value")
+            if wanted.contains_any(&[ResolvedType::KEY, AdtFlags::KEY])
+                && let Some(scrutinee) = node.child_by_field_name("value")
                 && let Some(scrutinee_range) = text_range_of(&scrutinee)
             {
                 targets.push(Target::MatchScrutinee {
@@ -472,7 +532,9 @@ fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
             }
         }
         "if_expression" => {
-            if let Some(alt) = node.child_by_field_name("alternative") {
+            if wanted.contains_any(&[ResolvedType::KEY])
+                && let Some(alt) = node.child_by_field_name("alternative")
+            {
                 let block = alt.named_child(0).unwrap_or(alt);
                 if let Some(branch_range) = text_range_of(&block) {
                     targets.push(Target::IfElse {
@@ -483,7 +545,8 @@ fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
             }
         }
         "try_expression" => {
-            if let Some(operand) = node.named_child(0)
+            if wanted.contains_any(&[ResolvedType::KEY])
+                && let Some(operand) = node.named_child(0)
                 && let Some(operand_range) = text_range_of(&operand)
             {
                 targets.push(Target::TryExpr {
@@ -493,13 +556,17 @@ fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
             }
         }
         "use_declaration" => {
-            if let Some(range) = text_range_of(node) {
+            if wanted.contains_any(&[ImportSource::KEY])
+                && let Some(range) = text_range_of(node)
+            {
                 targets.push(Target::Import {
                     node_id: node.id(),
                     range,
                 });
             }
-            if let Some(argument) = node.child_by_field_name("argument") {
+            if wanted.contains_any(&[Reexports::KEY])
+                && let Some(argument) = node.child_by_field_name("argument")
+            {
                 collect_import_paths(&argument, targets);
             }
         }
@@ -507,7 +574,7 @@ fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
     }
 
     for child in node.named_children() {
-        collect_targets(&child, targets);
+        collect_targets(&child, wanted, targets);
     }
 }
 
@@ -1195,6 +1262,7 @@ mod tests {
             db: Mutex::new(RootDatabase::default()),
             vfs,
             root: Arc::from(Path::new("/")),
+            wanted: RustDecorationProvider::DECORATIONS.into_iter().collect(),
         };
         let tree = parse_rust("fn main() {}\n", file_path);
 
