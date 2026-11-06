@@ -19,6 +19,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A week without a merge leaves main where the last run measured it, and a
+  # second run of the same commit spends the minutes for nothing. The check
+  # runs on a runner of GitHub, because a job on the macro runner spends its
+  # minutes even when it stops at once.
+  changes:
+    name: Look for a change since the last run
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+
+    permissions:
+      actions: read # The check reads the earlier runs of this workflow.
+
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+
+    steps:
+      - name: Compare main with the last successful run
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          last=$(gh run list --repo "${REPOSITORY}" --workflow bench.yml \
+              --branch main --status success --limit 1 \
+              --json headSha --jq '.[0].headSha // ""')
+
+          if [ "${last}" = "${HEAD}" ]; then
+              echo "changed=false" >> "${GITHUB_OUTPUT}"
+          else
+              echo "changed=true" >> "${GITHUB_OUTPUT}"
+          fi
+
   benchmarks:
     name: Run the benchmarks
     runs-on: codspeed-macro
@@ -27,9 +62,15 @@ jobs:
     # an hour, so two hours leave room for a run that works.
     timeout-minutes: 120
 
+    # Only a scheduled run asks `changes`, so the job also runs when that one
+    # skipped. A run by hand or on a labeled pull request always measures.
+    needs: changes
     if: >-
-      github.event_name != 'pull_request'
-      || contains(github.event.pull_request.labels.*.name, 'bench')
+      always()
+      && (needs.changes.result == 'skipped'
+      || needs.changes.outputs.changed == 'true')
+      && (github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'bench'))
 
     permissions:
       contents: read # The checkout reads the repository.
