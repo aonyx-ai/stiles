@@ -36,8 +36,9 @@ documentation, so the harness mounts `test-rust-docs` on its own.
 
 The library of this package defines the checks that no bundle covers:
 
-- `bench` measures stiles on a corpus of large projects, each pinned to one
-  commit, and writes the results to `target/bench`. See [Benchmarks].
+- `bench` prepares a corpus of large projects, each pinned to one commit,
+  for CodSpeed to time, and records the phases of stiles on each in
+  `target/bench`. See [Benchmarks].
 - `check-abi` compares the record of the plugin boundary with the one on
   `main`, and fails when a fingerprint moved and `ABI_VERSION` did not rise.
 - `check-features` checks each language crate without its default features,
@@ -56,7 +57,7 @@ actions of the bundles reach them without help.
 
 ## Benchmarks
 
-`bench` builds stiles in release mode and checks each project of the corpus
+`bench` builds stiles in release mode and prepares each project of the corpus
 with the rules that `.config/stiles.toml` pins, built against the working
 tree:
 
@@ -68,19 +69,18 @@ tree:
 | `trpc`          | A TypeScript monorepo with one `tsconfig.json` each   |
 
 ```console
-mise run rakko -- bench --project stiles --runs 10
+mise run rakko -- bench --project stiles
 ```
 
-Without `--project`, the run measures the whole corpus. A warm-up run first
+Without `--project`, the run prepares the whole corpus. A warm-up run first
 builds the rules and downloads what each project needs. One run with
-`stiles check --timings` then records the time of each phase, and hyperfine
-times the runs that follow, with their peak memory.
+`stiles check --timings` then records the time of each phase. The action
+times nothing more: the wall time comes from CodSpeed.
 
-`target/bench/<project>` holds the checkout, the export of hyperfine, and
-the record of the phases. `target/bench/results.json` holds the measures of
-every project in the [Bencher Metric Format]: the wall time, the peak memory,
-and one measure per phase. The numbers vary by a third between runs on a
-shared machine, so CI does not run the action on every pull request.
+`target/bench/<project>` holds the checkout and the record of the phases.
+`target/bench/results.json` holds the phases of every project in the
+[Bencher Metric Format]. CI does not run the action on every pull request,
+because a large project takes many minutes.
 
 The `Benchmarks` workflow runs the corpus on a macro runner of [CodSpeed]
 once a week, and on a pull request with the `bench` label. The action

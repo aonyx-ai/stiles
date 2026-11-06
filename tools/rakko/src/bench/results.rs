@@ -13,38 +13,16 @@ const SUMMARY_PHASES: usize = 3;
 /// The number of nanoseconds in a second
 const NANOSECONDS: f64 = 1e9;
 
-/// The number of bytes in a gibibyte
-const GIBIBYTE: f64 = 1024.0 * 1024.0 * 1024.0;
-
-/// What the benchmarks measured on one project of the corpus
+/// What the benchmarks recorded on one project of the corpus
 ///
-/// The wall time and the peak memory come from the timed runs of hyperfine.
-/// The phases come from one more run with `--timings`, so they split a run
-/// of the same kind, and not the mean of the timed runs.
+/// The phases come from one run with `--timings`, after a warm-up. The wall
+/// time of a run comes from CodSpeed, which times the projects itself.
 #[derive(Clone, PartialEq, Debug)]
 pub(super) struct Measurement {
     /// The name of the project
     project: &'static str,
-    /// The wall time of a run, in seconds
-    wall: Statistic,
-    /// The peak resident memory of a run, in bytes, where the platform
-    /// reports it
-    memory: Option<Statistic>,
     /// The time of each phase of the run with `--timings`, in its order
     phases: Vec<Phase>,
-}
-
-/// The summary of one metric over the timed runs, as hyperfine writes it
-#[derive(Copy, Clone, PartialEq, Debug, Deserialize)]
-struct Statistic {
-    /// The mean of the runs
-    mean: f64,
-    /// The smallest value of the runs
-    min: f64,
-    /// The largest value of the runs
-    max: f64,
-    /// The standard deviation of the runs, which one run does not have
-    stddev: Option<f64>,
 }
 
 /// The time of one phase, as `stiles check --timings` writes it
@@ -54,29 +32,6 @@ struct Phase {
     name: String,
     /// The summed time of the spans of the phase
     seconds: f64,
-}
-
-/// The file that `hyperfine --export-json` writes, in its second schema
-#[derive(Clone, PartialEq, Debug, Deserialize)]
-struct Export {
-    /// One result per benchmarked command
-    results: Vec<ExportResult>,
-}
-
-/// The result of one benchmarked command in an export of hyperfine
-#[derive(Clone, PartialEq, Debug, Deserialize)]
-struct ExportResult {
-    /// The summary of each metric over the runs
-    summary: Summaries,
-}
-
-/// The summaries of the metrics that the bench action reads
-#[derive(Clone, PartialEq, Debug, Deserialize)]
-struct Summaries {
-    /// The wall time, in seconds
-    time_wall_clock: Statistic,
-    /// The peak resident memory, in bytes, where the platform reports it
-    memory_peak_resident: Option<Statistic>,
 }
 
 /// The file that `stiles check --timings` writes
@@ -89,75 +44,35 @@ struct Timings {
 /// One measure of a benchmark in the Bencher Metric Format
 ///
 /// The format is plain JSON, and services such as Bencher ingest it as it
-/// is. A benchmark maps the name of each measure to its value, with the
-/// smallest and the largest value of the runs where there were several.
+/// is. A benchmark maps the name of each measure to its value.
 #[derive(Copy, Clone, PartialEq, Debug, Serialize)]
 struct Metric {
     /// The value of the measure
     value: f64,
-    /// The smallest value of the runs
-    #[serde(skip_serializing_if = "Option::is_none")]
-    lower_value: Option<f64>,
-    /// The largest value of the runs
-    #[serde(skip_serializing_if = "Option::is_none")]
-    upper_value: Option<f64>,
 }
 
 impl Measurement {
-    /// Reads the export of hyperfine and the record of the phases of a project
+    /// Reads the record of the phases of a project
     ///
     /// # Errors
     ///
-    /// Returns an error when a file cannot be read, holds no JSON of the
-    /// expected shape, or the export holds no result.
-    pub(super) fn load(
-        project: &'static str,
-        export: &Path,
-        timings: &Path,
-    ) -> Result<Self, HarnessError> {
-        let Export { results } = read_json(export)?;
+    /// Returns an error when the record cannot be read or holds no JSON of
+    /// the expected shape.
+    pub(super) fn load(project: &'static str, timings: &Path) -> Result<Self, HarnessError> {
         let Timings { phases } = read_json(timings)?;
 
-        let Some(ExportResult {
-            summary:
-                Summaries {
-                    time_wall_clock,
-                    memory_peak_resident,
-                },
-        }) = results.into_iter().next()
-        else {
-            return Err(HarnessError::EmptyExport {
-                path: export.to_path_buf(),
-            });
-        };
-
-        Ok(Self {
-            project,
-            wall: time_wall_clock,
-            memory: memory_peak_resident,
-            phases,
-        })
+        Ok(Self { project, phases })
     }
 
-    /// Returns one line that says what the project measured
+    /// Returns one line that says what the project recorded
     ///
-    /// The line names the mean wall time and its spread, the mean peak
-    /// memory, and the phases that took the longest.
+    /// The line names the sum of the phases and the phases that took the
+    /// longest.
     pub(super) fn summary(&self) -> String {
-        let Self {
-            project,
-            wall,
-            memory,
-            phases,
-        } = self;
+        let Self { project, phases } = self;
 
-        let mut line = format!("{project}: {:.2} s", wall.mean);
-        if let Some(stddev) = wall.stddev {
-            let _ = write!(line, " ± {stddev:.2} s");
-        }
-        if let Some(memory) = memory {
-            let _ = write!(line, ", peak {:.2} GiB", memory.mean / GIBIBYTE);
-        }
+        let total: f64 = phases.iter().map(|phase| phase.seconds).sum();
+        let mut line = format!("{project}: {total:.2} s in its phases");
 
         let mut longest: Vec<&Phase> = phases.iter().collect();
         longest.sort_by(|a, b| b.seconds.total_cmp(&a.seconds));
@@ -170,45 +85,22 @@ impl Measurement {
 
     /// Returns the measures of the project in the Bencher Metric Format
     ///
-    /// Times are in nanoseconds and memory in bytes, the units that the
-    /// format expects for latency. Each phase is a measure of its own, so a
-    /// regression points at the phase that it is in.
+    /// Each phase is a measure of its own, in nanoseconds, the unit that the
+    /// format expects for a time. A regression then points at its phase.
     fn metrics(&self) -> BTreeMap<String, Metric> {
-        let Self {
-            project: _,
-            wall,
-            memory,
-            phases,
-        } = self;
+        let Self { project: _, phases } = self;
 
-        let mut metrics = BTreeMap::new();
-        metrics.insert("latency".to_owned(), wall.metric(NANOSECONDS));
-        if let Some(memory) = memory {
-            metrics.insert("peak-memory".to_owned(), memory.metric(1.0));
-        }
-        for Phase { name, seconds } in phases {
-            metrics.insert(
-                format!("phase-{name}"),
-                Metric {
-                    value: seconds * NANOSECONDS,
-                    lower_value: None,
-                    upper_value: None,
-                },
-            );
-        }
-
-        metrics
-    }
-}
-
-impl Statistic {
-    /// Returns the statistic as a measure, with every value times `scale`
-    fn metric(self, scale: f64) -> Metric {
-        Metric {
-            value: self.mean * scale,
-            lower_value: Some(self.min * scale),
-            upper_value: Some(self.max * scale),
-        }
+        phases
+            .iter()
+            .map(|Phase { name, seconds }| {
+                (
+                    format!("phase-{name}"),
+                    Metric {
+                        value: seconds * NANOSECONDS,
+                    },
+                )
+            })
+            .collect()
     }
 }
 
@@ -285,18 +177,6 @@ mod tests {
 
     use super::*;
 
-    /// An export of hyperfine 2 with three runs, cut to what the action reads
-    const EXPORT: &str = r#"{
-        "schema_version": 2,
-        "results": [{
-            "command": "stiles check --keep-going .",
-            "summary": {
-                "time_wall_clock": {"unit": "second", "count": 3, "mean": 2.5, "stddev": 0.25, "median": 2.5, "min": 2.0, "max": 3.0},
-                "memory_peak_resident": {"unit": "byte", "count": 3, "mean": 2147483648.0, "stddev": 0.0, "median": 2147483648.0, "min": 2147483648.0, "max": 2147483648.0}
-            }
-        }]
-    }"#;
-
     /// A record of `stiles check --timings` with four phases
     const TIMINGS: &str = r#"{"phases": [
         {"name": "plugins", "spans": 1, "seconds": 0.5},
@@ -305,42 +185,23 @@ mod tests {
         {"name": "walk", "spans": 9, "seconds": 0.125}
     ]}"#;
 
-    /// Returns the measurement of the export and the record above
+    /// Returns the measurement of the record above
     fn measurement() -> Measurement {
         let directory = tempfile::tempdir().unwrap();
-        let export = directory.path().join("hyperfine.json");
         let timings = directory.path().join("timings.json");
-        fs::write(&export, EXPORT).unwrap();
         fs::write(&timings, TIMINGS).unwrap();
 
-        Measurement::load("stiles", &export, &timings).unwrap()
+        Measurement::load("stiles", &timings).unwrap()
     }
 
     #[test]
-    fn load_with_an_empty_export_fails() {
+    fn load_without_a_record_fails() {
         let directory = tempfile::tempdir().unwrap();
-        let export = directory.path().join("hyperfine.json");
         let timings = directory.path().join("timings.json");
-        fs::write(&export, r#"{"results": []}"#).unwrap();
-        fs::write(&timings, TIMINGS).unwrap();
 
-        let error = Measurement::load("stiles", &export, &timings).unwrap_err();
+        let error = Measurement::load("stiles", &timings).unwrap_err();
 
-        assert!(error.to_string().contains("hyperfine.json"), "{error}");
-    }
-
-    #[test]
-    fn metrics_give_the_latency_in_nanoseconds() {
-        let metrics = measurement().metrics();
-
-        assert_eq!(
-            metrics["latency"],
-            Metric {
-                value: 2.5e9,
-                lower_value: Some(2.0e9),
-                upper_value: Some(3.0e9),
-            }
-        );
+        assert!(error.to_string().contains("timings.json"), "{error}");
     }
 
     #[test]
@@ -352,14 +213,19 @@ mod tests {
         assert_eq!(
             names,
             [
-                "latency",
-                "peak-memory",
                 "phase-decorate",
                 "phase-load",
                 "phase-plugins",
                 "phase-walk"
             ]
         );
+    }
+
+    #[test]
+    fn metrics_give_a_phase_in_nanoseconds() {
+        let metrics = measurement().metrics();
+
+        assert_eq!(metrics["phase-decorate"], Metric { value: 1.5e9 });
     }
 
     #[test]
@@ -407,7 +273,7 @@ mod tests {
 
         assert_eq!(
             summary,
-            "stiles: 2.50 s ± 0.25 s, peak 2.00 GiB, decorate 1.50 s, plugins 0.50 s, load 0.25 s"
+            "stiles: 2.38 s in its phases, decorate 1.50 s, plugins 0.50 s, load 0.25 s"
         );
     }
 

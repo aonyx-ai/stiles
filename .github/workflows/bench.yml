@@ -87,23 +87,22 @@ jobs:
       - name: Set up the tools
         uses: $/.github/actions/setup
 
-      # The harness fetches each project, builds the rules, and warms up, so
-      # that `codspeed.yml` finds the checkouts ready. One timed run keeps the
-      # minutes of the preparation low. Its results stay on the runner. Each
-      # project prepares in a step of its own: a runner that dies takes the
-      # log of the job with it, and the step that it died in still names the
-      # project.
+      # The harness fetches each project, builds the rules, warms up, and
+      # records the phases, so that `codspeed.yml` finds the checkouts ready.
+      # Each project prepares in a step of its own: a runner that dies takes
+      # the log of the job with it, and the step that it died in still names
+      # the project.
       - name: Prepare stiles
-        run: mise run rakko -- bench --project stiles --runs 1
+        run: mise run rakko -- bench --project stiles
 
       - name: Prepare rust-analyzer
-        run: mise run rakko -- bench --project rust-analyzer --runs 1
+        run: mise run rakko -- bench --project rust-analyzer
 
       - name: Prepare typescript
-        run: mise run rakko -- bench --project typescript --runs 1
+        run: mise run rakko -- bench --project typescript
 
       - name: Prepare trpc
-        run: mise run rakko -- bench --project trpc --runs 1
+        run: mise run rakko -- bench --project trpc
 
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@af75f77f17a054769abefaa42fe8dc2975469b5f # v5.6.3
@@ -112,7 +111,7 @@ jobs:
 
       # CodSpeed shows the wall time of each project, and its flame graphs
       # show where a run went. The harness also records the time of each
-      # phase and the peak memory, which the artifact keeps beside the run.
+      # phase, which the artifact keeps beside the run.
       - name: Keep the results of the harness
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -121,5 +120,4 @@ jobs:
           path: |
             target/bench/results.json
             target/bench/*/timings.json
-            target/bench/*/hyperfine.json
           if-no-files-found: ignore

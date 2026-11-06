@@ -39,13 +39,6 @@ pub enum HarnessError {
         source: IoError,
     },
 
-    /// An export of hyperfine holds no result
-    #[error("{} holds no result", path.display())]
-    EmptyExport {
-        /// The export that the run read
-        path: PathBuf,
-    },
-
     /// A JSON file that a tool of the run wrote holds something else
     #[error("failed to parse {} as JSON", path.display())]
     UnparsableJson {

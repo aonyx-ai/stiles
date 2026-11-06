@@ -13,7 +13,7 @@ use rakko_action::{
 use rakko_tool::{Execution, Invocation};
 
 pub use self::args::BenchArgs;
-use self::corpus::{CONFIG, Project, RulesPin};
+use self::corpus::{CONFIG, RulesPin};
 use self::results::Measurement;
 use crate::{HarnessError, step};
 
@@ -23,19 +23,20 @@ const OUTPUT: &str = "target/bench";
 /// The file under [`OUTPUT`] that holds the measures of every project
 const RESULTS: &str = "results.json";
 
-/// The action that measures stiles on large codebases
+/// The action that prepares large codebases for the benchmarks of stiles
 ///
 /// The run builds stiles in release mode, as a user installs it. For each
 /// project of the corpus, it fetches the pinned commit and writes a
 /// configuration of stiles into the checkout. The configuration names the
 /// rules that this repository pins, built against this working tree. The
-/// run then checks the project three ways:
+/// run then checks the project twice:
 ///
 /// 1. One run that warms up. It builds the rules and downloads what the
 ///    toolchain of the project needs, so neither reaches the numbers.
 /// 2. One run with `--timings`, which records the time of each phase.
-/// 3. The timed runs, under hyperfine, which record the wall time and the
-///    peak memory of the whole process.
+///
+/// The action times nothing more. CodSpeed times the checks of the prepared
+/// projects, on hardware quiet enough for the numbers to mean something.
 ///
 /// Each check passes `--keep-going`, so a file that stiles cannot cover
 /// does not cut a run short. The findings of the rules do not matter here.
@@ -44,13 +45,10 @@ const RESULTS: &str = "results.json";
 /// write a record of their phases, and a run counts as finished when its
 /// record reaches the report.
 ///
-/// The results land in `target/bench`: the export of hyperfine and the
-/// record of the phases of each project, and `results.json` with the
-/// measures of every project in the Bencher Metric Format.
-///
-/// The numbers mean little on a shared machine, whose runs vary by a third.
-/// The action belongs on quiet hardware, so its name carries no prefix that
-/// makes CI run it on every pull request.
+/// The results land in `target/bench`: the record of the phases of each
+/// project, and `results.json` with the phases of every project in the
+/// Bencher Metric Format. The action takes minutes per project, so its name
+/// carries no prefix that makes CI run it on every pull request.
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Bench;
 
@@ -79,7 +77,6 @@ impl Action for Bench {
 async fn drive(context: &Context, args: &BenchArgs) -> Result<Outcome, HarnessError> {
     let root = context.root().get();
     let cargo = step::cargo(context).await?;
-    let hyperfine = step::tool(context, "hyperfine").await?;
 
     let Some(pin) = RulesPin::load(root)? else {
         return Ok(refused(format!(
@@ -94,7 +91,6 @@ async fn drive(context: &Context, args: &BenchArgs) -> Result<Outcome, HarnessEr
 
     let stiles = root.join("target/release/stiles");
     let output = root.join(OUTPUT);
-    let runs = args.runs().to_string();
     let mut measurements = Vec::new();
 
     for project in args.projects() {
@@ -131,25 +127,7 @@ async fn drive(context: &Context, args: &BenchArgs) -> Result<Outcome, HarnessEr
             ));
         }
 
-        let export = directory.join("hyperfine.json");
-        let measured = step::run(
-            hyperfine
-                .clone()
-                .args(["--runs", &runs, "--ignore-failure", "--command-name", name])
-                .arg("--export-json")
-                .arg(export.as_path())
-                .arg(command(&stiles, &project))
-                .in_directory(checkout.as_path()),
-        )
-        .await?;
-        if !measured.status().success() {
-            return Ok(step::failed(
-                &format!("measuring stiles on {name}"),
-                &measured,
-            ));
-        }
-
-        measurements.push(Measurement::load(name, &export, &timings)?);
+        measurements.push(Measurement::load(name, &timings)?);
     }
 
     self::results::write(&output.join(RESULTS), &measurements)?;
@@ -182,27 +160,6 @@ fn finished(execution: &Execution, record: &Path) -> Result<bool, HarnessError> 
     }
 }
 
-/// Returns the command line of a timed run, as hyperfine reads it
-///
-/// Hyperfine starts the command without a shell, and splits the line into
-/// words the way a POSIX shell does. Each path therefore goes in quotes, so
-/// a checkout under a directory with a space in its name stays one word.
-fn command(stiles: &Path, project: &Project) -> String {
-    format!(
-        "{} check --keep-going {}",
-        quote(&stiles.to_string_lossy()),
-        quote(project.path)
-    )
-}
-
-/// Returns a word in single quotes, as a POSIX shell reads it
-///
-/// A single quote cannot appear inside single quotes, so each one closes
-/// the quotes, stands escaped on its own, and opens them again.
-fn quote(word: &str) -> String {
-    format!("'{}'", word.replace('\'', r"'\''"))
-}
-
 /// Returns the outcome of a run that the configuration stopped
 fn refused(reason: String) -> Outcome {
     let location =
@@ -226,25 +183,6 @@ mod tests {
     #![allow(clippy::missing_panics_doc, clippy::unwrap_used)]
 
     use super::*;
-
-    #[test]
-    fn command_quotes_both_paths() {
-        let project = Project::named("typescript").unwrap();
-
-        let line = command(Path::new("/work/my stiles/stiles"), &project);
-
-        assert_eq!(
-            line,
-            "'/work/my stiles/stiles' check --keep-going 'src/compiler'"
-        );
-    }
-
-    #[test]
-    fn quote_with_a_single_quote_escapes_it() {
-        let word = quote("it's");
-
-        assert_eq!(word, r"'it'\''s'");
-    }
 
     #[test]
     fn trait_send() {
