@@ -137,6 +137,17 @@ toml = "1"
 # Rewrites the stiles requirements of a cached lint checkout and keeps the
 # rest of each manifest as it was written.
 toml_edit = "0.25"
+# Marks the phases of a run as spans, so that a hidden flag of `stiles check`
+# can report where the time of the run went. A span costs one atomic load
+# when nothing records it, so a run without the flag pays nearly nothing.
+# The attribute macros stay off, because stiles opens its spans by hand.
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+# Records the spans of the phases for `stiles check --timings`. The registry
+# alone is enough, because stiles sums the spans itself and writes no log.
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+  "registry",
+  "std",
+] }
 tree-sitter = "0.27"
 tree-sitter-rust = "0.24"
 # Both grammars come from the one crate: `.ts` files parse with the

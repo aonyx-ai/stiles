@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 bon.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
 tree-sitter.workspace = true
 stiles-types.workspace = true
 
