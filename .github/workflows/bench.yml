@@ -31,8 +31,8 @@ jobs:
       || contains(github.event.pull_request.labels.*.name, 'bench'))
 
     permissions:
-      contents: read
-      id-token: write
+      contents: read # The checkout reads the repository.
+      id-token: write # CodSpeed authenticates the upload through OIDC.
 
     steps:
       - name: Checkout code
