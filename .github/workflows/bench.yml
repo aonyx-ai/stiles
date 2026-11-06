@@ -22,6 +22,10 @@ jobs:
   benchmarks:
     name: Run the benchmarks
     runs-on: codspeed-macro
+    # A job that hangs would spend the minutes of the runner until GitHub
+    # stops it after six hours. The first run of the corpus died after about
+    # an hour, so two hours leave room for a run that works.
+    timeout-minutes: 120
 
     if: >-
       github.event_name != 'pull_request'
@@ -44,9 +48,21 @@ jobs:
 
       # The harness fetches each project, builds the rules, and warms up, so
       # that `codspeed.yml` finds the checkouts ready. One timed run keeps the
-      # minutes of the preparation low. Its results stay on the runner.
-      - name: Prepare the corpus
-        run: mise run rakko -- bench --runs 1
+      # minutes of the preparation low. Its results stay on the runner. Each
+      # project prepares in a step of its own: a runner that dies takes the
+      # log of the job with it, and the step that it died in still names the
+      # project.
+      - name: Prepare stiles
+        run: mise run rakko -- bench --project stiles --runs 1
+
+      - name: Prepare rust-analyzer
+        run: mise run rakko -- bench --project rust-analyzer --runs 1
+
+      - name: Prepare typescript
+        run: mise run rakko -- bench --project typescript --runs 1
+
+      - name: Prepare trpc
+        run: mise run rakko -- bench --project trpc --runs 1
 
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@af75f77f17a054769abefaa42fe8dc2975469b5f # v5.6.3
