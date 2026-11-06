@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::num::NonZeroUsize;
 use std::ops::Range;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -8,8 +9,9 @@ use ra_ap_hir::{
     Adt, AsAssocItem as _, Crate, CrateDependency, Enum, Function, HasAttrs, HirDisplay, ItemInNs,
     Module, ModuleDef, PathResolution, ScopeDef, Semantics, Type, attach_db,
 };
-use ra_ap_ide_db::base_db::{SourceDatabase as _, VfsPath};
+use ra_ap_ide_db::base_db::{SourceDatabase as _, VfsPath, all_crates};
 use ra_ap_ide_db::famous_defs::FamousDefs;
+use ra_ap_ide_db::prime_caches::parallel_prime_caches;
 use ra_ap_ide_db::{ChangeWithProcMacros, FileId, RootDatabase};
 use ra_ap_load_cargo::{LoadCargoConfig, ProcMacroServerChoice};
 use ra_ap_project_model::{CargoConfig, ProjectManifest, ProjectWorkspace};
@@ -65,6 +67,12 @@ impl RustDecorationProvider {
     ///
     /// This is an expensive operation that builds rust-analyzer's internal
     /// database from the project's Cargo.toml. Call this once at startup.
+    ///
+    /// The load also resolves the names of every crate of the workspace, on
+    /// every core of the machine. rust-analyzer would otherwise resolve them
+    /// on one thread, inside the first query of the first file that the
+    /// pipeline decorates. On stiles itself, that one query took most of
+    /// the decoration of the whole run.
     ///
     /// # Errors
     ///
@@ -135,6 +143,7 @@ impl RustDecorationProvider {
                 .map_err(|source| LoadRustWorkspaceError::DatabaseFailed { source })?;
 
         give_text_to_files_that_have_none(&mut db, &vfs, &root);
+        prime_caches(&db);
 
         Ok(Self {
             db: Mutex::new(db),
@@ -180,6 +189,21 @@ impl RustDecorationProvider {
             }
         }
     }
+}
+
+/// Resolves the names of every crate of the database, on every core
+///
+/// rust-analyzer resolves names on demand. Without this, the first query of
+/// the first file that stiles decorates resolves the whole workspace on one
+/// thread. The load of rust-analyzer can do the same work, but it does so
+/// before [`give_text_to_files_that_have_none`] runs. A worker that then
+/// reads a file without text panics, and the other workers wait for it
+/// forever. So the work runs here, after every file has its text.
+fn prime_caches(db: &RootDatabase) {
+    let threads = std::thread::available_parallelism().map_or(1, NonZeroUsize::get);
+    let crates = all_crates(db);
+
+    parallel_prime_caches(db, &crates, threads, &|_progress| {});
 }
 
 /// Records lossy UTF-8 text for interned files under `root` that have none
