@@ -231,8 +231,13 @@ async fn run(
         path.display()
     );
 
-    let providers = tracing::info_span!(target: PHASE_TARGET, "load")
-        .in_scope(|| Providers::load().path(&path).files(files).call())?;
+    let providers = tracing::info_span!(target: PHASE_TARGET, "load").in_scope(|| {
+        Providers::load()
+            .path(&path)
+            .files(files)
+            .inspected(&custom_lints.languages())
+            .call()
+    })?;
     let checks = FileChecks::run()
         .files(files)
         .providers(&providers)

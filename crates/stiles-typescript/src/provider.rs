@@ -11,11 +11,11 @@ use stiles_tsrs::tsrs_tsoptions::{ParseConfigHost, ParsedCommandLine};
 use stiles_tsrs::tsrs_vfs::{FS, bundled, osvfs};
 use stiles_tsrs::{tsrs_ast, tsrs_astnav, tsrs_tsoptions};
 use stiles_types::{
-    Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, DecorationMap,
-    DecorationProvider, ProviderName,
+    Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, Decoration as _,
+    DecorationKey, DecorationMap, DecorationProvider, DecorationSet, ProviderName,
 };
 
-use crate::decorations::{ImportSource, TypeText};
+use crate::decorations::{FnSignature, ImportSource, ResolvedType, StringUnion, TypeText};
 use crate::queries;
 
 mod load_type_script_project_error;
@@ -84,6 +84,7 @@ pub struct TypeScriptDecorationProvider {
     program: &'static Program,
     config: P<ParsedCommandLine>,
     root: Arc<Path>,
+    wanted: DecorationSet,
 }
 
 impl TypeScriptDecorationProvider {
@@ -101,6 +102,57 @@ impl TypeScriptDecorationProvider {
     /// assert_eq!(TypeScriptDecorationProvider::NAME.as_str(), "typescript");
     /// ```
     pub const NAME: ProviderName = ProviderName::new("typescript");
+
+    /// The decoration types that this provider attaches to nodes
+    ///
+    /// A provider computes all of them unless [`wanting`] narrows the set.
+    /// The other decoration types of this crate are fields of these.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::DecorationSet;
+    /// use stiles_typescript::TypeScriptDecorationProvider;
+    ///
+    /// let every = DecorationSet::from_iter(TypeScriptDecorationProvider::DECORATIONS);
+    ///
+    /// assert!(!every.is_empty());
+    /// ```
+    ///
+    /// [`wanting`]: TypeScriptDecorationProvider::wanting
+    pub const DECORATIONS: [DecorationKey; 5] = [
+        TypeText::KEY,
+        ResolvedType::KEY,
+        StringUnion::KEY,
+        FnSignature::KEY,
+        ImportSource::KEY,
+    ];
+
+    /// Returns the provider, computing only the decoration types of `wanted`
+    ///
+    /// Each kind of target yields some of [`DECORATIONS`], and the provider
+    /// skips a target whose types `wanted` leaves out. With an empty set,
+    /// the provider still decides whether it covers a file, and asks the
+    /// checker nothing about it.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::Path;
+    ///
+    /// use stiles_types::DecorationSet;
+    /// use stiles_typescript::TypeScriptDecorationProvider;
+    ///
+    /// let provider = TypeScriptDecorationProvider::load(Path::new("."))?
+    ///     .wanting(DecorationSet::default());
+    /// # Ok::<(), stiles_typescript::LoadTypeScriptProjectError>(())
+    /// ```
+    ///
+    /// [`DECORATIONS`]: TypeScriptDecorationProvider::DECORATIONS
+    #[must_use]
+    pub fn wanting(self, wanted: DecorationSet) -> Self {
+        Self { wanted, ..self }
+    }
 
     /// Loads the TypeScript project that holds `path`
     ///
@@ -185,6 +237,7 @@ impl TypeScriptDecorationProvider {
             program,
             config,
             root,
+            wanted: Self::DECORATIONS.into_iter().collect(),
         })
     }
 
@@ -258,7 +311,10 @@ impl DecorationProvider for TypeScriptDecorationProvider {
         }
 
         let mut targets = Targets::default();
-        collect_targets(&tree.root_node(), &mut targets);
+        collect_targets(&tree.root_node(), &self.wanted, &mut targets);
+        if targets.is_empty() {
+            return Ok(Coverage::Covered(DecorationMap::new()));
+        }
 
         let context = Context::background();
         let mut checker = self
@@ -366,22 +422,32 @@ struct Targets {
     modules: Vec<Target>,
 }
 
+impl Targets {
+    /// Returns whether the file holds nothing to ask the checker about
+    fn is_empty(&self) -> bool {
+        self.values.is_empty() && self.functions.is_empty() && self.modules.is_empty()
+    }
+}
+
 /// Collects every target under `node`
-fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Targets) {
+fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &mut Targets) {
     let kind = node.kind();
 
-    if TYPED_KINDS.contains(&kind)
+    if wanted.contains_any(&[TypeText::KEY, ResolvedType::KEY, StringUnion::KEY])
+        && TYPED_KINDS.contains(&kind)
         && let Some(target) = Target::builder().node(node).found_by(node).build()
     {
         targets.values.push(target);
     }
-    if FUNCTION_KINDS.contains(&kind)
+    if wanted.contains_any(&[FnSignature::KEY])
+        && FUNCTION_KINDS.contains(&kind)
         && let Some(name) = node.child_by_field_name("name")
         && let Some(target) = Target::builder().node(node).found_by(&name).build()
     {
         targets.functions.push(target);
     }
-    if MODULE_REFERENCE_KINDS.contains(&kind)
+    if wanted.contains_any(&[ImportSource::KEY])
+        && MODULE_REFERENCE_KINDS.contains(&kind)
         && let Some(source) = node.child_by_field_name("source")
         && let Some(target) = Target::builder().node(&source).found_by(&source).build()
     {
@@ -389,7 +455,7 @@ fn collect_targets(node: &DecoratedNode<'_>, targets: &mut Targets) {
     }
 
     for child in node.named_children() {
-        collect_targets(&child, targets);
+        collect_targets(&child, wanted, targets);
     }
 }
 
