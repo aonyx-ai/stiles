@@ -10,6 +10,10 @@ options:
 
 benchmarks:
   - name: tokio
+    # Stiles exits with 1 when it reports findings or a file stays
+    # uncovered, and every project of the corpus has both. CodSpeed fails a
+    # benchmark that exits with anything but 0, so the shell maps 1 to 0. A
+    # crash exits with another code and still fails the benchmark.
     exec: >-
-      target/release/stiles check --keep-going
-      target/bench/tokio/checkout
+      sh -c 'target/release/stiles check --keep-going
+      target/bench/tokio/checkout; test $? -le 1'
