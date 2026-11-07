@@ -7,6 +7,7 @@ description = "Test helpers for Stiles lint rules"
 repository.workspace = true
 
 [dependencies]
+bon.workspace = true
 tree-sitter.workspace = true
 tree-sitter-rust.workspace = true
 tree-sitter-typescript.workspace = true

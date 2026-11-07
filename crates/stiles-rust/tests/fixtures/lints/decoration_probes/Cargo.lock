@@ -378,6 +378,7 @@ dependencies = [
 name = "stiles-testing"
 version = "0.4.0"
 dependencies = [
+ "bon",
  "stiles-core",
  "stiles-types",
  "tree-sitter",
