@@ -33,7 +33,11 @@ const RESULTS: &str = "results.json";
 ///
 /// 1. One run that warms up. It builds the rules and downloads what the
 ///    toolchain of the project needs, so neither reaches the numbers.
-/// 2. One run with `--timings`, which records the time of each phase.
+/// 2. One run with `--timings`, which records the time of each phase. It
+///    runs cargo offline. Stiles builds the rules against this working
+///    tree, so cargo resolves their dependencies again on every run, and
+///    online it would ask the index of crates.io each time. The warm-up has
+///    already downloaded everything that the resolution needs.
 ///
 /// The action times nothing more. CodSpeed times the checks of the prepared
 /// projects, on hardware quiet enough for the numbers to mean something.
@@ -119,7 +123,13 @@ async fn drive(context: &Context, args: &BenchArgs) -> Result<Outcome, HarnessEr
         }
 
         let timings = directory.join("timings.json");
-        let timed = step::run(check().arg("--timings").arg(timings.as_path())).await?;
+        let timed = step::run(
+            check()
+                .arg("--timings")
+                .arg(timings.as_path())
+                .env("CARGO_NET_OFFLINE", "true"),
+        )
+        .await?;
         if !finished(&timed, &timings)? {
             return Ok(step::failed(
                 &format!("timing the phases of stiles on {name}"),
