@@ -105,14 +105,8 @@ jobs:
           mise run rakko -- bench --project "${PROJECT}"
           cp ".github/codspeed/${PROJECT}.yml" codspeed.yml
 
-      # Stiles builds the rules against this working tree, so cargo resolves
-      # their dependencies again on every round. Online it would ask the
-      # index of crates.io each time, and the round would time the network.
-      # The preparation has downloaded everything that the resolution needs.
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@af75f77f17a054769abefaa42fe8dc2975469b5f # v5.6.3
-        env:
-          CARGO_NET_OFFLINE: "true"
         with:
           mode: walltime
 
