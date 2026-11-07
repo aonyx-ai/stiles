@@ -1,7 +1,11 @@
+mod assert_fix;
+
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use stiles_types::{DecoratedTree, DecorationMap, Diagnostic, Language, LintPass, Severity, Span};
+
+pub use self::assert_fix::assert_fix;
 
 /// Parses source text into a decorated tree for the given language
 ///
@@ -166,7 +170,7 @@ pub fn assert_no_diagnostics(diagnostics: &[Diagnostic]) {
 ///
 /// let cases = fixtures(concat!(env!("CARGO_MANIFEST_DIR"), "/src"), Language::Rust);
 ///
-/// assert_eq!(cases[0].0, "lib.rs");
+/// assert!(cases.iter().any(|(name, _)| name == "lib.rs"));
 /// ```
 pub fn fixtures(dir: &str, language: Language) -> Vec<(String, String)> {
     let path = Path::new(dir);
