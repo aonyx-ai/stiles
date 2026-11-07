@@ -49,7 +49,7 @@ impl FailureThreshold {
 mod tests {
     use std::path::PathBuf;
 
-    use stiles_types::{Location, RuleId, Span, Suggestion};
+    use stiles_types::{Edit, Fix, Location, RuleId, Span};
 
     use super::*;
 
@@ -141,6 +141,13 @@ mod tests {
     }
 
     #[test]
+    fn promote_with_warnings_preserves_the_fix() {
+        let promoted = promoted_detailed_warning();
+
+        assert_eq!(promoted.fix(), Some(&fix()));
+    }
+
+    #[test]
     fn promote_with_warnings_preserves_the_message() {
         let promoted = promoted_detailed_warning();
 
@@ -187,27 +194,33 @@ mod tests {
             .build()
     }
 
-    fn suggestion() -> Suggestion {
-        Suggestion::builder()
-            .span(
-                Span::builder()
-                    .file(PathBuf::from("test.rs"))
-                    .start(0)
-                    .end(1)
-                    .build(),
-            )
-            .replacement("replacement")
+    fn fix() -> Fix {
+        Fix::builder()
             .message("try this")
+            .edits(vec![
+                Edit::builder()
+                    .span(
+                        Span::builder()
+                            .file(PathBuf::from("test.rs"))
+                            .start(0)
+                            .end(1)
+                            .build(),
+                    )
+                    .replacement("replacement")
+                    .build(),
+            ])
             .build()
+            .expect("the fix should build")
     }
 
-    /// Returns a warning with an origin, a related location, and a
-    /// suggestion, promoted under [`FailureThreshold::Warnings`]
+    /// Returns a warning with an origin, a related location, and a fix,
+    /// promoted under [`FailureThreshold::Warnings`]
     fn promoted_detailed_warning() -> Diagnostic {
         let diagnostic = test_diagnostic(Severity::Warn)
             .with_origin(origin())
             .with_related(related())
-            .with_suggestion(suggestion());
+            .with_fix(fix())
+            .expect("the fix should attach");
 
         FailureThreshold::Warnings.promote(diagnostic)
     }
@@ -231,13 +244,6 @@ mod tests {
                 .end(10)
                 .build()
         );
-    }
-
-    #[test]
-    fn promote_with_warnings_preserves_the_suggestions() {
-        let promoted = promoted_detailed_warning();
-
-        assert_eq!(promoted.suggestions(), [suggestion()]);
     }
 
     #[test]

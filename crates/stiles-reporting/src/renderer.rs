@@ -19,9 +19,9 @@ pub use self::render_diagnostics_error::RenderDiagnosticsError;
 
 /// Renders diagnostics to stderr using codespan-reporting
 ///
-/// Groups diagnostics by file, loads each file's source once, and renders
-/// all diagnostics with primary spans, origin annotations, related
-/// annotations, and suggestion notes.
+/// Groups diagnostics by file, and loads each file's source once. Each
+/// diagnostic shows its primary span, its origin and related annotations,
+/// and a note that names its fix.
 ///
 /// # Errors
 ///
@@ -113,15 +113,11 @@ pub(crate) fn to_codespan(
         }
     }
 
-    let mut notes = Vec::new();
-
-    for suggestion in diag.suggestions() {
-        notes.push(format!(
-            "{}: replace with `{}`",
-            suggestion.message(),
-            suggestion.replacement()
-        ));
-    }
+    let notes: Vec<String> = diag
+        .fix()
+        .map(|fix| format!("fix: {}", fix.message()))
+        .into_iter()
+        .collect();
 
     codespan_diag::Diagnostic::new(severity)
         .with_code(diag.rule_id().to_string())
@@ -202,7 +198,7 @@ fn collect_sources(
 mod tests {
     use std::path::PathBuf;
 
-    use stiles_types::{Location, RuleId, Span, Suggestion};
+    use stiles_types::{Edit, Fix, Location, RuleId, Span};
 
     use super::*;
 
@@ -293,50 +289,32 @@ mod tests {
     }
 
     #[test]
-    fn render_to_string_includes_suggestion_message() {
-        let diag = test_diagnostic().with_suggestion(
-            Suggestion::builder()
-                .span(
-                    Span::builder()
-                        .file(PathBuf::from("test.rs"))
-                        .start(0)
-                        .end(2)
-                        .build(),
-                )
-                .replacement("pub fn")
-                .message("make it public")
-                .build(),
-        );
+    fn render_to_string_names_the_fix() {
+        let fix = Fix::builder()
+            .message("make it public")
+            .edits(vec![
+                Edit::builder()
+                    .span(
+                        Span::builder()
+                            .file(PathBuf::from("test.rs"))
+                            .start(0)
+                            .end(2)
+                            .build(),
+                    )
+                    .replacement("pub fn")
+                    .build(),
+            ])
+            .build()
+            .expect("the fix should build");
+        let diag = test_diagnostic()
+            .with_fix(fix)
+            .expect("the fix should attach");
 
         let output = render_to_string(&[diag], &test_source()).unwrap();
 
         assert!(
-            output.contains("make it public"),
-            "output should contain suggestion message: {output}"
-        );
-    }
-
-    #[test]
-    fn render_to_string_includes_suggestion_replacement() {
-        let diag = test_diagnostic().with_suggestion(
-            Suggestion::builder()
-                .span(
-                    Span::builder()
-                        .file(PathBuf::from("test.rs"))
-                        .start(0)
-                        .end(2)
-                        .build(),
-                )
-                .replacement("pub fn")
-                .message("make it public")
-                .build(),
-        );
-
-        let output = render_to_string(&[diag], &test_source()).unwrap();
-
-        assert!(
-            output.contains("pub fn"),
-            "output should contain replacement: {output}"
+            output.contains("fix: make it public"),
+            "output should name the fix: {output}"
         );
     }
 
