@@ -9,6 +9,8 @@ use codespan_reporting::term;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use stiles_types::{Diagnostic, Severity};
 
+use crate::SourceRenderer;
+
 mod print_diagnostics_error;
 mod render_diagnostics_error;
 
@@ -67,7 +69,7 @@ pub fn render(diagnostics: &[Diagnostic]) -> Result<(), PrintDiagnosticsError> {
     Ok(())
 }
 
-fn to_codespan(
+pub(crate) fn to_codespan(
     diag: &Diagnostic,
     file_ids: &HashMap<Arc<Path>, usize>,
 ) -> codespan_diag::Diagnostic<usize> {
@@ -171,24 +173,7 @@ pub fn render_to_string(
         return Ok(String::new());
     }
 
-    let mut files = SimpleFiles::new();
-    let mut file_ids: HashMap<Arc<Path>, usize> = HashMap::new();
-
-    for (path, source) in sources {
-        let id = files.add(path.display().to_string(), source.as_str());
-        file_ids.insert(path.clone(), id);
-    }
-
-    let config = term::Config::default();
-    let mut output = Vec::new();
-
-    for diag in diagnostics {
-        let codespan_diag = to_codespan(diag, &file_ids);
-        term::emit_to_io_write(&mut output, &config, &files, &codespan_diag)
-            .map_err(|source| RenderDiagnosticsError::Unemitted { source })?;
-    }
-
-    String::from_utf8(output).map_err(|source| RenderDiagnosticsError::NotUtf8 { source })
+    SourceRenderer::new(sources).render(diagnostics)
 }
 
 fn collect_sources(
