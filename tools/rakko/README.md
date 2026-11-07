@@ -61,12 +61,12 @@ actions of the bundles reach them without help.
 with the rules that `.config/stiles.toml` pins, built against the working
 tree:
 
-| Project         | What it exercises                                     |
-| --------------- | ----------------------------------------------------- |
-| `stiles`        | This repository at 0.4.0, the small and fast baseline |
-| `rust-analyzer` | A large Rust workspace, with build scripts            |
-| `typescript`    | A large TypeScript project with one `tsconfig.json`   |
-| `trpc`          | A TypeScript monorepo with one `tsconfig.json` each   |
+| Project      | What it exercises                                     |
+| ------------ | ----------------------------------------------------- |
+| `stiles`     | This repository at 0.4.0, the small and fast baseline |
+| `tokio`      | A Rust workspace of ten crates, with build scripts    |
+| `typescript` | A large TypeScript project with one `tsconfig.json`   |
+| `trpc`       | A TypeScript monorepo with one `tsconfig.json` each   |
 
 ```console
 mise run rakko -- bench --project stiles
@@ -82,10 +82,11 @@ times nothing more: the wall time comes from CodSpeed.
 [Bencher Metric Format]. CI does not run the action on every pull request,
 because a large project takes many minutes.
 
-The `Benchmarks` workflow runs the corpus on a macro runner of [CodSpeed]
-once a week, and on a pull request with the `bench` label. The action
-prepares the corpus there, and CodSpeed times the checks that `codspeed.yml`
-lists.
+The `Benchmarks` workflow runs the corpus on macro runners of [CodSpeed]
+once a week, and on a pull request with the `bench` label. Each project gets
+a job of its own, because a job on such a runner stops after about 69
+minutes. The job prepares its project with the action, and CodSpeed times the
+check that `.github/codspeed/<project>.yml` names.
 
 ## Commands
 

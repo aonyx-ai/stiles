@@ -36,11 +36,11 @@ pub(super) const CORPUS: [Project; 4] = [
         ],
     },
     Project {
-        name: "rust-analyzer",
-        remote: "https://github.com/rust-lang/rust-analyzer",
-        rev: "fde5133f7d116dd81f33f71bd0d389c768c7bd58",
+        name: "tokio",
+        remote: "https://github.com/tokio-rs/tokio",
+        rev: "ac57dc8c3f41bb92c0dcad9134f5211ef503413f",
         path: ".",
-        ignore: &["test_data/"],
+        ignore: &[],
     },
     Project {
         name: "typescript",
@@ -62,9 +62,10 @@ pub(super) const CORPUS: [Project; 4] = [
 ///
 /// - The stiles repository at 0.4.0 is the small and fast baseline, with
 ///   the ignore patterns of its own configuration.
-/// - rust-analyzer is a large Rust workspace, whose load runs build scripts
-///   and resolves many crates. Its `test_data` directories hold Rust files
-///   that no crate reaches.
+/// - tokio is a Rust workspace of ten crates and about 800 files. A larger
+///   workspace such as rust-analyzer does not fit: its load runs the build
+///   scripts of a large tree of dependencies, and a job on the runner of
+///   CodSpeed stops after about 69 minutes.
 /// - The compiler of TypeScript 5.9.3 is a large TypeScript project with a
 ///   single `tsconfig.json`. Later versions of that repository hold the Go
 ///   port instead.

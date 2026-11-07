@@ -31,7 +31,7 @@ impl Args for BenchArgs {
             .name(argument_name!("project"))
             .shape(ArgumentShape::Text)
             .documentation(
-                "Prepare only this project of the corpus: stiles, rust-analyzer, typescript, \
+                "Prepare only this project of the corpus: stiles, tokio, typescript, \
                      or trpc",
             )
             .build()])
