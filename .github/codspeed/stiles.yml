@@ -1,0 +1,15 @@
+---
+# CodSpeed reads this file in the job of the `Benchmarks` workflow that
+# measures stiles. The job copies it to `codspeed.yml` after `bench` has
+# prepared the project, so the checkout below exists and the rules are built.
+# The harness warms up the project, so CodSpeed does not. Three rounds bound
+# the minutes that the job spends on the runner.
+options:
+  warmup-time: 0s
+  max-rounds: 3
+
+benchmarks:
+  - name: stiles
+    exec: >-
+      target/release/stiles check --keep-going
+      target/bench/stiles/checkout

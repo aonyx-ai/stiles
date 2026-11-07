@@ -55,12 +55,18 @@ jobs:
           fi
 
   benchmarks:
-    name: Run the benchmarks
+    name: Run the benchmarks of ${{ matrix.project }}
     runs-on: codspeed-macro
-    # A job that hangs would spend the minutes of the runner until GitHub
-    # stops it after six hours. The first run of the corpus died after about
-    # an hour, so two hours leave room for a run that works.
-    timeout-minutes: 120
+    # Every run of the whole corpus in one job lost its runner after 69
+    # minutes, whatever project it was preparing at the time. Each project
+    # therefore gets a job of its own, and the jobs run side by side. A job
+    # that runs longer than the runner allows stops here instead.
+    timeout-minutes: 65
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [stiles, tokio, typescript, trpc]
 
     # Only a scheduled run asks `changes`, so the job also runs when that one
     # skipped. A run by hand or on a labeled pull request always measures.
@@ -87,22 +93,17 @@ jobs:
       - name: Set up the tools
         uses: $/.github/actions/setup
 
-      # The harness fetches each project, builds the rules, warms up, and
-      # records the phases, so that `codspeed.yml` finds the checkouts ready.
-      # Each project prepares in a step of its own: a runner that dies takes
-      # the log of the job with it, and the step that it died in still names
-      # the project.
-      - name: Prepare stiles
-        run: mise run rakko -- bench --project stiles
+      # The harness fetches the project, builds the rules, warms up, and
+      # records the phases. CodSpeed then reads the configuration of the
+      # project, which names the prepared checkout.
+      - name: Prepare the project
+        env:
+          PROJECT: ${{ matrix.project }}
+        run: |
+          set -euo pipefail
 
-      - name: Prepare rust-analyzer
-        run: mise run rakko -- bench --project rust-analyzer
-
-      - name: Prepare typescript
-        run: mise run rakko -- bench --project typescript
-
-      - name: Prepare trpc
-        run: mise run rakko -- bench --project trpc
+          mise run rakko -- bench --project "${PROJECT}"
+          cp ".github/codspeed/${PROJECT}.yml" codspeed.yml
 
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@af75f77f17a054769abefaa42fe8dc2975469b5f # v5.6.3
@@ -116,7 +117,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: bench-results
+          name: bench-results-${{ matrix.project }}
           path: |
             target/bench/results.json
             target/bench/*/timings.json
