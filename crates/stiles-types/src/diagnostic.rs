@@ -1,14 +1,17 @@
-use bon::bon;
-use stabby::{string, vec};
+mod attach_fix_error;
 
-use crate::{Location, RuleId, Severity, Span, Suggestion};
+use bon::bon;
+use stabby::{option, string, vec};
+
+pub use self::attach_fix_error::AttachFixError;
+use crate::{Fix, Location, RuleId, Severity, Span};
 
 /// A diagnostic emitted by a lint rule
 ///
 /// Diagnostics are the primary output of the linting pipeline. Each one
 /// identifies a specific issue in source code, with a severity and a
 /// primary span. It can also carry origin locations, related locations,
-/// and suggested fixes.
+/// and one fix.
 ///
 /// A diagnostic is what a plugin hands back across the plugin boundary.
 /// Stabby lays it out, and its strings and lists are stabby's `String` and
@@ -22,7 +25,7 @@ use crate::{Location, RuleId, Severity, Span, Suggestion};
 /// # Examples
 ///
 /// ```
-/// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+/// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
 ///
 /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
 /// let diagnostic = Diagnostic::builder()
@@ -42,7 +45,7 @@ pub struct Diagnostic {
     span: Span,
     origins: vec::Vec<Location>,
     related: vec::Vec<Location>,
-    suggestions: vec::Vec<Suggestion>,
+    fix: option::Option<Fix>,
     severity: Severity,
 }
 
@@ -53,7 +56,7 @@ impl Diagnostic {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -78,7 +81,7 @@ impl Diagnostic {
             span,
             origins: vec::Vec::new(),
             related: vec::Vec::new(),
-            suggestions: vec::Vec::new(),
+            fix: option::Option::None(),
             severity,
         }
     }
@@ -88,7 +91,7 @@ impl Diagnostic {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -114,7 +117,7 @@ impl Diagnostic {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -135,12 +138,23 @@ impl Diagnostic {
         self
     }
 
-    /// Adds a suggested fix to this diagnostic
+    /// Attaches the fix that resolves this diagnostic
+    ///
+    /// A diagnostic holds at most one fix, because `stiles check --fix`
+    /// applies the fix without review. Two fixes would leave a choice
+    /// between them. The fix must lie in the file of the diagnostic, so
+    /// that a fix never changes a file the reader was not shown.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AttachFixError::OtherFile`] if the fix edits another file
+    /// than the span of the diagnostic names, and
+    /// [`AttachFixError::SecondFix`] if the diagnostic already holds a fix.
     ///
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// use stiles_types::{Diagnostic, Edit, Fix, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -149,20 +163,29 @@ impl Diagnostic {
     ///     .message("a wildcard arm")
     ///     .span(span.clone())
     ///     .build();
-    ///
-    /// let suggestion = Suggestion::builder()
-    ///     .span(span)
-    ///     .replacement("Some(_)")
+    /// let fix = Fix::builder()
     ///     .message("name the variant")
-    ///     .build();
+    ///     .edits(vec![Edit::builder().span(span).replacement("Some(_)").build()])
+    ///     .build()?;
     ///
-    /// let diagnostic = diagnostic.with_suggestion(suggestion);
+    /// let diagnostic = diagnostic.with_fix(fix)?;
     ///
-    /// assert_eq!(diagnostic.suggestions().len(), 1);
+    /// assert!(diagnostic.fix().is_some());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn with_suggestion(mut self, suggestion: Suggestion) -> Self {
-        self.suggestions.push(suggestion);
-        self
+    pub fn with_fix(mut self, fix: Fix) -> Result<Self, AttachFixError> {
+        if fix.file() != self.span.file() {
+            return Err(AttachFixError::OtherFile {
+                diagnostic: self.span.file().to_path_buf(),
+                fix: fix.file().to_path_buf(),
+            });
+        }
+        if self.fix.is_some() {
+            return Err(AttachFixError::SecondFix);
+        }
+
+        self.fix = option::Option::Some(fix);
+        Ok(self)
     }
 
     /// Replaces the severity of this diagnostic
@@ -198,7 +221,7 @@ impl Diagnostic {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -219,7 +242,7 @@ impl Diagnostic {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -240,7 +263,7 @@ impl Diagnostic {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -261,7 +284,7 @@ impl Diagnostic {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -282,7 +305,7 @@ impl Diagnostic {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -303,7 +326,7 @@ impl Diagnostic {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -319,12 +342,12 @@ impl Diagnostic {
         &self.related
     }
 
-    /// Returns suggested source code fixes
+    /// Returns the fix that resolves this diagnostic, if the rule attached one
     ///
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -334,10 +357,10 @@ impl Diagnostic {
     ///     .span(span.clone())
     ///     .build();
     ///
-    /// assert!(diagnostic.suggestions().is_empty());
+    /// assert!(diagnostic.fix().is_none());
     /// ```
-    pub fn suggestions(&self) -> &[Suggestion] {
-        &self.suggestions
+    pub fn fix(&self) -> Option<&Fix> {
+        self.fix.as_ref()
     }
 }
 
@@ -346,6 +369,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use crate::Edit;
 
     fn test_diagnostic() -> Diagnostic {
         Diagnostic::builder()
@@ -420,6 +444,13 @@ mod tests {
     }
 
     #[test]
+    fn new_diagnostic_has_no_fix() {
+        let diag = test_diagnostic();
+
+        assert!(diag.fix().is_none());
+    }
+
+    #[test]
     fn new_diagnostic_has_no_origins() {
         let diag = test_diagnostic();
 
@@ -431,13 +462,6 @@ mod tests {
         let diag = test_diagnostic();
 
         assert!(diag.related().is_empty());
-    }
-
-    #[test]
-    fn new_diagnostic_has_no_suggestions() {
-        let diag = test_diagnostic();
-
-        assert!(diag.suggestions().is_empty());
     }
 
     #[test]
@@ -484,6 +508,62 @@ mod tests {
     fn trait_unpin() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Diagnostic>();
+    }
+
+    fn fix_in(file: &str) -> Fix {
+        Fix::builder()
+            .message("replace it")
+            .edits(vec![
+                Edit::builder()
+                    .span(
+                        Span::builder()
+                            .file(PathBuf::from(file))
+                            .start(0)
+                            .end(10)
+                            .build(),
+                    )
+                    .replacement("replacement")
+                    .build(),
+            ])
+            .build()
+            .expect("the fix should build")
+    }
+
+    #[test]
+    fn with_fix_attaches_the_fix() {
+        let diag = test_diagnostic()
+            .with_fix(fix_in("test.rs"))
+            .expect("the fix should attach");
+
+        assert_eq!(diag.fix(), Some(&fix_in("test.rs")));
+    }
+
+    #[test]
+    fn with_fix_in_another_file_returns_other_file() {
+        let error = test_diagnostic()
+            .with_fix(fix_in("other.rs"))
+            .expect_err("the fix should not attach");
+
+        assert_eq!(
+            error,
+            AttachFixError::OtherFile {
+                diagnostic: PathBuf::from("test.rs"),
+                fix: PathBuf::from("other.rs"),
+            }
+        );
+    }
+
+    #[test]
+    fn with_fix_on_a_fixed_diagnostic_returns_second_fix() {
+        let diag = test_diagnostic()
+            .with_fix(fix_in("test.rs"))
+            .expect("the first fix should attach");
+
+        let error = diag
+            .with_fix(fix_in("test.rs"))
+            .expect_err("the second fix should not attach");
+
+        assert_eq!(error, AttachFixError::SecondFix);
     }
 
     #[test]
@@ -561,25 +641,6 @@ mod tests {
         assert_eq!(diag.severity(), Severity::Error);
     }
 
-    #[test]
-    fn with_suggestion_adds_suggestion() {
-        let suggestion = Suggestion::builder()
-            .span(
-                Span::builder()
-                    .file(PathBuf::from("test.rs"))
-                    .start(0)
-                    .end(10)
-                    .build(),
-            )
-            .replacement("replacement")
-            .message("try this")
-            .build();
-
-        let diag = test_diagnostic().with_suggestion(suggestion.clone());
-
-        assert_eq!(diag.suggestions(), [suggestion]);
-    }
-
     mod prop {
         use proptest::prelude::*;
 
@@ -637,7 +698,7 @@ mod tests {
 
                 prop_assert!(diag.origins().is_empty());
                 prop_assert!(diag.related().is_empty());
-                prop_assert!(diag.suggestions().is_empty());
+                prop_assert!(diag.fix().is_none());
             }
 
             #[test]
@@ -672,24 +733,6 @@ mod tests {
                     diag = diag.with_related(related);
                 }
                 prop_assert_eq!(diag.related().len(), count);
-            }
-
-            #[test]
-            fn with_suggestion_accumulates(count in 1..=10usize) {
-                let mut diag = test_diagnostic();
-                for i in 0..count {
-                    let suggestion = Suggestion::builder()
-                        .span(Span::builder()
-                            .file(PathBuf::from("f.rs"))
-                            .start(i)
-                            .end(i + 1)
-                            .build())
-                        .replacement(format!("fix {i}"))
-                        .message(format!("suggestion {i}"))
-                        .build();
-                    diag = diag.with_suggestion(suggestion);
-                }
-                prop_assert_eq!(diag.suggestions().len(), count);
             }
         }
     }

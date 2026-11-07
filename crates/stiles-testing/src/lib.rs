@@ -230,7 +230,7 @@ impl DiagnosticAssertion<'_> {
     ///
     /// ```
     /// # use stiles_testing::assert_diagnostic;
-    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     /// # let span = Span::builder().file("<test>").start(3).end(7).build();
     /// # let diagnostic = Diagnostic::builder()
     /// #     .rule_id(RuleId::new("lint.example"))
@@ -261,7 +261,7 @@ impl DiagnosticAssertion<'_> {
     ///
     /// ```
     /// # use stiles_testing::assert_diagnostic;
-    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     /// # let span = Span::builder().file("<test>").start(3).end(7).build();
     /// # let diagnostic = Diagnostic::builder()
     /// #     .rule_id(RuleId::new("lint.example"))
@@ -292,7 +292,7 @@ impl DiagnosticAssertion<'_> {
     ///
     /// ```
     /// # use stiles_testing::assert_diagnostic;
-    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     /// # let span = Span::builder().file("<test>").start(3).end(7).build();
     /// # let diagnostic = Diagnostic::builder()
     /// #     .rule_id(RuleId::new("lint.example"))
@@ -322,7 +322,7 @@ impl DiagnosticAssertion<'_> {
     ///
     /// ```
     /// # use stiles_testing::assert_diagnostic;
-    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     /// # let span = Span::builder().file("<test>").start(3).end(7).build();
     /// # let diagnostic = Diagnostic::builder()
     /// #     .rule_id(RuleId::new("lint.example"))
@@ -361,7 +361,7 @@ impl DiagnosticAssertion<'_> {
     ///
     /// ```
     /// # use stiles_testing::assert_diagnostic;
-    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     /// # let span = Span::builder().file("<test>").start(3).end(7).build();
     /// # let diagnostic = Diagnostic::builder()
     /// #     .rule_id(RuleId::new("lint.example"))
@@ -394,7 +394,7 @@ impl DiagnosticAssertion<'_> {
     ///
     /// ```
     /// # use stiles_testing::assert_diagnostic;
-    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span};
     /// # let span = Span::builder().file("<test>").start(3).end(7).build();
     /// # let diagnostic = Diagnostic::builder()
     /// #     .rule_id(RuleId::new("lint.example"))
@@ -417,17 +417,17 @@ impl DiagnosticAssertion<'_> {
         self
     }
 
-    /// Asserts the diagnostic has the given number of suggestions
+    /// Asserts the diagnostic holds a fix
     ///
     /// # Panics
     ///
-    /// Panics if the suggestion count does not match `expected`.
+    /// Panics if the rule attached no fix to the diagnostic.
     ///
     /// # Examples
     ///
     /// ```
     /// # use stiles_testing::assert_diagnostic;
-    /// # use stiles_types::{Diagnostic, Location, RuleId, Severity, Span, Suggestion};
+    /// # use stiles_types::{Diagnostic, Edit, Fix, RuleId, Severity, Span};
     /// # let span = Span::builder().file("<test>").start(3).end(7).build();
     /// # let diagnostic = Diagnostic::builder()
     /// #     .rule_id(RuleId::new("lint.example"))
@@ -436,20 +436,45 @@ impl DiagnosticAssertion<'_> {
     /// #     .span(span.clone())
     /// #     .build();
     /// #
-    /// let suggestion = Suggestion::builder()
-    ///     .span(span)
-    ///     .replacement("Some(_)")
+    /// let fix = Fix::builder()
     ///     .message("name the variant")
+    ///     .edits(vec![Edit::builder().span(span).replacement("Some(_)").build()])
+    ///     .build()?;
+    ///
+    /// assert_diagnostic(&diagnostic.with_fix(fix)?).has_fix();
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn has_fix(self) -> Self {
+        assert!(self.diagnostic.fix().is_some(), "expected a fix, got none");
+        self
+    }
+
+    /// Asserts the diagnostic holds no fix
+    ///
+    /// # Panics
+    ///
+    /// Panics if the rule attached a fix to the diagnostic.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_testing::assert_diagnostic;
+    /// # use stiles_types::{Diagnostic, RuleId, Severity, Span};
+    /// # let span = Span::builder().file("<test>").start(3).end(7).build();
+    /// let diagnostic = Diagnostic::builder()
+    ///     .rule_id(RuleId::new("lint.example"))
+    ///     .severity(Severity::Warn)
+    ///     .message("a wildcard arm")
+    ///     .span(span)
     ///     .build();
     ///
-    /// assert_diagnostic(&diagnostic.with_suggestion(suggestion)).has_suggestion_count(1);
+    /// assert_diagnostic(&diagnostic).has_no_fix();
     /// ```
-    pub fn has_suggestion_count(self, expected: usize) -> Self {
-        assert_eq!(
-            self.diagnostic.suggestions().len(),
-            expected,
-            "expected {expected} suggestions, got {}",
-            self.diagnostic.suggestions().len()
+    pub fn has_no_fix(self) -> Self {
+        assert!(
+            self.diagnostic.fix().is_none(),
+            "expected no fix, got {:?}",
+            self.diagnostic.fix()
         );
         self
     }

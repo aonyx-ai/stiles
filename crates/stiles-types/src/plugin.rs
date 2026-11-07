@@ -42,8 +42,8 @@
 use stabby::IStable;
 
 use crate::{
-    BoxedLintPass, DecoratedNode, DecorationKey, DecorationLookup, Diagnostic, FilePath, Language,
-    Location, Panic, RuleId, RuleOption, RuleOptions, Severity, Span, Suggestion,
+    BoxedLintPass, DecoratedNode, DecorationKey, DecorationLookup, Diagnostic, Edit, FilePath, Fix,
+    Language, Location, Panic, RuleId, RuleOption, RuleOptions, Severity, Span,
 };
 
 mod abi_version;
@@ -76,9 +76,9 @@ pub use self::fingerprint::{decoration_fingerprint, stable_fingerprint};
 /// ```
 /// use stiles_types::plugin::{ABI_VERSION, AbiVersion};
 ///
-/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 8 });
+/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 9 });
 /// ```
-pub const ABI_VERSION: AbiVersion = AbiVersion { major: 0, minor: 8 };
+pub const ABI_VERSION: AbiVersion = AbiVersion { major: 0, minor: 9 };
 
 /// A fingerprint of how this crate lays out the plugin boundary
 ///
@@ -142,7 +142,8 @@ pub const TYPES_FINGERPRINT: u64 = stable_fingerprint(&[
     <BoxedLintPass as IStable>::ID,
     <Diagnostic as IStable>::ID,
     <Span as IStable>::ID,
-    <Suggestion as IStable>::ID,
+    <Fix as IStable>::ID,
+    <Edit as IStable>::ID,
     <Location as IStable>::ID,
     <RuleId as IStable>::ID,
     <Severity as IStable>::ID,
