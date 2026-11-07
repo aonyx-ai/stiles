@@ -24,6 +24,26 @@ stiles check [OPTIONS] [PATH]
 | `PATH`            | The directory or file to check. Defaults to `.`                |
 | `--keep-going`    | Report each failure and continue. The run still exits non-zero |
 | `--deny-warnings` | Fail on warnings as well as errors                             |
+| `--fix`           | Apply the fixes of the findings, then report what remains      |
+
+### Fixes
+
+A rule can attach a fix to a finding. A fix is a set of edits that apply
+together, and a rule attaches one only when it is correct without review.
+The report marks such a finding with a `fix:` note.
+
+`--fix` applies the fixes in rounds. A round applies every fix that does not
+overlap an earlier fix in the same file, and then checks the changed files
+again. A fix that overlaps waits for the next round. The rounds stop when a
+round changes nothing. Stiles then writes the changed files, and reports the
+findings that remain. The exit status depends on those findings only.
+
+Stiles writes nothing when the run fails. That covers every failure of
+[early stops](#early-stops), and two failures of the fixes themselves:
+
+- A file comes back to a text it held in an earlier round. The fixes of two
+  rules undo each other, and the error names those rules.
+- The files still change after 10 rounds. No flag raises this limit.
 
 ## `stiles rules`
 
@@ -66,6 +86,8 @@ output or behavior:
 | A file Stiles cannot read or analyze | Ends the run | Reported, run continues |
 | A rule that panics                   | Ends the run | Reported, run continues |
 | A run that finds nothing to check    | Ends the run | Ends the run            |
+| A fix that lies outside its file     | Ends the run | Ends the run            |
+| Fixes that do not settle             | Ends the run | Ends the run            |
 
 ## Exit status
 
@@ -123,7 +145,11 @@ substitution, for example `tag=$(stiles abi)`.
   "start": 120,
   "end": 124,
   "line": 7,
-  "column": 5
+  "column": 5,
+  "fix": {
+    "message": "…",
+    "edits": [{ "start": 120, "end": 124, "replacement": "…" }]
+  }
 }
 ```
 
@@ -137,5 +163,9 @@ substitution, for example `tag=$(stiles abi)`.
 | `end`      | The byte offset where the diagnostic ends            |
 | `line`     | The line of `start`, counting from 1                 |
 | `column`   | The column of `start` in characters, counting from 1 |
+| `fix`      | The fix of the diagnostic, or `null` without one     |
+
+The edits of a fix come in the order of their spans. Each edit replaces the
+bytes from `start` to `end` with `replacement`.
 
 `stiles abi --json` writes the tag as one JSON string.

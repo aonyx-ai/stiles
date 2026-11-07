@@ -12,6 +12,7 @@ Arguments:
 Options:
       --keep-going     Continue checking after encountering errors
       --deny-warnings  Treat warnings as errors
+      --fix            Apply the fixes of the findings, and report the findings that remain
   -q, --quiet          Suppress informational messages
   -v, --verbose        Show additional detail
       --json           Output results as JSON

@@ -55,6 +55,10 @@ pub(super) struct FileChecks;
 impl FileChecks {
     /// Checks every file of `files`, and returns the checks in their order
     ///
+    /// A file in `texts` is checked with the text it maps to, and any other
+    /// file with its text on disk. `stiles check --fix` changes files in
+    /// memory, and checks the changed text before it writes anything.
+    ///
     /// # Errors
     ///
     /// Returns an error if the passes cannot be configured, if a pipeline
@@ -63,6 +67,7 @@ impl FileChecks {
     #[builder]
     pub(super) fn run(
         files: &[PathBuf],
+        texts: &HashMap<PathBuf, String>,
         providers: &Providers,
         custom_lints: &CustomLints,
         options: &RuleOptions,
@@ -84,6 +89,7 @@ impl FileChecks {
 
                 let check = check_file()
                     .file(file)
+                    .maybe_text(texts.get(file))
                     .pipelines(&mut pipelines)
                     .providers(providers)
                     .custom_lints(custom_lints)
@@ -135,6 +141,9 @@ fn create_lint_passes(
 
 /// Checks one file on the current thread
 ///
+/// The file holds `text` when the caller passes one, and its text on disk
+/// otherwise.
+///
 /// # Errors
 ///
 /// Returns an error if the passes cannot be configured, or if the pipeline
@@ -143,14 +152,18 @@ fn create_lint_passes(
 #[bon::builder]
 fn check_file(
     file: &PathBuf,
+    text: Option<&String>,
     pipelines: &mut HashMap<Grammar, Pipeline>,
     providers: &Providers,
     custom_lints: &CustomLints,
     options: &RuleOptions,
 ) -> anyhow::Result<FileCheck> {
-    let text = match std::fs::read_to_string(file) {
-        Ok(text) => text,
-        Err(source) => return Ok(FileCheck::Unreadable { source }),
+    let text = match text {
+        Some(text) => text.clone(),
+        None => match std::fs::read_to_string(file) {
+            Ok(text) => text,
+            Err(source) => return Ok(FileCheck::Unreadable { source }),
+        },
     };
 
     let mut passes = tracing::info_span!(target: PHASE_TARGET, "configure")
