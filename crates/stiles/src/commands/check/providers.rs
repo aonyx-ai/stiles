@@ -97,6 +97,60 @@ impl Providers {
         Ok(Self { rust, typescript })
     }
 
+    /// Gives each provider the changed text of the files it may decorate
+    ///
+    /// A round of `stiles check --fix` changes files in memory. The next
+    /// round checks the changed text, and a provider declines a file whose
+    /// text differs from the one it analyzed. Each change therefore goes to
+    /// the provider that [`Providers::for_file`] picks for its file. A file
+    /// that no loaded provider covers needs no change.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a provider cannot take the changed text.
+    pub(super) fn change_files(&mut self, changes: &[(PathBuf, String)]) -> anyhow::Result<()> {
+        let mut rust = Vec::new();
+        let mut typescript: HashMap<PathBuf, Vec<(PathBuf, String)>> = HashMap::new();
+
+        for (file, text) in changes {
+            let Some(grammar) = Grammar::of(file) else {
+                continue;
+            };
+            let change = (file.clone(), text.clone());
+            match grammar.language() {
+                Language::Rust => rust.push(change),
+                Language::TypeScript => {
+                    let Some(root) = TypeScriptDecorationProvider::project_root(file) else {
+                        continue;
+                    };
+                    typescript.entry(root).or_default().push(change);
+                }
+            }
+        }
+
+        if let Some(provider) = &mut self.rust
+            && !rust.is_empty()
+        {
+            provider
+                .change_files(rust)
+                .context("failed to give the Rust provider the fixed text")?;
+        }
+
+        for (root, changes) in typescript {
+            let Some(provider) = self.typescript.get_mut(&root) else {
+                continue;
+            };
+            provider.change_files(changes).with_context(|| {
+                format!(
+                    "give the TypeScript project at {} the fixed text",
+                    root.display()
+                )
+            })?;
+        }
+
+        Ok(())
+    }
+
     /// Returns the providers that may decorate `file`, a file in `language`
     ///
     /// A provider of another language, or of another TypeScript project,

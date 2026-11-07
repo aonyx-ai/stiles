@@ -54,7 +54,7 @@ flowchart LR
    to every lint pass and collects the diagnostics they return.
 4. **Report.** After the last file, the command writes every diagnostic to
    stdout, rendered with its span, its supporting annotations, and its
-   suggested fixes, or as one JSON object per line with `--json`.
+   fix, or as one JSON object per line with `--json`.
 
 The pipeline handles one file at a time, and the command runs one pipeline
 per core. The command loads the providers once per run, and every thread
@@ -85,6 +85,22 @@ Discovery decides which files reach the pipeline. It walks the target the
 way git and ripgrep do, honors every ignore file, and applies the `ignore`
 patterns from the configuration. The [file discovery][discovery]
 documentation describes those rules.
+
+### Fixes
+
+A rule can attach a fix to a diagnostic: a set of edits in the file of the
+diagnostic that apply together. A rule attaches one only when the change is
+correct without review. With `--fix`, the command runs the files in rounds
+after the first walk. A round applies the fixes of each file in source order
+and skips a fix that overlaps one it took. It then hands the changed text to
+the providers, and walks every file again, because a change to one file can
+change the decorations of another. The rounds end when a round
+changes nothing, and the command writes the files only if the run succeeded.
+
+A file that returns to an earlier text fails the run, because two rules undo
+each other. The command keeps a hash of each text a file held, so it notices
+the repeat at once. A cap of 10 rounds stops fixes that change a file
+without a repeat.
 
 ## Language support
 

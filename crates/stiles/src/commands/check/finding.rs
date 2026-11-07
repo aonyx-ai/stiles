@@ -8,7 +8,7 @@ use anyhow::Context as _;
 use bon::bon;
 use serde::Serialize;
 use stiles_reporting::SourceRenderer;
-use stiles_types::{Diagnostic, Severity};
+use stiles_types::{Diagnostic, Fix, Severity};
 
 /// One diagnostic as `stiles check` reports it
 ///
@@ -20,7 +20,7 @@ use stiles_types::{Diagnostic, Severity};
 ///
 /// `start` and `end` are byte offsets into the file. `line` and `column`
 /// count from one, and the column counts characters, the way an editor
-/// shows a position.
+/// shows a position. `fix` is `null` when the rule attached no fix.
 #[derive(Clone, Eq, PartialEq, Debug, Serialize)]
 pub(crate) struct Finding {
     rule: &'static str,
@@ -31,8 +31,44 @@ pub(crate) struct Finding {
     end: usize,
     line: usize,
     column: usize,
+    fix: Option<FindingFix>,
     #[serde(skip)]
     rendered: String,
+}
+
+/// The fix of a finding, as `--json` prints it
+///
+/// The edits come in the order of their spans, and their offsets are bytes
+/// of the file as the check read it.
+#[derive(Clone, Eq, PartialEq, Debug, Serialize)]
+struct FindingFix {
+    message: String,
+    edits: Vec<FindingEdit>,
+}
+
+/// One edit of the fix of a finding, as `--json` prints it
+#[derive(Clone, Eq, PartialEq, Debug, Serialize)]
+struct FindingEdit {
+    start: usize,
+    end: usize,
+    replacement: String,
+}
+
+impl From<&Fix> for FindingFix {
+    fn from(fix: &Fix) -> Self {
+        Self {
+            message: fix.message().to_owned(),
+            edits: fix
+                .edits()
+                .iter()
+                .map(|edit| FindingEdit {
+                    start: edit.span().start(),
+                    end: edit.span().end(),
+                    replacement: edit.replacement().to_owned(),
+                })
+                .collect(),
+        }
+    }
 }
 
 #[bon]
@@ -70,6 +106,7 @@ impl Finding {
             end: span.end(),
             line,
             column,
+            fix: diagnostic.fix().map(FindingFix::from),
             rendered,
         })
     }
@@ -118,7 +155,7 @@ fn position(source: &str, offset: usize) -> (usize, usize) {
 mod tests {
     use std::ops::Range;
 
-    use stiles_types::{RuleId, Span};
+    use stiles_types::{Edit, RuleId, Span};
 
     use super::*;
 
@@ -191,6 +228,45 @@ mod tests {
                 "end": 14,
                 "line": 2,
                 "column": 4,
+                "fix": null,
+            })
+        );
+    }
+
+    #[test]
+    fn json_of_a_fixed_finding_holds_its_edits() {
+        let path: Arc<Path> = Path::new("src/lib.rs").into();
+        let sources = HashMap::from([(path, "/// One.\n".to_owned())]);
+        let span = Span::builder().file("src/lib.rs").start(7).end(8).build();
+        let fix = Fix::builder()
+            .message("remove the period")
+            .edits(vec![
+                Edit::builder().span(span.clone()).replacement("").build(),
+            ])
+            .build()
+            .expect("the fix should build");
+        let diagnostic = Diagnostic::builder()
+            .rule_id(RuleId::new("lint.test"))
+            .severity(Severity::Warn)
+            .message("test message")
+            .span(span)
+            .build()
+            .with_fix(fix)
+            .expect("the fix should attach");
+        let finding = Finding::builder()
+            .diagnostic(&diagnostic)
+            .sources(&sources)
+            .renderer(&SourceRenderer::new(&sources))
+            .build()
+            .expect("should render");
+
+        let json = serde_json::to_value(&finding).expect("should serialize");
+
+        assert_eq!(
+            json["fix"],
+            serde_json::json!({
+                "message": "remove the period",
+                "edits": [{ "start": 7, "end": 8, "replacement": "" }],
             })
         );
     }
@@ -262,20 +338,56 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
+    fn trait_send_finding() {
         fn assert_send<T: Send>() {}
         assert_send::<Finding>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_send_finding_edit() {
+        fn assert_send<T: Send>() {}
+        assert_send::<FindingEdit>();
+    }
+
+    #[test]
+    fn trait_send_finding_fix() {
+        fn assert_send<T: Send>() {}
+        assert_send::<FindingFix>();
+    }
+
+    #[test]
+    fn trait_sync_finding() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<Finding>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_sync_finding_edit() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<FindingEdit>();
+    }
+
+    #[test]
+    fn trait_sync_finding_fix() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<FindingFix>();
+    }
+
+    #[test]
+    fn trait_unpin_finding() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Finding>();
+    }
+
+    #[test]
+    fn trait_unpin_finding_edit() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<FindingEdit>();
+    }
+
+    #[test]
+    fn trait_unpin_finding_fix() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<FindingFix>();
     }
 }

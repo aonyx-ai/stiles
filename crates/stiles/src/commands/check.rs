@@ -4,6 +4,7 @@ mod failure_threshold;
 mod file_checks;
 mod file_failure;
 mod finding;
+mod fix_rounds;
 mod grammar;
 mod phase_timings;
 mod providers;
@@ -24,6 +25,7 @@ use self::failure_threshold::FailureThreshold;
 use self::file_checks::{FileCheck, FileChecks};
 use self::file_failure::FileFailure;
 use self::finding::Finding;
+use self::fix_rounds::FixRounds;
 use self::phase_timings::PhaseTimings;
 use self::providers::Providers;
 use super::closing_text::ClosingText;
@@ -45,6 +47,10 @@ pub(crate) struct CheckArgs {
     /// Treat warnings as errors
     #[arg(long)]
     deny_warnings: bool,
+
+    /// Apply the fixes of the findings, and report the findings that remain
+    #[arg(long)]
+    fix: bool,
 
     /// Write the time of each phase of the run to FILE as JSON
     ///
@@ -161,6 +167,7 @@ async fn run(
         path,
         keep_going,
         deny_warnings,
+        fix,
         timings: _,
     } = args;
 
@@ -232,7 +239,7 @@ async fn run(
         path.display()
     );
 
-    let providers = tracing::info_span!(target: PHASE_TARGET, "load").in_scope(|| {
+    let mut providers = tracing::info_span!(target: PHASE_TARGET, "load").in_scope(|| {
         Providers::load()
             .path(&path)
             .files(files)
@@ -241,10 +248,24 @@ async fn run(
     })?;
     let checks = FileChecks::run()
         .files(files)
+        .texts(&HashMap::new())
         .providers(&providers)
         .custom_lints(&custom_lints)
         .options(config.options())
         .call()?;
+
+    let (checks, fixed_texts, fixed) = match fix {
+        true => FixRounds::run()
+            .files(files)
+            .checks(checks)
+            .rules(config.rules())
+            .providers(&mut providers)
+            .custom_lints(&custom_lints)
+            .options(config.options())
+            .call()?
+            .into_parts(),
+        false => (checks, HashMap::new(), 0),
+    };
 
     let mut all_diagnostics = Vec::new();
     let mut sources: HashMap<Arc<Path>, String> = HashMap::new();
@@ -303,6 +324,30 @@ async fn run(
         outcome = CheckOutcome::Failure;
     }
 
+    match outcome {
+        CheckOutcome::Success => {
+            write_fixes(&fixed_texts).context("failed to write the fixes")?;
+            if fixed > 0 {
+                context
+                    .output()
+                    .message(format!(
+                        "fixed {fixed} {} in {} {}",
+                        FINDINGS.for_count(fixed),
+                        fixed_texts.len(),
+                        FILES.for_count(fixed_texts.len())
+                    ))
+                    .await
+                    .context("failed to report the fixes")?;
+            }
+        }
+        CheckOutcome::Failure if !fixed_texts.is_empty() => {
+            closing.push(format_args!(
+                "error: stiles wrote none of its fixes, because the run failed"
+            ));
+        }
+        CheckOutcome::Failure => {}
+    }
+
     let report = tracing::info_span!(target: PHASE_TARGET, "report");
 
     remedies
@@ -329,6 +374,21 @@ async fn run(
             .context("failed to report a diagnostic")?;
     }
 
+    let fixable = all_diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.fix().is_some())
+        .count();
+    if !fix && fixable > 0 {
+        context
+            .output()
+            .message(format!(
+                "help: {fixable} {} a fix that `--fix` applies",
+                FINDINGS_HAVE.for_count(fixable)
+            ))
+            .await
+            .context("failed to report the fixable findings")?;
+    }
+
     drop(report);
 
     let outcome = outcome.combine(
@@ -343,6 +403,59 @@ async fn run(
         CheckOutcome::Success => Ok(ExitCode::SUCCESS),
     }
 }
+
+/// Writes the fixed text of each file to disk
+///
+/// # Errors
+///
+/// Returns an error if a file cannot be written. The files written before
+/// it keep their fixed text.
+fn write_fixes(texts: &HashMap<PathBuf, String>) -> anyhow::Result<()> {
+    let mut files: Vec<_> = texts.iter().collect();
+    files.sort_by_key(|(file, _)| *file);
+
+    for (file, text) in files {
+        std::fs::write(file, text)
+            .with_context(|| format!("failed to write the fixed text of {}", file.display()))?;
+    }
+
+    Ok(())
+}
+
+/// A word of a message, in the forms for one thing and for several
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+struct Noun {
+    one: &'static str,
+    many: &'static str,
+}
+
+impl Noun {
+    /// Returns the form of the word for `count` things
+    fn for_count(self, count: usize) -> &'static str {
+        match count == 1 {
+            true => self.one,
+            false => self.many,
+        }
+    }
+}
+
+/// The findings that a message counts
+const FINDINGS: Noun = Noun {
+    one: "finding",
+    many: "findings",
+};
+
+/// The findings that a message counts, with the verb that follows them
+const FINDINGS_HAVE: Noun = Noun {
+    one: "finding has",
+    many: "findings have",
+};
+
+/// The files that a message counts
+const FILES: Noun = Noun {
+    one: "file",
+    many: "files",
+};
 
 #[cfg(test)]
 mod tests {
@@ -427,6 +540,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_send_noun() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Noun>();
+    }
+
+    #[test]
     fn trait_sync_check_args() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<CheckArgs>();
@@ -439,6 +558,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_sync_noun() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Noun>();
+    }
+
+    #[test]
     fn trait_unpin_check_args() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<CheckArgs>();
@@ -448,5 +573,11 @@ mod tests {
     fn trait_unpin_coverage_remedies() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<CoverageRemedies>();
+    }
+
+    #[test]
+    fn trait_unpin_noun() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Noun>();
     }
 }
