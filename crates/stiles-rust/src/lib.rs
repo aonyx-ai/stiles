@@ -9,7 +9,7 @@ pub use stiles_types::RuleId;
 pub use self::adapter::RustLintPassAdapter;
 pub use self::language_fingerprint::LANGUAGE_FINGERPRINT;
 #[cfg(feature = "provider")]
-pub use self::provider::{LoadRustWorkspaceError, RustDecorationProvider};
+pub use self::provider::{ChangeRustFilesError, LoadRustWorkspaceError, RustDecorationProvider};
 
 include!(concat!(env!("OUT_DIR"), "/lint_pass.rs"));
 

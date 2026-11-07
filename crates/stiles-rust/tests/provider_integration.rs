@@ -80,6 +80,27 @@ fn rejected_imports_project() -> PathBuf {
     root
 }
 
+/// Writes a crate named `name`, for a test that changes its files
+///
+/// A test that changes a file needs a provider of its own, because the
+/// change stays in the database. Each such test names its own directory, so
+/// its Cargo run and its writes stay apart from every other test.
+fn changed_files_project(name: &str) -> PathBuf {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    std::fs::create_dir_all(root.join("src")).expect("should create the fixture directories");
+    std::fs::write(
+        root.join("Cargo.toml"),
+        format!(
+            "[workspace]\n\n[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n"
+        ),
+    )
+    .expect("should write the fixture manifest");
+    std::fs::write(root.join("src/lib.rs"), "pub fn one() -> u8 {\n    1\n}\n")
+        .expect("should write the fixture crate root");
+
+    root
+}
+
 /// Loads the fixture workspace once and lends it to every test
 ///
 /// Loading runs `cargo metadata` and `cargo check` against the fixture. A
@@ -534,6 +555,50 @@ fn anyhow_bare_try_over_the_whole_file_reports_only_anyhow_bodies() {
 /// missing file text and aborted the whole test binary. The fixture
 /// holds a bad module and a bad [`include_str!`] target, so a repair
 /// narrowed to Rust source also fails this test.
+#[test]
+fn change_files_covers_the_changed_text() {
+    let root = changed_files_project("changed_text_project");
+    let mut provider = RustDecorationProvider::load(&root).expect("should load the project");
+    let file_path = root.join("src/lib.rs");
+    let source = "pub fn one() -> u8 {\n    2\n}\n".to_owned();
+    let tree = parse_source(source.clone(), file_path.clone());
+
+    provider
+        .change_files([(file_path, source)])
+        .expect("the change should apply");
+    let coverage = provider.decorate(&tree).expect("decorate should succeed");
+
+    match coverage {
+        Coverage::Covered(_) => {}
+        Coverage::NotCovered(gap) => panic!("the changed text should be covered, got: {gap}"),
+    }
+}
+
+#[test]
+fn change_files_signs_a_function_the_change_added() {
+    let root = changed_files_project("added_function_project");
+    let mut provider = RustDecorationProvider::load(&root).expect("should load the project");
+    let file_path = root.join("src/lib.rs");
+    let source = "pub fn one() -> u8 {\n    1\n}\n\npub fn two() -> u16 {\n    2\n}\n".to_owned();
+    let mut tree = parse_source(source.clone(), file_path.clone());
+
+    provider
+        .change_files([(file_path, source)])
+        .expect("the change should apply");
+    let Coverage::Covered(decorations) = provider.decorate(&tree).expect("should decorate") else {
+        panic!("the changed text should be covered");
+    };
+    tree.merge_decorations(decorations);
+
+    let root_node = tree.root_node();
+    let two = find_function_by_name(&root_node, "two").expect("should find two");
+    let display = two
+        .decoration::<FnSignature>()
+        .and_then(FnSignature::return_type)
+        .map(ResolvedType::display);
+    assert_eq!(display, Some("u16"));
+}
+
 #[test]
 fn decorate_with_a_module_that_is_not_utf8_covers_its_siblings() {
     let root = not_utf8_project();

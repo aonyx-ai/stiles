@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::num::NonZeroUsize;
 use std::ops::Range;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use ra_ap_hir::import_map::{ImportInfo, ImportMap};
@@ -27,8 +27,10 @@ use crate::decorations::{
     PublicPath, Reexports, ResolvedType, ResultKind, ReturnMode, TypePath,
 };
 
+mod change_rust_files_error;
 mod load_rust_workspace_error;
 
+pub use self::change_rust_files_error::ChangeRustFilesError;
 pub use self::load_rust_workspace_error::LoadRustWorkspaceError;
 
 /// Decoration provider for Rust using rust-analyzer
@@ -203,6 +205,69 @@ impl RustDecorationProvider {
             root,
             wanted: Self::DECORATIONS.into_iter().collect(),
         })
+    }
+
+    /// Gives the database the changed text of files
+    ///
+    /// Each change is a file and the text it holds now. `stiles check
+    /// --fix` changes files in memory and writes them only when the run
+    /// succeeds. The next round of fixes checks the changed text, so the
+    /// database has to hold it instead of the copy on disk. rust-analyzer
+    /// then answers from the new text and recomputes only what depends on
+    /// it.
+    ///
+    /// A change to a file the database does not hold, or holds as excluded,
+    /// changes nothing. Such a file gets the same gap as before.
+    ///
+    /// The method takes `&mut self` because no file may be decorated while
+    /// the database changes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ChangeRustFilesError`] if the path of a change cannot be
+    /// made absolute, or if the lock of the database is poisoned.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::{Path, PathBuf};
+    ///
+    /// use stiles_rust::RustDecorationProvider;
+    ///
+    /// let mut provider = RustDecorationProvider::load(Path::new("."))?;
+    ///
+    /// provider.change_files([(PathBuf::from("src/lib.rs"), "pub fn one() {}\n".to_owned())])?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn change_files(
+        &mut self,
+        changes: impl IntoIterator<Item = (PathBuf, String)>,
+    ) -> Result<(), ChangeRustFilesError> {
+        let mut change = ChangeWithProcMacros::default();
+
+        for (path, text) in changes {
+            let path = std::path::absolute(&path).map_err(|source| {
+                ChangeRustFilesError::UnresolvablePath {
+                    path: path.clone(),
+                    source,
+                }
+            })?;
+            let path = VfsPath::new_real_path(path.to_string_lossy().to_string());
+            let Some((file_id, excluded)) = self.vfs.file_id(&path) else {
+                continue;
+            };
+            match excluded {
+                FileExcluded::Yes => continue,
+                FileExcluded::No => change.change_file(file_id, Some(text)),
+            }
+        }
+
+        self.db
+            .get_mut()
+            .map_err(|_| ChangeRustFilesError::PoisonedDatabase)?
+            .apply_change(change);
+
+        Ok(())
     }
 
     /// Creates a provider that holds an empty workspace
