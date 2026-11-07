@@ -1,4 +1,9 @@
 [[label]]
+name = "bench"
+description = "Run the benchmarks on CodSpeed for this pull request"
+color = "#f59e0b"
+
+[[label]]
 name = "good-first-issue"
 description = "Good issue for newcomers - mentoring available"
 color = "#4ade80"
