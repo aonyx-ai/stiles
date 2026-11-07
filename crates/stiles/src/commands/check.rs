@@ -15,6 +15,7 @@ use std::sync::Arc;
 use clawless::exit::Exit;
 use clawless::prelude::*;
 use stiles_core::{PHASE_TARGET, RunPipelineError};
+use stiles_reporting::SourceRenderer;
 use stiles_types::{Diagnostic, UncoveredFile};
 
 use self::check_outcome::CheckOutcome;
@@ -314,10 +315,12 @@ async fn run(
         .map(|diagnostic| threshold.promote(diagnostic))
         .collect();
 
+    let renderer = SourceRenderer::new(&sources);
     for diagnostic in &all_diagnostics {
         let finding = Finding::builder()
             .diagnostic(diagnostic)
             .sources(&sources)
+            .renderer(&renderer)
             .build()?;
         context
             .output()

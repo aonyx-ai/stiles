@@ -7,6 +7,7 @@ use std::sync::Arc;
 use anyhow::Context as _;
 use bon::bon;
 use serde::Serialize;
+use stiles_reporting::SourceRenderer;
 use stiles_types::{Diagnostic, Severity};
 
 /// One diagnostic as `stiles check` reports it
@@ -49,8 +50,10 @@ impl Finding {
     pub(crate) fn new(
         diagnostic: &Diagnostic,
         sources: &HashMap<Arc<Path>, String>,
+        renderer: &SourceRenderer<'_>,
     ) -> anyhow::Result<Self> {
-        let rendered = stiles_reporting::render_to_string(slice::from_ref(diagnostic), sources)
+        let rendered = renderer
+            .render(slice::from_ref(diagnostic))
             .context("failed to render the diagnostic")?;
         let span = diagnostic.span();
         let (line, column) = match sources.get(span.file()) {
@@ -139,6 +142,7 @@ mod tests {
         Finding::builder()
             .diagnostic(&diagnostic)
             .sources(&sources)
+            .renderer(&SourceRenderer::new(&sources))
             .build()
             .expect("should render")
     }
@@ -210,6 +214,7 @@ mod tests {
         let finding = Finding::builder()
             .diagnostic(&diagnostic)
             .sources(&sources)
+            .renderer(&SourceRenderer::new(&sources))
             .build()
             .expect("should render");
 
