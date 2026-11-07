@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -18,9 +19,13 @@ use stiles_types::{
 use crate::decorations::{FnSignature, ImportSource, ResolvedType, StringUnion, TypeText};
 use crate::queries;
 
+mod change_type_script_files_error;
 mod load_type_script_project_error;
+mod overlay_fs;
 
+pub use self::change_type_script_files_error::ChangeTypeScriptFilesError;
 pub use self::load_type_script_project_error::LoadTypeScriptProjectError;
+use self::overlay_fs::OverlayFs;
 
 /// The file that marks the root of a TypeScript project
 const CONFIG_FILE: &str = "tsconfig.json";
@@ -72,7 +77,11 @@ const MODULE_REFERENCE_KINDS: [&str; 2] = ["import_statement", "export_statement
 ///
 /// The program is built once and lives for the rest of the process, as it
 /// does in tsrs's own command-line compiler. A check loads each project
-/// once, so the memory is the run's.
+/// once, so the memory is the run's. [`change_files`] builds a new program
+/// for each round of fixes that changes a file of the project. The old
+/// program stays in memory too, so a run holds one program per such round.
+///
+/// [`change_files`]: TypeScriptDecorationProvider::change_files
 ///
 /// # Examples
 ///
@@ -84,6 +93,8 @@ pub struct TypeScriptDecorationProvider {
     program: &'static Program,
     config: P<ParsedCommandLine>,
     root: Arc<Path>,
+    fs: Arc<dyn FS>,
+    texts: HashMap<String, String>,
     wanted: DecorationSet,
 }
 
@@ -222,23 +233,78 @@ impl TypeScriptDecorationProvider {
             });
         };
         let config = P::new(config);
-
-        let compiler_host = new_cached_fs_compiler_host(
-            root_text,
-            fs,
-            &bundled::default_lib_path(),
-            None,
-            None,
-            None,
-        );
-        let program = new_program(ProgramOptions::new(config, compiler_host));
+        let program = build_program(root_text, config, Arc::clone(&fs));
 
         Ok(Self {
             program,
             config,
             root,
+            fs,
+            texts: HashMap::new(),
             wanted: Self::DECORATIONS.into_iter().collect(),
         })
+    }
+
+    /// Builds the program again, with `changes` in place of the text on disk
+    ///
+    /// Each change is a file and the text it holds now. `stiles check
+    /// --fix` changes files in memory and writes them only when the run
+    /// succeeds. The next round of fixes checks the changed text, so the
+    /// program has to read it instead of the copy on disk. Changes add up,
+    /// so the program reads the newest text of every file a change named.
+    ///
+    /// The program of the project does not change in place. This builds a
+    /// new one that reads the changed files from memory and every other
+    /// file from disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ChangeTypeScriptFilesError`] if the path of a change
+    /// cannot be made absolute, or is not valid UTF-8.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::{Path, PathBuf};
+    ///
+    /// use stiles_typescript::TypeScriptDecorationProvider;
+    ///
+    /// let mut provider = TypeScriptDecorationProvider::load(Path::new("."))?;
+    ///
+    /// provider.change_files([(PathBuf::from("src/main.ts"), "const a = 1;\n".to_owned())])?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn change_files(
+        &mut self,
+        changes: impl IntoIterator<Item = (PathBuf, String)>,
+    ) -> Result<(), ChangeTypeScriptFilesError> {
+        for (path, text) in changes {
+            let path = std::path::absolute(&path).map_err(|source| {
+                ChangeTypeScriptFilesError::UnresolvablePath {
+                    path: path.clone(),
+                    source,
+                }
+            })?;
+            let Some(name) = path.to_str() else {
+                return Err(ChangeTypeScriptFilesError::NotUtf8 { path });
+            };
+            self.texts.insert(name.to_owned(), text);
+        }
+
+        let Some(root_text) = self.root.to_str() else {
+            return Err(ChangeTypeScriptFilesError::NotUtf8 {
+                path: self.root.to_path_buf(),
+            });
+        };
+        let fs: Arc<dyn FS> = Arc::new(
+            OverlayFs::builder()
+                .inner(Arc::clone(&self.fs))
+                .texts(self.texts.clone())
+                .build(),
+        );
+        self.program = build_program(root_text, self.config, fs);
+
+        Ok(())
     }
 
     /// Returns the directory of the TypeScript project that holds `path`
@@ -457,6 +523,16 @@ fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &m
     for child in node.named_children() {
         collect_targets(&child, wanted, targets);
     }
+}
+
+/// Builds the program of a project whose files `fs` reads
+///
+/// tsrs keeps a program for the rest of the process, so the program it
+/// returns is `'static`.
+fn build_program(root: &str, config: P<ParsedCommandLine>, fs: Arc<dyn FS>) -> &'static Program {
+    let compiler_host =
+        new_cached_fs_compiler_host(root, fs, &bundled::default_lib_path(), None, None, None);
+    new_program(ProgramOptions::new(config, compiler_host))
 }
 
 /// Returns the nearest directory at or above `path` that holds a

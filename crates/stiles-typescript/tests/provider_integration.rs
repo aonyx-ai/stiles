@@ -197,6 +197,56 @@ fn types_of(tree: &DecoratedTree, name: &str) -> Vec<Option<String>> {
 }
 
 #[test]
+fn change_files_covers_the_changed_text() {
+    let project = Project::new(STRICT, &[("src/main.ts", "export const a = 1;\n")]);
+    let path = project.path("src/main.ts");
+    let mut provider = project.provider();
+    let tree = parse(&path, "export const a = 2;\n");
+
+    provider
+        .change_files([(path, "export const a = 2;\n".to_owned())])
+        .expect("the change should apply");
+    let coverage = provider.decorate(&tree).expect("should decorate");
+
+    let Coverage::Covered(_) = &coverage else {
+        panic!("expected the changed text to be covered, got {coverage:?}");
+    };
+}
+
+#[test]
+fn change_files_leaves_the_file_on_disk() {
+    let project = Project::new(STRICT, &[("src/main.ts", "export const a = 1;\n")]);
+    let path = project.path("src/main.ts");
+    let mut provider = project.provider();
+
+    provider
+        .change_files([(path.clone(), "export const a = 2;\n".to_owned())])
+        .expect("the change should apply");
+
+    let on_disk = std::fs::read_to_string(&path).expect("the file should exist");
+    assert_eq!(on_disk, "export const a = 1;\n");
+}
+
+#[test]
+fn change_files_types_the_changed_text() {
+    let project = Project::new(STRICT, &[("src/main.ts", "export const a: number = 1;\n")]);
+    let path = project.path("src/main.ts");
+    let mut provider = project.provider();
+    let source = "export const a: string = \"one\";\n";
+    let mut tree = parse(&path, source);
+
+    provider
+        .change_files([(path, source.to_owned())])
+        .expect("the change should apply");
+    let Coverage::Covered(decorations) = provider.decorate(&tree).expect("should decorate") else {
+        panic!("expected the changed text to be covered");
+    };
+    tree.merge_decorations(decorations);
+
+    assert_eq!(types_of(&tree, "a"), [Some("string".to_owned())]);
+}
+
+#[test]
 fn decorate_a_changed_file_reports_stale_source() {
     let project = Project::new(STRICT, &[("src/main.ts", "export const a = 1;\n")]);
     let path = project.path("src/main.ts");
