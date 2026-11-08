@@ -7,6 +7,8 @@ use anyhow::Context as _;
 use serde::Deserialize;
 use toml_edit::{DocumentMut, Item, TableLike};
 
+use super::cache::cache_root;
+use super::digest::digest;
 use super::stiles_patch::STILES_CRATES;
 
 /// The tables of a manifest that declare dependencies
@@ -24,12 +26,71 @@ const DEPENDENCY_TABLES: [&str; 3] = ["dependencies", "dev-dependencies", "build
 /// The checkout belongs to the cache, and a later run without a source
 /// must find it as it was fetched. So stiles keeps every file it rewrote,
 /// with the lockfile, and puts them back after the build.
+///
+/// The lockfile that the checkout gets back does not fit the rewritten
+/// manifests. Cargo would resolve them again on every run, and ask the
+/// registry each time. Stiles therefore keeps the lockfile that a build
+/// resolved in the cache, and hands it to the next build. When the source
+/// has moved since, cargo updates the kept lockfile as it would any other.
 #[must_use = "the checkout keeps the rewritten requirements until `restore` runs"]
 pub(super) struct RewrittenRequirements {
     originals: Vec<(PathBuf, String)>,
+    /// The lockfile of the workspace of the lints
+    lockfile: PathBuf,
+    /// Where the cache keeps the lockfile that a build resolved
+    resolved: PathBuf,
 }
 
 impl RewrittenRequirements {
+    /// Hands the kept lockfile of an earlier build to the checkout
+    ///
+    /// Nothing happens before the first build, because the cache keeps no
+    /// lockfile yet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the kept lockfile cannot be copied.
+    fn reuse_resolved(&self) -> anyhow::Result<()> {
+        if !self.resolved.is_file() {
+            return Ok(());
+        }
+
+        std::fs::copy(&self.resolved, &self.lockfile)
+            .with_context(|| format!("failed to write {}", self.lockfile.display()))?;
+
+        Ok(())
+    }
+
+    /// Keeps the lockfile that the build resolved for the next build
+    ///
+    /// The copy lands under a temporary name and moves into place. A
+    /// process that dies halfway therefore leaves no partial lockfile that
+    /// cargo would refuse on every later run.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the lockfile cannot be copied into the cache.
+    pub(super) fn keep_resolved(&self) -> anyhow::Result<()> {
+        if !self.lockfile.is_file() {
+            return Ok(());
+        }
+
+        let directory = self
+            .resolved
+            .parent()
+            .context("the kept lockfile has no directory")?;
+        std::fs::create_dir_all(directory)
+            .with_context(|| format!("failed to create {}", directory.display()))?;
+
+        let partial = self
+            .resolved
+            .with_extension(format!("{}.partial", std::process::id()));
+        std::fs::copy(&self.lockfile, &partial)
+            .with_context(|| format!("failed to write {}", partial.display()))?;
+        std::fs::rename(&partial, &self.resolved)
+            .with_context(|| format!("failed to write {}", self.resolved.display()))
+    }
+
     /// Puts back every file as it was before the rewrite
     ///
     /// # Errors
@@ -87,6 +148,12 @@ pub(super) fn rewrite(
         .map(|package| (package.name, package.version))
         .collect();
 
+    let resolved = resolved_lockfile_in(
+        &cache_root().context("failed to find the directory of the resolved lockfiles")?,
+        directory,
+        source,
+    );
+
     let lints = load_metadata(cargo, directory).context("failed to read the lints")?;
     let mut manifests: BTreeSet<PathBuf> = lints
         .packages
@@ -100,7 +167,7 @@ pub(super) fn rewrite(
     if lockfile.is_file() {
         let contents = std::fs::read_to_string(&lockfile)
             .with_context(|| format!("failed to read {}", lockfile.display()))?;
-        originals.push((lockfile, contents));
+        originals.push((lockfile.clone(), contents));
     }
 
     for manifest in manifests {
@@ -116,7 +183,26 @@ pub(super) fn rewrite(
         originals.push((manifest, contents));
     }
 
-    Ok(RewrittenRequirements { originals })
+    let rewritten = RewrittenRequirements {
+        originals,
+        lockfile,
+        resolved,
+    };
+    rewritten
+        .reuse_resolved()
+        .context("failed to reuse the lockfile of an earlier build")?;
+
+    Ok(rewritten)
+}
+
+/// Returns where `root` keeps the lockfile of `directory` against `source`
+///
+/// The name holds both paths. Two checkouts of stiles that share one cache
+/// therefore do not replace the lockfile of each other on every run.
+fn resolved_lockfile_in(root: &Path, directory: &Path, source: &Path) -> PathBuf {
+    let key = format!("{}\0{}", directory.display(), source.display());
+
+    root.join("resolved").join(format!("{}.lock", digest(&key)))
 }
 
 /// Asks cargo for the packages of the workspace at `directory`
@@ -238,6 +324,77 @@ mod tests {
             .unwrap_or_else(|| manifest.to_owned())
     }
 
+    /// Returns requirements whose lockfile and kept lockfile sit in `directory`
+    fn with_lockfiles_in(directory: &Path) -> RewrittenRequirements {
+        RewrittenRequirements {
+            originals: Vec::new(),
+            lockfile: directory.join("Cargo.lock"),
+            resolved: directory.join("cache").join("kept.lock"),
+        }
+    }
+
+    #[test]
+    fn keep_resolved_copies_the_lockfile_into_the_cache() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let rewritten = with_lockfiles_in(directory.path());
+        std::fs::write(&rewritten.lockfile, "resolved").expect("the lockfile should be written");
+
+        rewritten
+            .keep_resolved()
+            .expect("the lockfile should be kept");
+
+        assert_eq!(
+            std::fs::read_to_string(&rewritten.resolved).expect("the kept file should be readable"),
+            "resolved"
+        );
+    }
+
+    #[test]
+    fn keep_resolved_leaves_only_the_kept_lockfile() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let rewritten = with_lockfiles_in(directory.path());
+        std::fs::write(&rewritten.lockfile, "resolved").expect("the lockfile should be written");
+
+        rewritten
+            .keep_resolved()
+            .expect("the lockfile should be kept");
+
+        let kept = std::fs::read_dir(directory.path().join("cache"))
+            .expect("the cache should be readable")
+            .count();
+        assert_eq!(kept, 1);
+    }
+
+    #[test]
+    fn keep_resolved_replaces_an_earlier_lockfile() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let rewritten = with_lockfiles_in(directory.path());
+        std::fs::write(&rewritten.lockfile, "first").expect("the lockfile should be written");
+        rewritten
+            .keep_resolved()
+            .expect("the lockfile should be kept");
+        std::fs::write(&rewritten.lockfile, "second").expect("the lockfile should be written");
+
+        rewritten
+            .keep_resolved()
+            .expect("the lockfile should be kept");
+
+        assert_eq!(
+            std::fs::read_to_string(&rewritten.resolved).expect("the kept file should be readable"),
+            "second"
+        );
+    }
+
+    #[test]
+    fn keep_resolved_without_a_lockfile_keeps_nothing() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let rewritten = with_lockfiles_in(directory.path());
+
+        rewritten.keep_resolved().expect("nothing should fail");
+
+        assert!(!rewritten.resolved.exists());
+    }
+
     #[test]
     fn pin_requirements_keeps_the_other_keys_of_an_entry() {
         let manifest =
@@ -318,12 +475,42 @@ mod tests {
     }
 
     #[test]
+    fn resolved_lockfile_in_differs_between_two_sources() {
+        let first = resolved_lockfile_in(
+            Path::new("/cache"),
+            Path::new("/cache/git/rules/abc"),
+            Path::new("/work/stiles"),
+        );
+
+        let second = resolved_lockfile_in(
+            Path::new("/cache"),
+            Path::new("/cache/git/rules/abc"),
+            Path::new("/work/stiles-other"),
+        );
+
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn resolved_lockfile_in_sits_under_the_root() {
+        let path = resolved_lockfile_in(
+            Path::new("/cache"),
+            Path::new("/cache/git/rules/abc"),
+            Path::new("/work/stiles"),
+        );
+
+        assert!(path.starts_with("/cache/resolved"));
+    }
+
+    #[test]
     fn restore_writes_back_every_original() {
         let directory = tempfile::tempdir().expect("temporary directory should be created");
         let manifest = directory.path().join("Cargo.toml");
         std::fs::write(&manifest, "rewritten").expect("the manifest should be written");
         let rewritten = RewrittenRequirements {
             originals: vec![(manifest.clone(), "original".to_owned())],
+            lockfile: directory.path().join("Cargo.lock"),
+            resolved: directory.path().join("kept.lock"),
         };
 
         rewritten.restore().expect("the restore should succeed");
@@ -331,6 +518,38 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(&manifest).expect("the manifest should be readable"),
             "original"
+        );
+    }
+
+    #[test]
+    fn reuse_resolved_hands_over_the_kept_lockfile() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let rewritten = with_lockfiles_in(directory.path());
+        std::fs::write(&rewritten.lockfile, "fetched").expect("the lockfile should be written");
+        std::fs::create_dir(directory.path().join("cache")).expect("the cache should be created");
+        std::fs::write(&rewritten.resolved, "resolved").expect("the kept file should be written");
+
+        rewritten
+            .reuse_resolved()
+            .expect("the lockfile should be reused");
+
+        assert_eq!(
+            std::fs::read_to_string(&rewritten.lockfile).expect("the lockfile should be readable"),
+            "resolved"
+        );
+    }
+
+    #[test]
+    fn reuse_resolved_without_a_kept_lockfile_leaves_the_checkout_alone() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let rewritten = with_lockfiles_in(directory.path());
+        std::fs::write(&rewritten.lockfile, "fetched").expect("the lockfile should be written");
+
+        rewritten.reuse_resolved().expect("nothing should fail");
+
+        assert_eq!(
+            std::fs::read_to_string(&rewritten.lockfile).expect("the lockfile should be readable"),
+            "fetched"
         );
     }
 
