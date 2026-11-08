@@ -500,7 +500,8 @@ struct Loaded {
 ///
 /// With a stiles source, a checkout of a git source first requires the
 /// version that the source holds, so that the patch applies. The checkout
-/// gets its files back once cargo exits. A path source is a tree of the
+/// gets its files back once cargo exits, and a successful build leaves its
+/// lockfile in the cache for the next one. A path source is a tree of the
 /// project, which stiles never writes.
 ///
 /// # Errors
@@ -552,9 +553,14 @@ fn build(
         .output();
 
     if let Some(rewritten) = rewritten {
+        let kept = match &output {
+            Ok(output) if output.status.success() => rewritten.keep_resolved(),
+            Ok(_) | Err(_) => Ok(()),
+        };
         rewritten
             .restore()
             .context("failed to restore the manifests of the lints")?;
+        kept.context("failed to keep the resolved lockfile of the lints")?;
     }
 
     let output = output.context("failed to run cargo build")?;

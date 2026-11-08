@@ -587,6 +587,37 @@ fn check_with_a_stiles_source_compiles_over_cached_prebuilt_lints() {
         .stdout(predicate::str::contains(format!("warning[{RULE}]")));
 }
 
+/// Pins that a build against a stiles source leaves its lockfile in the cache
+///
+/// The checkout gets its original lockfile back after the build. Without
+/// the kept copy, cargo would resolve the rewritten manifests again on every
+/// run, and ask the index of crates.io each time.
+#[test]
+fn check_with_a_stiles_source_keeps_the_resolved_lockfile() {
+    let cache = tempfile::tempdir().expect("temporary directory should be created");
+    let rules = repository_with_one_lint("kept_lock_lint", RULE);
+    let target = package(TODO_SOURCE);
+    configure_git_lint_against_source(
+        target.path(),
+        GitPin {
+            url: &rules.url(),
+            rev: rules.rev(),
+        },
+        &stiles_source(),
+    );
+
+    stiles(&cache)
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .success();
+
+    let kept = std::fs::read_dir(cache.path().join("resolved"))
+        .expect("the cache should hold the resolved lockfiles")
+        .count();
+    assert_eq!(kept, 1);
+}
+
 /// Points the package at one git lint source, built against `source`
 fn configure_git_lint_against_source(package: &Path, pin: GitPin<'_>, source: &Path) {
     configure_git_lint(package, pin);
