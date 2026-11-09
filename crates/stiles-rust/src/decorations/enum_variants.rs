@@ -5,15 +5,17 @@ use stiles_macros::Decoration;
 
 /// The names of the variants of an enum, in declaration order
 ///
-/// A rule reads it to tell a predicate of a variant, such as `is_error` on
-/// an enum with an `Error` variant, from any other method whose name starts
-/// with `is_`. A rule can also name the variants in its message.
+/// A rule reads it to tell a predicate of a variant from any other method
+/// whose name starts with `is_`. On an enum with an `Error` variant,
+/// `is_error` is such a predicate. A rule can also name the variants in its
+/// message.
 ///
 /// The provider attaches it beside [`ResolvedType`] and [`AdtFlags`] on a
-/// value that decides a branch: the value of an `if let` or a let-else, the
-/// receiver of an `is_` method, an operand of `==` or `!=`, and the
-/// `matches!` macro that tests a value. It looks through references, so the
-/// names of `Kind` also reach a `&Kind`.
+/// value that decides a branch. Such a value is the value of an `if let` or
+/// a let-else, the receiver of an `is_` method, or an operand of `==` or
+/// `!=`. The `matches!` macro that tests a value counts as well. The
+/// provider looks through references, so the names of `Kind` also reach a
+/// `&Kind`.
 ///
 /// # Examples
 ///

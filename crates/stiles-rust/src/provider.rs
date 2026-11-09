@@ -760,7 +760,7 @@ fn predicate_receiver<'a>(call: &DecoratedNode<'a>) -> Option<DecoratedNode<'a>>
 fn equality_operands<'a>(binary: &DecoratedNode<'a>) -> Vec<DecoratedNode<'a>> {
     let compares = binary
         .child_by_field_name("operator")
-        .is_some_and(|operator| matches!(operator.text(), "==" | "!="));
+        .is_some_and(|operator| ["==", "!="].contains(&operator.text()));
     if !compares {
         return Vec::new();
     }
