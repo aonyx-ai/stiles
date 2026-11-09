@@ -28,6 +28,7 @@ hex.workspace = true
 ignore.workspace = true
 kawauso-project.workspace = true
 libloading.workspace = true
+pulldown-cmark.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

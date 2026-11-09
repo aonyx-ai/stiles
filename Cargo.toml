@@ -123,6 +123,11 @@ sha2 = "0.11"
 # reference counts free memory through the allocator that made them.
 stabby = "72.1"
 syn = { version = "3", features = ["full", "extra-traits"] }
+# Renders the Markdown of rule docs on the reference page. Only the HTML
+# writer is needed.
+pulldown-cmark = { version = "0.13", default-features = false, features = [
+  "html",
+] }
 # Unpacks an archive of prebuilt lints. The `xattr` feature is off,
 # because a lint library carries no extended attributes.
 tar = { version = "0.4", default-features = false }
