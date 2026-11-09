@@ -26,7 +26,8 @@ use stiles_types::{
 
 use crate::decorations::{
     AdtFlags, AdtKind, EnumVariants, ErrorType, Exhaustiveness, FnSignature, ImportSource,
-    NeverKind, OptionKind, PublicPath, Reexports, ResolvedType, ResultKind, ReturnMode, TypePath,
+    ItemExposure, NeverKind, OptionKind, PublicPath, Reexports, ResolvedType, ResultKind,
+    ReturnMode, TypePath,
 };
 
 mod change_rust_files_error;
@@ -79,13 +80,14 @@ impl RustDecorationProvider {
     /// ```
     ///
     /// [`wanting`]: RustDecorationProvider::wanting
-    pub const DECORATIONS: [DecorationKey; 6] = [
+    pub const DECORATIONS: [DecorationKey; 7] = [
         FnSignature::KEY,
         ResolvedType::KEY,
         AdtFlags::KEY,
         EnumVariants::KEY,
         ImportSource::KEY,
         Reexports::KEY,
+        ItemExposure::KEY,
     ];
 
     /// Returns the provider, computing only the decoration types of `wanted`
@@ -557,6 +559,11 @@ fn resolve_targets(
                     decorations.insert(*node_id, reexports);
                 }
             }
+            Target::ModuleItem { node_id, range } => {
+                if let Some(exposure) = resolve_item_exposure(&ctx, *range) {
+                    decorations.insert(*node_id, exposure);
+                }
+            }
         }
     }
     decorations
@@ -611,6 +618,11 @@ enum Target {
         node_id: usize,
         range: TextRange,
     },
+    /// An item that sits directly in a module
+    ModuleItem {
+        node_id: usize,
+        range: TextRange,
+    },
 }
 
 /// Converts a byte range into rust-analyzer's 32-bit one
@@ -635,6 +647,16 @@ fn text_range_of(node: &DecoratedNode<'_>) -> Option<TextRange> {
 }
 
 fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &mut Vec<Target>) {
+    if wanted.contains_any(&[ItemExposure::KEY])
+        && is_module_item(node)
+        && let Some(range) = text_range_of(node)
+    {
+        targets.push(Target::ModuleItem {
+            node_id: node.id(),
+            range,
+        });
+    }
+
     match node.kind() {
         "function_item" | "function_signature_item" => {
             if wanted.contains_any(&[FnSignature::KEY])
@@ -707,6 +729,37 @@ fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &m
 
     for child in node.named_children() {
         collect_targets(&child, wanted, targets);
+    }
+}
+
+/// Returns whether `node` is an item that sits directly in a module
+///
+/// A method sits in the body of an `impl` or a trait, and a nested item in
+/// a block, so neither counts. An `extern` block is not a module either.
+fn is_module_item(node: &DecoratedNode<'_>) -> bool {
+    match node.kind() {
+        "function_item" | "struct_item" | "enum_item" | "union_item" | "trait_item"
+        | "type_item" | "const_item" | "static_item" => {
+            node.parent().is_some_and(|scope| is_module_scope(&scope))
+        }
+        _ => false,
+    }
+}
+
+/// Returns whether `scope` holds the items of a module outside any body
+///
+/// The check climbs through every enclosing module. A `mod` inside a
+/// function body has a `declaration_list` too, and its items are local to
+/// that body.
+fn is_module_scope(scope: &DecoratedNode<'_>) -> bool {
+    match scope.kind() {
+        "source_file" => true,
+        "declaration_list" => scope
+            .parent()
+            .filter(|owner| owner.kind() == "mod_item")
+            .and_then(|owner| owner.parent())
+            .is_some_and(|outer| is_module_scope(&outer)),
+        _ => false,
     }
 }
 
@@ -1359,6 +1412,60 @@ fn resolve_reexports(
     };
 
     Some(Reexports::new(public_paths(ctx, module_paths, def)))
+}
+
+/// Returns whether a dependent crate can name the item at `range`
+///
+/// A tree-sitter item starts after its attributes and a rust-analyzer item
+/// starts before them, so only the ends of the two spans can be compared.
+/// A difference between the ends yields [`None`], because the two parsers
+/// then disagree about the item. An item that `cfg` disables has no
+/// definition and also yields [`None`].
+///
+/// The import map of the defining crate holds an entry for each item that
+/// the crate exposes through a chain of `pub` names. The map records a
+/// `#[doc(hidden)]` path like any other, and [`ItemExposure`] counts it.
+fn resolve_item_exposure(ctx: &DecorateCtx<'_, '_>, range: TextRange) -> Option<ItemExposure> {
+    let item = ast::Item::cast(covering_node(ctx.syntax, range)?)?;
+    if item.syntax().text_range().end() != range.end() {
+        return None;
+    }
+
+    let def = module_item_definition(ctx, item)?;
+    let krate = defining_crate(ctx, def)?;
+    let key = ItemInNs::from(def).try_into().ok()?;
+
+    Some(
+        match ImportMap::of(ctx.sema.db, krate.base()).import_info_for(key) {
+            Some(_) => ItemExposure::Public,
+            None => ItemExposure::Internal,
+        },
+    )
+}
+
+/// Returns the definition of an item that [`ItemExposure`] describes
+fn module_item_definition(ctx: &DecorateCtx<'_, '_>, item: ast::Item) -> Option<ModuleDef> {
+    let sema = ctx.sema;
+
+    match item {
+        ast::Item::Fn(item) => sema.to_def(&item).map(ModuleDef::from),
+        ast::Item::Struct(item) => sema.to_def(&item).map(ModuleDef::from),
+        ast::Item::Enum(item) => sema.to_def(&item).map(ModuleDef::from),
+        ast::Item::Union(item) => sema.to_def(&item).map(ModuleDef::from),
+        ast::Item::Trait(item) => sema.to_def(&item).map(ModuleDef::from),
+        ast::Item::TypeAlias(item) => sema.to_def(&item).map(ModuleDef::from),
+        ast::Item::Const(item) => sema.to_def(&item).map(ModuleDef::from),
+        ast::Item::Static(item) => sema.to_def(&item).map(ModuleDef::from),
+        ast::Item::AsmExpr(_)
+        | ast::Item::ExternBlock(_)
+        | ast::Item::ExternCrate(_)
+        | ast::Item::Impl(_)
+        | ast::Item::MacroCall(_)
+        | ast::Item::MacroDef(_)
+        | ast::Item::MacroRules(_)
+        | ast::Item::Module(_)
+        | ast::Item::Use(_) => None,
+    }
 }
 
 /// Returns the crate that defines `def`, or [`None`] for a builtin type

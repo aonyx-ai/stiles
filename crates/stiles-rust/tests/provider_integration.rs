@@ -6,8 +6,8 @@ use std::sync::OnceLock;
 
 use decoration_probes::{AnyhowBareTry, FunctionScopedImport, WildcardMatchArm};
 use stiles_rust::decorations::{
-    AdtFlags, EnumVariants, FnSignature, ImportSource, PublicPath, Reexports, ResolvedType,
-    ReturnMode, TypePathRef,
+    AdtFlags, EnumVariants, FnSignature, ImportSource, ItemExposure, PublicPath, Reexports,
+    ResolvedType, ReturnMode, TypePathRef,
 };
 use stiles_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter};
 use stiles_types::{
@@ -1270,6 +1270,154 @@ fn import_source_on_an_uppercase_module_is_module() {
     );
 }
 
+/// Returns the node of the item called `name`, anywhere under `root`
+fn find_item_by_name<'a>(root: &DecoratedNode<'a>, name: &str) -> Option<DecoratedNode<'a>> {
+    for child in root.named_children() {
+        if child.kind().ends_with("_item")
+            && let Some(name_node) = child.child_by_field_name("name")
+            && name_node.text() == name
+        {
+            return Some(child);
+        }
+        if let Some(found) = find_item_by_name(&child, name) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+/// Returns the [`ItemExposure`] on the named item of `tree`
+fn exposure_of(tree: &DecoratedTree, name: &str) -> Option<ItemExposure> {
+    let root = tree.root_node();
+    let item = find_item_by_name(&root, name).unwrap_or_else(|| panic!("should find {name}"));
+
+    item.decoration::<ItemExposure>().copied()
+}
+
+/// Returns the [`ItemExposure`] on the named item of `src/lib.rs`
+fn lib_exposure(name: &str) -> Option<ItemExposure> {
+    exposure_of(&parse_and_decorate_fixture(load_provider()), name)
+}
+
+/// Returns the [`ItemExposure`] on the named item of `src/seal.rs`
+fn seal_exposure(name: &str) -> Option<ItemExposure> {
+    exposure_of(&decorate_fixture_file(load_provider(), "src/seal.rs"), name)
+}
+
+/// Returns the [`ItemExposure`] on each named item of `src/lib.rs`
+fn exposures_of(names: [&str; 8]) -> Vec<Option<ItemExposure>> {
+    names.into_iter().map(lib_exposure).collect()
+}
+
+#[test]
+fn item_exposure_is_absent_on_a_function_in_a_body() {
+    let exposure = lib_exposure("exposed_inside_a_body");
+
+    assert_eq!(exposure, None);
+}
+
+#[test]
+fn item_exposure_is_absent_on_a_function_in_a_module_in_a_body() {
+    let exposure = lib_exposure("exposed_inside_a_module_in_a_body");
+
+    assert_eq!(exposure, None);
+}
+
+#[test]
+fn item_exposure_is_absent_on_a_method() {
+    let exposure = lib_exposure("exposed_method");
+
+    assert_eq!(exposure, None);
+}
+
+#[test]
+fn item_exposure_is_absent_on_an_item_a_cfg_disables() {
+    let exposure = seal_exposure("exposed_under_a_disabled_cfg");
+
+    assert_eq!(exposure, None);
+}
+
+#[test]
+fn item_exposure_is_internal_for_a_crate_visible_item() {
+    let exposure = lib_exposure("exposed_to_the_crate");
+
+    assert_eq!(exposure, Some(ItemExposure::Internal));
+}
+
+#[test]
+fn item_exposure_is_internal_for_a_struct_in_a_private_file_module() {
+    let exposure = seal_exposure("Entries");
+
+    assert_eq!(exposure, Some(ItemExposure::Internal));
+}
+
+#[test]
+fn item_exposure_is_internal_for_a_trait_in_a_private_file_module() {
+    let exposure = seal_exposure("Sealed");
+
+    assert_eq!(exposure, Some(ItemExposure::Internal));
+}
+
+#[test]
+fn item_exposure_is_internal_for_an_item_in_a_private_module() {
+    let exposure = lib_exposure("exposed_private_function");
+
+    assert_eq!(exposure, Some(ItemExposure::Internal));
+}
+
+#[test]
+fn item_exposure_is_internal_for_every_kind_in_a_private_module() {
+    let exposures = exposures_of([
+        "exposed_private_function",
+        "ExposedPrivateStruct",
+        "ExposedPrivateEnum",
+        "ExposedPrivateUnion",
+        "ExposedPrivateTrait",
+        "ExposedPrivateAlias",
+        "EXPOSED_PRIVATE_CONST",
+        "EXPOSED_PRIVATE_STATIC",
+    ]);
+
+    assert_eq!(exposures, vec![Some(ItemExposure::Internal); 8]);
+}
+
+#[test]
+fn item_exposure_is_public_for_a_doc_hidden_item() {
+    let exposure = lib_exposure("exposed_but_doc_hidden");
+
+    assert_eq!(exposure, Some(ItemExposure::Public));
+}
+
+#[test]
+fn item_exposure_is_public_for_a_reexported_item() {
+    let exposure = lib_exposure("exposed_through_a_reexport");
+
+    assert_eq!(exposure, Some(ItemExposure::Public));
+}
+
+#[test]
+fn item_exposure_is_public_for_an_item_in_a_public_module() {
+    let exposure = lib_exposure("exposed_public_function");
+
+    assert_eq!(exposure, Some(ItemExposure::Public));
+}
+
+#[test]
+fn item_exposure_is_public_for_every_kind_in_a_public_module() {
+    let exposures = exposures_of([
+        "exposed_public_function",
+        "ExposedPublicStruct",
+        "ExposedPublicEnum",
+        "ExposedPublicUnion",
+        "ExposedPublicTrait",
+        "ExposedPublicAlias",
+        "EXPOSED_PUBLIC_CONST",
+        "EXPOSED_PUBLIC_STATIC",
+    ]);
+
+    assert_eq!(exposures, vec![Some(ItemExposure::Public); 8]);
+}
+
 #[test]
 fn local_enum_has_non_exhaustive_external_false() {
     let provider = load_provider();
@@ -1614,6 +1762,17 @@ fn match_on_enum_scrutinee<'a>(root: &DecoratedNode<'a>) -> DecoratedNode<'a> {
 }
 
 #[test]
+fn wanting_item_exposure_decorates_an_item() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([ItemExposure::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let item = find_item_by_name(&root, "exposed_to_the_crate").expect("should find the item");
+
+    assert!(item.decoration::<ItemExposure>().is_some());
+}
+
+#[test]
 fn wanting_no_decorations_attaches_no_signature() {
     let provider = load_provider_wanting(DecorationSet::default());
     let tree = parse_and_decorate_fixture(&provider);
@@ -1633,6 +1792,17 @@ fn wanting_only_signatures_leaves_a_scrutinee_untyped() {
     let scrutinee = match_on_enum_scrutinee(&root);
 
     assert!(scrutinee.decoration::<ResolvedType>().is_none());
+}
+
+#[test]
+fn wanting_only_signatures_leaves_an_item_without_exposure() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([FnSignature::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let item = find_item_by_name(&root, "exposed_to_the_crate").expect("should find the item");
+
+    assert!(item.decoration::<ItemExposure>().is_none());
 }
 
 #[test]
