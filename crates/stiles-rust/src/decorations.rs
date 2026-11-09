@@ -6,6 +6,7 @@
 
 mod adt_flags;
 mod adt_kind;
+mod enum_variants;
 mod error_type;
 mod exhaustiveness;
 mod fn_signature;
@@ -22,6 +23,7 @@ mod type_path_ref;
 
 pub use self::adt_flags::AdtFlags;
 pub use self::adt_kind::AdtKind;
+pub use self::enum_variants::EnumVariants;
 pub use self::error_type::ErrorType;
 pub use self::exhaustiveness::Exhaustiveness;
 pub use self::fn_signature::FnSignature;

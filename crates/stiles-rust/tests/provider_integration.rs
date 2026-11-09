@@ -6,8 +6,8 @@ use std::sync::OnceLock;
 
 use decoration_probes::{AnyhowBareTry, FunctionScopedImport, WildcardMatchArm};
 use stiles_rust::decorations::{
-    AdtFlags, FnSignature, ImportSource, PublicPath, Reexports, ResolvedType, ReturnMode,
-    TypePathRef,
+    AdtFlags, EnumVariants, FnSignature, ImportSource, PublicPath, Reexports, ResolvedType,
+    ReturnMode, TypePathRef,
 };
 use stiles_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter};
 use stiles_types::{
@@ -1116,6 +1116,128 @@ fn import_source_on_an_uppercase_module_is_module() {
         import_source_in(&tree, "import_from_uppercase_module"),
         ImportSource::Module
     );
+}
+
+/// Returns the first node of `kind` inside the function called `function`
+fn branch_node(tree: &DecoratedTree, function: &str, kind: &str) -> Vec<String> {
+    let root = tree.root_node();
+    let func =
+        find_function_by_name(&root, function).unwrap_or_else(|| panic!("should find {function}"));
+    let node = find_first_node_of_kind(&func, kind).unwrap_or_else(|| panic!("should find {kind}"));
+    let value = match kind {
+        "call_expression" => node
+            .child_by_field_name("function")
+            .and_then(|f| f.child_by_field_name("value"))
+            .expect("call should have a receiver"),
+        "binary_expression" => node.child_by_field_name("left").expect("left operand"),
+        "macro_invocation" => node,
+        _ => node.child_by_field_name("value").expect("value field"),
+    };
+
+    value
+        .decoration::<EnumVariants>()
+        .map(|variants| variants.names().map(str::to_owned).collect())
+        .unwrap_or_default()
+}
+
+const COLORS: [&str; 3] = ["Red", "Green", "Blue"];
+
+#[test]
+fn branch_value_of_if_let_names_the_variants() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert_eq!(
+        branch_node(&tree, "if_let_on_enum", "let_condition"),
+        COLORS
+    );
+}
+
+#[test]
+fn branch_value_of_let_else_names_the_variants() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert_eq!(
+        branch_node(&tree, "let_else_on_enum", "let_declaration"),
+        COLORS
+    );
+}
+
+#[test]
+fn branch_value_of_plain_let_has_no_decoration() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert!(branch_node(&tree, "plain_let_on_enum", "let_declaration").is_empty());
+}
+
+#[test]
+fn branch_value_of_predicate_looks_through_a_reference() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert_eq!(
+        branch_node(&tree, "predicate_on_a_reference", "call_expression"),
+        COLORS
+    );
+}
+
+#[test]
+fn branch_value_of_predicate_on_a_string_names_no_variant() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert!(branch_node(&tree, "predicate_on_a_string", "call_expression").is_empty());
+}
+
+#[test]
+fn branch_value_of_equality_on_integers_names_no_variant() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert!(branch_node(&tree, "equality_on_integers", "binary_expression").is_empty());
+}
+
+#[test]
+fn branch_value_of_matches_on_a_name_names_the_variants() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert_eq!(
+        branch_node(&tree, "matches_on_a_name", "macro_invocation"),
+        COLORS
+    );
+}
+
+#[test]
+fn branch_value_of_matches_on_a_call_names_the_variants() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert_eq!(
+        branch_node(&tree, "matches_on_a_call", "macro_invocation"),
+        COLORS
+    );
+}
+
+#[test]
+fn branch_value_of_option_is_marked_as_option() {
+    let tree = parse_and_decorate_fixture(load_provider());
+    let root = tree.root_node();
+    let func = find_function_by_name(&root, "if_let_on_option").expect("should find function");
+    let condition = find_first_node_of_kind(&func, "let_condition").expect("should find let");
+    let value = condition.child_by_field_name("value").expect("value field");
+
+    let resolved = value.decoration::<ResolvedType>().expect("should be typed");
+
+    assert!(resolved.is_option());
+}
+
+#[test]
+fn branch_value_of_foreign_non_exhaustive_enum_is_marked() {
+    let tree = parse_and_decorate_fixture(load_provider());
+    let root = tree.root_node();
+    let func = find_function_by_name(&root, "if_let_on_a_foreign_non_exhaustive_enum")
+        .expect("should find function");
+    let condition = find_first_node_of_kind(&func, "let_condition").expect("should find let");
+    let value = condition.child_by_field_name("value").expect("value field");
+
+    let flags = value.decoration::<AdtFlags>().expect("should have flags");
+
+    assert!(flags.non_exhaustive_external());
 }
 
 #[test]
