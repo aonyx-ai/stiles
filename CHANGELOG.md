@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-11-09
+
+### Added
+
+- The tests of a rule check that its fixes produce the expected text ([#617])
+- `stiles check --fix` applies the fixes of the findings and reports what remains ([#619])
+- The Rust and TypeScript providers analyze the changed text of a file before it is written ([#618])
+- The Rust provider types the values that decide a branch and names the variants of an enum ([#631])
+
+### Changed
+
+- A check of a Rust project resolves names on every core, so it runs faster on a machine with many cores ([#610])
+- A check asks a toolchain for types only in the languages that a configured rule inspects ([#611])
+- A check parses, decorates, and walks files on every core ([#612])
+- A diagnostic holds one fix, and the edits of that fix apply together ([#616])
+- A check against a `stiles-source` reuses the lockfile of its last build, so it no longer asks the registry on every run ([#626])
+
+### Fixed
+
+- A check with many findings reports them without reading every source file once per finding ([#622])
+
 ## [0.4.0] - 2026-11-05
 
 ### Changed
@@ -70,3 +91,14 @@ and this project adheres to
 [#576]: https://github.com/aonyx-ai/stiles/pull/576
 [#577]: https://github.com/aonyx-ai/stiles/pull/577
 [#590]: https://github.com/aonyx-ai/stiles/pull/590
+[0.5.0]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.5.0
+[#617]: https://github.com/aonyx-ai/stiles/pull/617
+[#619]: https://github.com/aonyx-ai/stiles/pull/619
+[#618]: https://github.com/aonyx-ai/stiles/pull/618
+[#631]: https://github.com/aonyx-ai/stiles/pull/631
+[#610]: https://github.com/aonyx-ai/stiles/pull/610
+[#611]: https://github.com/aonyx-ai/stiles/pull/611
+[#612]: https://github.com/aonyx-ai/stiles/pull/612
+[#616]: https://github.com/aonyx-ai/stiles/pull/616
+[#626]: https://github.com/aonyx-ai/stiles/pull/626
+[#622]: https://github.com/aonyx-ai/stiles/pull/622
