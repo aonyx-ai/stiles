@@ -7,10 +7,11 @@ Write your own lint rules for the style conventions of your project
 Usage: stiles [OPTIONS] [COMMAND]
 
 Commands:
-  abi    Print the tag that names the prebuilt lints this stiles can load
-  check  Run stiles lints against a project
-  rules  List the rules the project's configured lints declare
-  help   Print this message or the help of the given subcommand(s)
+  abi        Print the tag that names the prebuilt lints this stiles can load
+  check      Run stiles lints against a project
+  reference  Generate a reference page for a set of rules
+  rules      List the rules the project's configured lints declare
+  help       Print this message or the help of the given subcommand(s)
 
 Options:
   -q, --quiet    Suppress informational messages

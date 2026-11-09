@@ -2,6 +2,7 @@ mod commands;
 mod config;
 mod custom_lints;
 mod discovery;
+mod reference;
 
 use clawless::clap;
 use clawless::exit::ProcessExit;

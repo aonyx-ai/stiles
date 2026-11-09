@@ -55,6 +55,21 @@ line names a rule, the languages it runs on, and `off` when the project's
 stiles rules [PATH]
 ```
 
+## `stiles reference`
+
+To generate a reference page for a set of rules, run this in the project that
+holds them. The page is one HTML file that needs no other files.
+
+```bash
+stiles reference --package PACKAGE --output FILE [PATH]
+```
+
+`--package` names a package that re-exports each rule crate with
+`pub use rule_crate;`. Each of those crates holds one public lint pass and one
+public `RuleId` constant, built with `RuleId::new("...")`. The docs of the pass
+become the entry of the rule. A `// DON'T` example and its `// DO` fix in the
+`# Examples` section appear side by side, and doctests are left out.
+
 ## `stiles abi`
 
 To find the ABI version of a Stiles binary, you can run this command. It takes
