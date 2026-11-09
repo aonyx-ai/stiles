@@ -13,7 +13,7 @@ The API documentation for each Stiles crate is on docs.rs.
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | [stiles-plugin][stiles-plugin]         | `DeclaresRules` and `export_lints!`, which hand the lints of a crate to Stiles                       |
 | [stiles-types][stiles-types]           | `Diagnostic`, `Span`, `Fix`, `Edit`, `Severity`, `RuleId`, `DecoratedNode`, and the decoration types |
-| [stiles-testing][stiles-testing]       | `parse`, `decorate`, `execute`, `fixtures`, and `assert_diagnostic`                                  |
+| [stiles-testing][stiles-testing]       | `parse`, `decorate`, `execute`, `fixtures`, `assert_diagnostic`, and `assert_fix`                    |
 | [stiles-rust][stiles-rust]             | `RustLintPass` and the Rust decorations                                                              |
 | [stiles-typescript][stiles-typescript] | `TypeScriptLintPass` and the TypeScript decorations                                                  |
 
