@@ -15,7 +15,9 @@ use ra_ap_ide_db::prime_caches::parallel_prime_caches;
 use ra_ap_ide_db::{ChangeWithProcMacros, FileId, RootDatabase};
 use ra_ap_load_cargo::{LoadCargoConfig, ProcMacroServerChoice};
 use ra_ap_project_model::{CargoConfig, ProjectManifest, ProjectWorkspace};
-use ra_ap_syntax::{AstNode, Edition, NodeOrToken, SyntaxNode, TextRange, TextSize, ast};
+use ra_ap_syntax::{
+    AstNode, Edition, NodeOrToken, SyntaxNode, SyntaxToken, TextRange, TextSize, ast,
+};
 use ra_ap_vfs::{AbsPathBuf, FileExcluded, Vfs};
 use stiles_types::{
     Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, Decoration as _,
@@ -23,8 +25,8 @@ use stiles_types::{
 };
 
 use crate::decorations::{
-    AdtFlags, AdtKind, ErrorType, Exhaustiveness, FnSignature, ImportSource, NeverKind, OptionKind,
-    PublicPath, Reexports, ResolvedType, ResultKind, ReturnMode, TypePath,
+    AdtFlags, AdtKind, EnumVariants, ErrorType, Exhaustiveness, FnSignature, ImportSource,
+    NeverKind, OptionKind, PublicPath, Reexports, ResolvedType, ResultKind, ReturnMode, TypePath,
 };
 
 mod change_rust_files_error;
@@ -77,10 +79,11 @@ impl RustDecorationProvider {
     /// ```
     ///
     /// [`wanting`]: RustDecorationProvider::wanting
-    pub const DECORATIONS: [DecorationKey; 5] = [
+    pub const DECORATIONS: [DecorationKey; 6] = [
         FnSignature::KEY,
         ResolvedType::KEY,
         AdtFlags::KEY,
+        EnumVariants::KEY,
         ImportSource::KEY,
         Reexports::KEY,
     ];
@@ -529,6 +532,21 @@ fn resolve_targets(
                     decorations.insert(*operand_node_id, ty);
                 }
             }
+            Target::BranchValue { range, node_id } => {
+                if let Some(expr) = find_expr_covering(&ctx, *range)
+                    && let Some(info) = ctx.sema.type_of_expr(&expr)
+                {
+                    decorate_branch_value(&ctx, &mut decorations, *node_id, &info.original, *range);
+                }
+            }
+            Target::MatchesMacro {
+                first_token,
+                node_id,
+            } => {
+                if let Some(ty) = resolve_matches_value(&ctx, *first_token) {
+                    decorate_branch_value(&ctx, &mut decorations, *node_id, &ty, *first_token);
+                }
+            }
             Target::Import { node_id, range } => {
                 if let Some(source) = resolve_import(&ctx, *range) {
                     decorations.insert(*node_id, source);
@@ -571,6 +589,19 @@ enum Target {
     TryExpr {
         operand_range: TextRange,
         operand_node_id: usize,
+    },
+    /// A value whose variant decides a branch
+    BranchValue {
+        range: TextRange,
+        node_id: usize,
+    },
+    /// A `matches!` call, which the provider types through its expansion
+    ///
+    /// Tree-sitter sees the arguments of a macro as loose tokens, so no
+    /// node holds the tested value. The decoration goes on the macro call.
+    MatchesMacro {
+        first_token: TextRange,
+        node_id: usize,
     },
     Import {
         node_id: usize,
@@ -650,6 +681,12 @@ fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &m
                 });
             }
         }
+        "let_condition" | "let_declaration" | "call_expression" | "binary_expression"
+        | "macro_invocation"
+            if wanted.contains_any(&[EnumVariants::KEY]) =>
+        {
+            collect_branch_values(node, targets);
+        }
         "use_declaration" => {
             if wanted.contains_any(&[ImportSource::KEY])
                 && let Some(range) = text_range_of(node)
@@ -670,6 +707,91 @@ fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &m
 
     for child in node.named_children() {
         collect_targets(&child, wanted, targets);
+    }
+}
+
+/// Collects the values of a node whose variant decides a branch
+///
+/// The value of an `if let` or a `while let` decides between two paths. So
+/// does the value of a let-else, but a plain `let` tests nothing. A method
+/// call counts when it is an `is_` method without arguments, and a binary
+/// expression when it compares for equality. Which of those test a variant
+/// is for the rule to decide, from the decorations.
+fn collect_branch_values(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
+    let values: Vec<DecoratedNode<'_>> = match node.kind() {
+        "let_condition" => node.child_by_field_name("value").into_iter().collect(),
+        "let_declaration" => node
+            .child_by_field_name("alternative")
+            .and_then(|_| node.child_by_field_name("value"))
+            .into_iter()
+            .collect(),
+        "call_expression" => predicate_receiver(node).into_iter().collect(),
+        "binary_expression" => equality_operands(node),
+        "macro_invocation" => {
+            collect_matches_macro(node, targets);
+            Vec::new()
+        }
+        _ => Vec::new(),
+    };
+
+    for value in values {
+        if let Some(range) = text_range_of(&value) {
+            targets.push(Target::BranchValue {
+                range,
+                node_id: value.id(),
+            });
+        }
+    }
+}
+
+/// Returns the receiver of a call to an `is_` method without arguments
+fn predicate_receiver<'a>(call: &DecoratedNode<'a>) -> Option<DecoratedNode<'a>> {
+    let function = call.child_by_field_name("function")?;
+    let arguments = call.child_by_field_name("arguments")?;
+    let field = function.child_by_field_name("field")?;
+    let is_predicate = function.kind() == "field_expression"
+        && field.text().starts_with("is_")
+        && arguments.named_child_count() == 0;
+
+    is_predicate.then(|| function.child_by_field_name("value"))?
+}
+
+/// Returns both operands of `==` or `!=`, and nothing for any other operator
+fn equality_operands<'a>(binary: &DecoratedNode<'a>) -> Vec<DecoratedNode<'a>> {
+    let compares = binary
+        .child_by_field_name("operator")
+        .is_some_and(|operator| ["==", "!="].contains(&operator.text()));
+    if !compares {
+        return Vec::new();
+    }
+
+    ["left", "right"]
+        .into_iter()
+        .filter_map(|side| binary.child_by_field_name(side))
+        .collect()
+}
+
+/// Collects a call of `matches!`, with the first token of its value
+fn collect_matches_macro(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
+    let names_matches = node
+        .child_by_field_name("macro")
+        .is_some_and(|name| name.text().rsplit("::").next() == Some("matches"));
+    if !names_matches {
+        return;
+    }
+
+    let first_token = node
+        .named_children()
+        .into_iter()
+        .find(|child| child.kind() == "token_tree")
+        .and_then(|tree| tree.child(1))
+        .and_then(|token| text_range_of(&token));
+
+    if let Some(first_token) = first_token {
+        targets.push(Target::MatchesMacro {
+            first_token,
+            node_id: node.id(),
+        });
     }
 }
 
@@ -937,21 +1059,110 @@ fn resolve_match_scrutinee(
     let resolved = ResolvedType::new(display).with_adt_kind(adt_kind);
 
     let flags = match ty.as_adt() {
-        Some(Adt::Enum(e)) => {
-            let krate = e.module(ctx.sema.db).krate(ctx.sema.db);
-            let local_krate = func.map(|f| f.module(ctx.sema.db).krate(ctx.sema.db));
-            let is_external = local_krate.is_some_and(|lk| lk != krate);
-            let has_non_exhaustive = e.attrs(ctx.sema.db).is_non_exhaustive();
-            let exhaustiveness = match (has_non_exhaustive, is_external) {
-                (true, true) => Exhaustiveness::NonExhaustive,
-                (true, false) | (false, true) | (false, false) => Exhaustiveness::Exhaustive,
-            };
-            Some(AdtFlags::from_exhaustiveness(exhaustiveness))
-        }
+        Some(Adt::Enum(e)) => Some(adt_flags(ctx, e, func)),
         Some(Adt::Struct(_) | Adt::Union(_)) | None => None,
     };
 
     Some((resolved, flags))
+}
+
+/// Returns the flags of an enum as seen from the function that names it
+fn adt_flags(ctx: &DecorateCtx<'_, '_>, e: Enum, func: Option<Function>) -> AdtFlags {
+    let krate = e.module(ctx.sema.db).krate(ctx.sema.db);
+    let local_krate = func.map(|f| f.module(ctx.sema.db).krate(ctx.sema.db));
+    let is_external = local_krate.is_some_and(|lk| lk != krate);
+    let has_non_exhaustive = e.attrs(ctx.sema.db).is_non_exhaustive();
+    let exhaustiveness = match (has_non_exhaustive, is_external) {
+        (true, true) => Exhaustiveness::NonExhaustive,
+        (true, false) | (false, true) | (false, false) => Exhaustiveness::Exhaustive,
+    };
+
+    AdtFlags::from_exhaustiveness(exhaustiveness)
+}
+
+/// Attaches what a rule needs to judge a value that decides a branch
+///
+/// The provider looks through references, because `self` in a method that
+/// takes `&self` tests the same variants as an owned value.
+fn decorate_branch_value(
+    ctx: &DecorateCtx<'_, '_>,
+    decorations: &mut DecorationMap,
+    node_id: usize,
+    ty: &Type<'_>,
+    range: TextRange,
+) {
+    let ty = ty.strip_references();
+    let func = find_enclosing_fn(ctx, range);
+    let display = match &func {
+        Some(f) => ctx.display_type(&ty, f),
+        None => format!("{ty:?}"),
+    };
+    let adt_kind = match ty.as_adt() {
+        Some(Adt::Enum(_)) => AdtKind::Enum,
+        Some(Adt::Struct(_) | Adt::Union(_)) | None => AdtKind::Other,
+    };
+
+    decorations.insert(
+        node_id,
+        ResolvedType::new(display)
+            .with_adt_kind(adt_kind)
+            .with_result_kind(result_kind(ctx, &ty))
+            .with_option_kind(option_kind(ctx, &ty)),
+    );
+
+    if let Some(Adt::Enum(e)) = ty.as_adt() {
+        let db = ctx.sema.db;
+        let names = e
+            .variants(db)
+            .into_iter()
+            .map(|variant| variant.name(db).display(db, ctx.edition).to_string());
+
+        decorations.insert(node_id, adt_flags(ctx, e, func));
+        decorations.insert(node_id, EnumVariants::new(names));
+    }
+}
+
+/// Returns the type of the value that a `matches!` call tests
+///
+/// The macro expands to a `match` on its first argument. The token descends
+/// into that expansion, and the outermost `match` whose scrutinee holds the
+/// token is the one that the macro wrote. An inner `match` can only be part
+/// of the value itself.
+fn resolve_matches_value<'db>(
+    ctx: &DecorateCtx<'_, 'db>,
+    first_token: TextRange,
+) -> Option<Type<'db>> {
+    let token = token_at(ctx.syntax, first_token)?;
+
+    ctx.sema
+        .descend_into_macros(token)
+        .into_iter()
+        .find_map(|descended| {
+            let scrutinee = descended
+                .parent_ancestors()
+                .filter_map(ast::MatchExpr::cast)
+                .filter_map(|expr| expr.expr())
+                .filter(|expr| {
+                    expr.syntax()
+                        .text_range()
+                        .contains_range(descended.text_range())
+                })
+                .last()?;
+
+            Some(ctx.sema.type_of_expr(&scrutinee)?.original)
+        })
+}
+
+/// Returns the token that spans exactly `range`
+fn token_at(syntax: &SyntaxNode, range: TextRange) -> Option<SyntaxToken> {
+    if range.is_empty() || !syntax.text_range().contains_range(range) {
+        return None;
+    }
+
+    match syntax.covering_element(range) {
+        NodeOrToken::Token(token) => Some(token),
+        NodeOrToken::Node(_) => None,
+    }
 }
 
 fn resolve_expr_type(ctx: &DecorateCtx<'_, '_>, range: TextRange) -> Option<ResolvedType> {

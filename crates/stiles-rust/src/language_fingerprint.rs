@@ -1,6 +1,8 @@
 use stiles_types::plugin::{decoration_fingerprint, stable_fingerprint};
 
-use crate::decorations::{AdtFlags, FnSignature, ImportSource, Reexports, ResolvedType};
+use crate::decorations::{
+    AdtFlags, EnumVariants, FnSignature, ImportSource, Reexports, ResolvedType,
+};
 
 include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 
@@ -43,6 +45,7 @@ include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 pub const LANGUAGE_FINGERPRINT: u64 = stable_fingerprint(&[
     VISITOR_FINGERPRINT,
     decoration_fingerprint::<AdtFlags>(),
+    decoration_fingerprint::<EnumVariants>(),
     decoration_fingerprint::<FnSignature>(),
     decoration_fingerprint::<ImportSource>(),
     decoration_fingerprint::<Reexports>(),

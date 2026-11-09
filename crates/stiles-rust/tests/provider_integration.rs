@@ -6,8 +6,8 @@ use std::sync::OnceLock;
 
 use decoration_probes::{AnyhowBareTry, FunctionScopedImport, WildcardMatchArm};
 use stiles_rust::decorations::{
-    AdtFlags, FnSignature, ImportSource, PublicPath, Reexports, ResolvedType, ReturnMode,
-    TypePathRef,
+    AdtFlags, EnumVariants, FnSignature, ImportSource, PublicPath, Reexports, ResolvedType,
+    ReturnMode, TypePathRef,
 };
 use stiles_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter};
 use stiles_types::{
@@ -549,6 +549,104 @@ fn anyhow_bare_try_over_the_whole_file_reports_only_anyhow_bodies() {
     );
 }
 
+#[test]
+fn branch_value_of_equality_on_integers_names_no_variant() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert!(branch_node(&tree, "equality_on_integers", BranchSite::Comparison).is_empty());
+}
+
+#[test]
+fn branch_value_of_foreign_non_exhaustive_enum_is_marked() {
+    let tree = parse_and_decorate_fixture(load_provider());
+    let root = tree.root_node();
+    let func = find_function_by_name(&root, "if_let_on_a_foreign_non_exhaustive_enum")
+        .expect("should find function");
+    let condition = find_first_node_of_kind(&func, "let_condition").expect("should find let");
+    let value = condition.child_by_field_name("value").expect("value field");
+
+    let flags = value.decoration::<AdtFlags>().expect("should have flags");
+
+    assert!(flags.non_exhaustive_external());
+}
+
+#[test]
+fn branch_value_of_if_let_names_the_variants() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert_eq!(
+        branch_node(&tree, "if_let_on_enum", BranchSite::LetCondition),
+        COLORS
+    );
+}
+
+#[test]
+fn branch_value_of_let_else_names_the_variants() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert_eq!(
+        branch_node(&tree, "let_else_on_enum", BranchSite::LetDeclaration),
+        COLORS
+    );
+}
+
+#[test]
+fn branch_value_of_matches_on_a_call_names_the_variants() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert_eq!(
+        branch_node(&tree, "matches_on_a_call", BranchSite::Matches),
+        COLORS
+    );
+}
+
+#[test]
+fn branch_value_of_matches_on_a_name_names_the_variants() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert_eq!(
+        branch_node(&tree, "matches_on_a_name", BranchSite::Matches),
+        COLORS
+    );
+}
+
+#[test]
+fn branch_value_of_option_is_marked_as_option() {
+    let tree = parse_and_decorate_fixture(load_provider());
+    let root = tree.root_node();
+    let func = find_function_by_name(&root, "if_let_on_option").expect("should find function");
+    let condition = find_first_node_of_kind(&func, "let_condition").expect("should find let");
+    let value = condition.child_by_field_name("value").expect("value field");
+
+    let resolved = value.decoration::<ResolvedType>().expect("should be typed");
+
+    assert!(resolved.is_option());
+}
+
+#[test]
+fn branch_value_of_plain_let_has_no_decoration() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert!(branch_node(&tree, "plain_let_on_enum", BranchSite::LetDeclaration).is_empty());
+}
+
+#[test]
+fn branch_value_of_predicate_looks_through_a_reference() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert_eq!(
+        branch_node(&tree, "predicate_on_a_reference", BranchSite::Call),
+        COLORS
+    );
+}
+
+#[test]
+fn branch_value_of_predicate_on_a_string_names_no_variant() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    assert!(branch_node(&tree, "predicate_on_a_string", BranchSite::Call).is_empty());
+}
+
 /// Checks that a module that is not UTF-8 leaves its siblings covered
 ///
 /// Before the load repaired such files, rust-analyzer panicked over the
@@ -650,6 +748,39 @@ fn decorate_with_code_under_cfg_test_resolves_types() {
         .decoration::<ResolvedType>()
         .expect("a scrutinee under cfg(test) should have ResolvedType");
     assert!(ty.is_enum(), "Color should be an enum");
+}
+
+/// Returns the [`Reexports`] on the imported path `leaf` in `src/reexports.rs`
+///
+/// The `use` lines of that file each name their items once, so the text of
+/// a path that a `use` imports picks out its node. Only a node whose parent
+/// is a `use`, a list, or a rename is an imported path: the `Shape` inside
+/// `facade_core::Shape::Circle` is a qualifier.
+fn decorated_reexports_of(tree: &DecoratedTree, leaf: &str) -> Reexports {
+    fn find<'a>(node: &DecoratedNode<'a>, leaf: &str) -> Option<DecoratedNode<'a>> {
+        let parent_kind = node.parent().map(|parent| parent.kind());
+        let imported = match parent_kind {
+            Some("use_declaration" | "use_list" | "use_as_clause") => true,
+            Some(_) | None => false,
+        };
+        if imported && node.text() == leaf {
+            return Some(*node);
+        }
+        node.named_children()
+            .iter()
+            .find_map(|child| find(child, leaf))
+    }
+
+    let node = find(&tree.root_node(), leaf)
+        .unwrap_or_else(|| panic!("src/reexports.rs should import {leaf}"));
+
+    node.decoration::<Reexports>()
+        .cloned()
+        .unwrap_or_else(|| panic!("{leaf} should carry Reexports"))
+}
+
+fn rendered(reexports: &Reexports) -> Vec<String> {
+    reexports.paths().iter().map(ToString::to_string).collect()
 }
 
 #[test]
@@ -833,39 +964,6 @@ fn fn_signature_on_async_function_reports_the_awaited_error() {
     );
 }
 
-/// Returns the [`Reexports`] on the imported path `leaf` in `src/reexports.rs`
-///
-/// The `use` lines of that file each name their items once, so the text of
-/// a path that a `use` imports picks out its node. Only a node whose parent
-/// is a `use`, a list, or a rename is an imported path: the `Shape` inside
-/// `facade_core::Shape::Circle` is a qualifier.
-fn decorated_reexports_of(tree: &DecoratedTree, leaf: &str) -> Reexports {
-    fn find<'a>(node: &DecoratedNode<'a>, leaf: &str) -> Option<DecoratedNode<'a>> {
-        let parent_kind = node.parent().map(|parent| parent.kind());
-        let imported = match parent_kind {
-            Some("use_declaration" | "use_list" | "use_as_clause") => true,
-            Some(_) | None => false,
-        };
-        if imported && node.text() == leaf {
-            return Some(*node);
-        }
-        node.named_children()
-            .iter()
-            .find_map(|child| find(child, leaf))
-    }
-
-    let node = find(&tree.root_node(), leaf)
-        .unwrap_or_else(|| panic!("src/reexports.rs should import {leaf}"));
-
-    node.decoration::<Reexports>()
-        .cloned()
-        .unwrap_or_else(|| panic!("{leaf} should carry Reexports"))
-}
-
-fn rendered(reexports: &Reexports) -> Vec<String> {
-    reexports.paths().iter().map(ToString::to_string).collect()
-}
-
 #[test]
 fn fn_signature_on_async_function_reports_the_awaited_result() {
     let sig = signature_of("returns_anyhow_result_async");
@@ -937,6 +1035,60 @@ fn fn_signature_on_non_result_function_has_no_error_type() {
 
     assert!(sig.error_type().is_none());
 }
+
+/// The kind of node that holds a value deciding a branch
+#[derive(Copy, Clone)]
+enum BranchSite {
+    /// The `let` of an `if let`
+    LetCondition,
+    /// A `let` statement
+    LetDeclaration,
+    /// A method call, whose receiver is the value
+    Call,
+    /// An `==` or `!=`, whose left operand is the value
+    Comparison,
+    /// A `matches!` call, which holds the decoration itself
+    Matches,
+}
+
+impl BranchSite {
+    /// Returns the name of the node kind in the grammar
+    fn kind(self) -> &'static str {
+        match self {
+            Self::LetCondition => "let_condition",
+            Self::LetDeclaration => "let_declaration",
+            Self::Call => "call_expression",
+            Self::Comparison => "binary_expression",
+            Self::Matches => "macro_invocation",
+        }
+    }
+}
+
+/// Returns the variants decorated on the first `site` inside `function`
+fn branch_node(tree: &DecoratedTree, function: &str, site: BranchSite) -> Vec<String> {
+    let root = tree.root_node();
+    let func =
+        find_function_by_name(&root, function).unwrap_or_else(|| panic!("should find {function}"));
+    let node = find_first_node_of_kind(&func, site.kind()).expect("should find the site");
+    let value = match site {
+        BranchSite::Call => node
+            .child_by_field_name("function")
+            .and_then(|f| f.child_by_field_name("value"))
+            .expect("call should have a receiver"),
+        BranchSite::Comparison => node.child_by_field_name("left").expect("left operand"),
+        BranchSite::Matches => node,
+        BranchSite::LetCondition | BranchSite::LetDeclaration => {
+            node.child_by_field_name("value").expect("value field")
+        }
+    };
+
+    value
+        .decoration::<EnumVariants>()
+        .map(|variants| variants.names().map(str::to_owned).collect())
+        .unwrap_or_default()
+}
+
+const COLORS: [&str; 3] = ["Red", "Green", "Blue"];
 
 #[test]
 fn fn_signature_on_sync_function_reports_direct_mode() {

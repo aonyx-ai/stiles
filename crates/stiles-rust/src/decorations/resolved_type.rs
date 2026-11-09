@@ -6,7 +6,7 @@ use crate::decorations::{AdtKind, NeverKind, OptionKind, ResultKind};
 /// Resolved type information attached to a tree-sitter node
 ///
 /// Decoration providers populate this on match scrutinees, `else`
-/// clauses, and `?` operands. Rules access it via
+/// clauses, `?` operands, and values that decide a branch. Rules access it via
 /// `node.decoration::<ResolvedType>()`.
 ///
 /// A rule reads it out of memory the host allocated, so stabby lays it

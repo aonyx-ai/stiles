@@ -220,6 +220,64 @@ pub fn import_from_uppercase_module() {
     draw();
 }
 
+impl Color {
+    pub fn is_red(&self) -> bool {
+        match self {
+            Color::Red => true,
+            Color::Green | Color::Blue => false,
+        }
+    }
+}
+
+pub fn if_let_on_enum(color: Color) {
+    if let Color::Red = color {
+    } else {
+    }
+}
+
+pub fn let_else_on_enum(color: Color) {
+    let Color::Red = color else {
+        return;
+    };
+}
+
+pub fn plain_let_on_enum(color: Color) -> Color {
+    let kept = color;
+    kept
+}
+
+pub fn if_let_on_option(value: Option<u8>) {
+    if let Some(_) = value {
+    } else {
+    }
+}
+
+pub fn if_let_on_a_foreign_non_exhaustive_enum(kind: std::io::ErrorKind) {
+    if let std::io::ErrorKind::NotFound = kind {
+    } else {
+    }
+}
+
+pub fn predicate_on_a_reference(color: &Color) -> bool {
+    color.is_red()
+}
+
+pub fn predicate_on_a_string(text: &str) -> bool {
+    text.is_empty()
+}
+
+pub fn equality_on_integers(x: i32) -> bool {
+    x == 1
+}
+
+pub fn matches_on_a_name(color: Color) -> bool {
+    matches!(color, Color::Red | Color::Blue)
+}
+
+pub fn matches_on_a_call() -> bool {
+    matches!(pick_color(), Color::Red)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
