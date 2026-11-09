@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "stiles-codegen"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -333,7 +333,7 @@ dependencies = [
 
 [[package]]
 name = "stiles-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bon",
  "stiles-types",
@@ -344,7 +344,7 @@ dependencies = [
 
 [[package]]
 name = "stiles-macros"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -353,7 +353,7 @@ dependencies = [
 
 [[package]]
 name = "stiles-plugin"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "stabby",
  "stiles-rust",
@@ -363,7 +363,7 @@ dependencies = [
 
 [[package]]
 name = "stiles-rust"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bon",
  "stabby",
@@ -376,7 +376,7 @@ dependencies = [
 
 [[package]]
 name = "stiles-testing"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bon",
  "stiles-core",
@@ -388,7 +388,7 @@ dependencies = [
 
 [[package]]
 name = "stiles-types"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bon",
  "stabby",
@@ -398,7 +398,7 @@ dependencies = [
 
 [[package]]
 name = "stiles-typescript"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bon",
  "stabby",
