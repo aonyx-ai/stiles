@@ -1,6 +1,7 @@
 use anyhow::Context as _;
 
 mod reexports;
+mod seal;
 
 pub enum Color {
     Red,
@@ -276,6 +277,75 @@ pub fn matches_on_a_name(color: Color) -> bool {
 
 pub fn matches_on_a_call() -> bool {
     matches!(pick_color(), Color::Red)
+}
+
+mod exposure_private {
+    pub fn exposed_private_function() {}
+
+    pub struct ExposedPrivateStruct;
+
+    pub enum ExposedPrivateEnum {
+        Only,
+    }
+
+    pub union ExposedPrivateUnion {
+        pub whole: u8,
+    }
+
+    pub trait ExposedPrivateTrait {}
+
+    pub type ExposedPrivateAlias = u8;
+
+    pub const EXPOSED_PRIVATE_CONST: u8 = 0;
+
+    pub static EXPOSED_PRIVATE_STATIC: u8 = 0;
+
+    pub fn exposed_through_a_reexport() {}
+}
+
+pub use exposure_private::exposed_through_a_reexport;
+
+pub mod exposure_public {
+    pub fn exposed_public_function() {}
+
+    pub struct ExposedPublicStruct;
+
+    pub enum ExposedPublicEnum {
+        Only,
+    }
+
+    pub union ExposedPublicUnion {
+        pub whole: u8,
+    }
+
+    pub trait ExposedPublicTrait {}
+
+    pub type ExposedPublicAlias = u8;
+
+    pub const EXPOSED_PUBLIC_CONST: u8 = 0;
+
+    pub static EXPOSED_PUBLIC_STATIC: u8 = 0;
+}
+
+pub(crate) fn exposed_to_the_crate() {}
+
+#[doc(hidden)]
+pub fn exposed_but_doc_hidden() {}
+
+pub fn exposed_outer_of_a_body() {
+    pub fn exposed_inside_a_body() {}
+
+    mod exposed_module_in_a_body {
+        pub fn exposed_inside_a_module_in_a_body() {}
+    }
+
+    exposed_inside_a_body();
+}
+
+pub struct ExposedOwner;
+
+impl ExposedOwner {
+    pub fn exposed_method(&self) {}
 }
 
 #[cfg(test)]

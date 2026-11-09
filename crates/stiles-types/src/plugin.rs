@@ -76,11 +76,11 @@ pub use self::fingerprint::{decoration_fingerprint, stable_fingerprint};
 /// ```
 /// use stiles_types::plugin::{ABI_VERSION, AbiVersion};
 ///
-/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 10 });
+/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 11 });
 /// ```
 pub const ABI_VERSION: AbiVersion = AbiVersion {
     major: 0,
-    minor: 10,
+    minor: 11,
 };
 
 /// A fingerprint of how this crate lays out the plugin boundary
