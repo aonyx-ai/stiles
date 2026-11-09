@@ -105,6 +105,55 @@ fn a_second_line_against_the_summary_is_flagged() {
 }
 ```
 
+## Offer a fix
+
+A fix is a set of edits that apply together, all in the file of the diagnostic.
+`stiles check --fix` applies every fix without review, so attach one only when
+the change is correct in every case the rule reports.
+
+```rust
+let end = node.span().end();
+let after_summary = Span::builder()
+    .file(node.span().file())
+    .start(end)
+    .end(end)
+    .build();
+let fix = Fix::builder()
+    .message("add a blank `///` line")
+    .edits(vec![
+        Edit::builder()
+            .span(after_summary)
+            .replacement("///\n")
+            .build(),
+    ])
+    .build()
+    .expect("one edit never overlaps itself");
+
+vec![
+    Diagnostic::builder()
+        .rule_id(RULE_ID)
+        .severity(Severity::Warn)
+        .message("the summary line needs a blank `///` line after it")
+        .span(node.span())
+        .build()
+        .with_fix(fix)
+        .expect("the fix lies in the file of the diagnostic"),
+]
+```
+
+`assert_fix` applies the fixes in rounds, as `--fix` does. It then checks the
+result byte for byte, and checks that the rule reports nothing on it.
+
+```rust
+#[test]
+fn the_fix_adds_a_blank_line_after_the_summary() {
+    assert_fix()
+        .tree(parse("/// Adds\n/// The rest.\nfn f() {}\n", Language::Rust))
+        .passes(passes)
+        .produces("/// Adds\n///\n/// The rest.\nfn f() {}\n");
+}
+```
+
 ## Run the rule
 
 ```toml title=".config/stiles.toml"

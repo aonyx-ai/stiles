@@ -25,6 +25,7 @@ Stiles keeps the following things in its cache:
 | -------------------------------- | ----------------------------------------------------------------- |
 | `git/<remote>/<rev>/`            | A checkout of the pinned commit, including cargo target directory |
 | `prebuilt/<remote>/<rev>/<tag>/` | Libraries unpacked from a published archive                       |
+| `resolved/<digest>.lock`         | The lockfile of the last build against a `stiles-source`          |
 
 ## Clearing caches
 

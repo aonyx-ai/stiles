@@ -74,7 +74,7 @@ output or behavior:
 | `-h`, `--help`    | Print help                                    |
 | `-V`, `--version` | Print the version                             |
 | `-q`, `--quiet`   | Hide the `help:` lines                        |
-| `-v`, `--verbose` | Name each file as Stiles checks it            |
+| `-v`, `--verbose` | Name each file that Stiles checked            |
 | `--json`          | Write each result as one JSON object per line |
 
 ## Early stops
