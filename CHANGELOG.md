@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-11-09
+
+### Added
+
+- The Rust provider says whether another crate can name an item ([#634])
+- `stiles reference` generates a reference page for a set of rules ([#635])
+
+### Changed
+
+- The plugin ABI moves to 0.11, because the language fingerprint now covers the decoration that says whether another crate can name an item ([#636])
+
 ## [0.5.0] - 2026-11-09
 
 ### Added
@@ -102,3 +113,7 @@ and this project adheres to
 [#616]: https://github.com/aonyx-ai/stiles/pull/616
 [#626]: https://github.com/aonyx-ai/stiles/pull/626
 [#622]: https://github.com/aonyx-ai/stiles/pull/622
+[0.6.0]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.6.0
+[#634]: https://github.com/aonyx-ai/stiles/pull/634
+[#635]: https://github.com/aonyx-ai/stiles/pull/635
+[#636]: https://github.com/aonyx-ai/stiles/pull/636
