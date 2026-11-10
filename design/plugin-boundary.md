@@ -1,6 +1,6 @@
 # The plugin boundary for 1.0
 
-Status: proposal. Tracks [stiles#640][issue-640].
+Status: accepted. Tracks [stiles#640][issue-640].
 
 From 1.0 an ABI version is one integer, and a plugin loads only on its own
 version. A boundary that breaks whenever it grows would therefore cost one major
@@ -115,7 +115,7 @@ A plugin never assembles a `Plugin` struct, so registration grows by new
 functions, not new fields. `export_lints!` and the codegen write the calls. The
 codegen cannot see which methods of the generated trait a pass overrides, so it
 emits a `dispatches` call for every kind of the grammar.
-[Open question 4](#open-questions) is how to narrow that.
+[Decision 4](#decisions) says how that narrows later.
 
 The host refuses a plugin when:
 
@@ -173,7 +173,7 @@ reads a previous sibling. `Context` therefore also offers the line of an offset,
 the siblings of a node, and `parse(language, text)`, which returns a tree the
 pass walks like the file's own.
 
-Whether `raw()` stays is [open question 1](#open-questions).
+[Decision 1](#decisions) removes `raw()`.
 
 ### Decorations
 
@@ -228,7 +228,7 @@ Five rules need another file, such as `outer_module_doc`, which would compare
 the doc on a `mod` declaration with the header of that module's own file. They
 wait for a project hook in [the pass table](#the-pass), not for a decoration.
 
-Macros are [open question 2](#open-questions).
+[Decision 2](#decisions) covers macros.
 
 ### Output
 
@@ -290,30 +290,28 @@ severity it does not know.
 
 Steps 1 to 3 break every plugin once, in one pre-1.0 version.
 
-## Open questions
+## Decisions
 
-1. **Does `raw()` stay?** It hands a pass the tree-sitter node, which the plugin
+These were open questions, and each one took the recommendation.
+
+1. **`raw()` goes.** It hands a pass the tree-sitter node, which the plugin
    navigates with its own copy of the C library. That ties every plugin to the
-   host's tree-sitter: a `TSNode` layout change breaks them silently.
-   Recommendation: remove it in step 1, and offer what the 14 call sites use
-   through `Context`, as [the node](#the-node) lists.
-2. **How do rules see into macros?** Ten rules skip macro bodies. One answer is
-   a decoration on each `macro_invocation` that carries the expansion as a tree,
-   with spans mapped to the call site. The walk would visit it like any other
-   code. That needs rust-analyzer's expansion and a re-parse with tree-sitter.
-   Recommendation: design it after step 4, and leave the rest of the catalog
-   unblocked by it.
-3. **Do diagnostics go through the sink, or stay structs?** A struct with a
-   length prefix also grows by appending, if stabby keeps declaration order.
-   That is unverified. Recommendation: the sink, because it needs no layout
-   argument at all.
-4. **How narrow is a pass's kind list?** The codegen cannot see which methods a
-   pass overrides, so every pass declares every kind. A grammar that renames a
-   kind then refuses every plugin. Recommendation: accept that for 1.0, and
-   narrow it with an attribute macro on the impl later.
-5. **Does TypeScript reach 1.0 as a peer?** The catalog gives it two facts. No
-   rule reads a TypeScript type today. Recommendation: ship it with `ExprType`
-   and `Resolution`, and call it experimental until a rule reads them.
+   host's tree-sitter, and a `TSNode` layout change would break them silently.
+   Step 1 removes it, and `Context` offers what the 14 call sites use, as
+   [the node](#the-node) lists.
+2. **Macros come after the catalog.** Ten rules skip macro bodies. The leading
+   idea is a decoration on each `macro_invocation` that carries the expansion
+   as a tree, with spans mapped to the call site, so the walk visits it like
+   any other code. Its design waits until step 4 is done, and the rest of the
+   catalog does not wait for it.
+3. **Diagnostics go through the sink.** A struct with a length prefix could
+   also grow by appending, but only if stabby keeps declaration order, which
+   is unverified. The sink needs no layout argument at all.
+4. **Every pass declares every kind for 1.0.** The codegen cannot see which
+   methods a pass overrides. A grammar that renames a kind therefore refuses
+   every plugin. An attribute macro on the impl can narrow the list later.
+5. **TypeScript ships as experimental.** It gets `ExprType` and `Resolution`,
+   and it stays experimental until a rule reads them.
 
 [issue-607]: https://github.com/aonyx-ai/stiles/issues/607
 [issue-638]: https://github.com/aonyx-ai/stiles/issues/638
