@@ -33,7 +33,7 @@ Each release that changes the ABI raises it once.
 
 :::
 
-## `plugin (ABI x.y-hash) built against another stiles-types than stiles (ABI x.y)`
+## `plugin (ABI x.y-hash) built against another stiles-types`
 
 A hash after the ABI version marks a build from unpublished Stiles source, such
 as a git revision, a path, or a patch. Between two releases, one ABI version

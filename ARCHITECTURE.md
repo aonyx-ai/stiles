@@ -377,8 +377,8 @@ vouches that the version names one layout, and the version decides. When
 either side was built from unpublished source, the loader compares two
 fingerprints too: one for stiles-types and one that stiles-plugin joins
 from every language crate. The first mismatch refuses the library with an
-error that says what to rebuild. Only then does the loader ask the plugin for its lints: a factory,
-a language, and the declared rules of each.
+error that says what to rebuild. Only then does the loader ask the plugin
+for its lints: a factory, a language, and the declared rules of each.
 
 The handshake guards against silence. A plugin built against drifted
 source would mostly work, and rules fail open, so a wrong answer would
