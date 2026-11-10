@@ -4710,6 +4710,7 @@ name = "stiles-plugin"
 version = "0.6.0"
 dependencies = [
  "stabby",
+ "stiles-codegen",
  "stiles-rust",
  "stiles-types",
  "stiles-typescript",
@@ -4797,6 +4798,7 @@ dependencies = [
  "bon",
  "proptest",
  "stabby",
+ "stiles-codegen",
  "thiserror",
  "tree-sitter",
  "tree-sitter-rust",

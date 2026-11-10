@@ -1,6 +1,6 @@
 # The plugin boundary as this commit builds it. A test in stiles-plugin
 # fails when these values differ from the code, and `rakko check-abi`
-# fails when a fingerprint moves and the version does not.
-version = "0.11"
+# fails when the version breaks the promise of the latest release.
+version = "0.12"
 types-fingerprint = "f063eff53a8bcf01"
 language-fingerprint = "87e24521b8535eb0"

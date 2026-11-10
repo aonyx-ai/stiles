@@ -15,11 +15,13 @@
 //! 1. [`PluginDeclaration::abi_version`] is a pair of bare integers at
 //!    offset zero of a `#[repr(C)]` struct, so it reads correctly
 //!    whatever else changed.
-//! 2. The two fingerprints are plain integers, readable under any pair
-//!    of compilers.
-//! 3. Only when every one of them matches the host's own constants may
-//!    [`PluginDeclaration::load`] be called. What it hands back is only
-//!    meaningful once the two images are known to lay it out the same way.
+//! 2. The two fingerprints and the [`Provenance`] are plain integers,
+//!    readable under any pair of compilers.
+//! 3. When both sides are published, the matching version vouches for the
+//!    layout. Otherwise the fingerprints must match the host's own
+//!    constants too. Only then may [`PluginDeclaration::load`] be called.
+//!    What it hands back is only meaningful once the two images are known
+//!    to lay it out the same way.
 //!
 //! Stabby lays out every value that crosses the boundary. Every allocation
 //! among them carries the function that frees it. The side that allocated
@@ -50,6 +52,7 @@ mod abi_version;
 mod declaration;
 mod factory;
 mod fingerprint;
+mod provenance;
 
 pub use self::abi_version::AbiVersion;
 pub use self::declaration::PluginDeclaration;
@@ -57,17 +60,21 @@ pub use self::factory::{
     Constructed, ExportedLint, LintPassFactory, Loaded, Plugin, construct, factory,
 };
 pub use self::fingerprint::{decoration_fingerprint, stable_fingerprint};
+pub use self::provenance::Provenance;
 
 /// The version of the plugin declaration protocol this crate speaks
 ///
 /// This guards three things no fingerprint can read back: the shape of
 /// [`PluginDeclaration`], the meaning of its fields, and the signatures
 /// of [`LintPass`]'s methods. The two fingerprints guard everything
-/// else. Raise this whenever the declaration struct or [`LintPass`]
-/// changes.
+/// else.
 ///
-/// [`AbiVersion`] says which component to raise, and which plugins that
-/// leaves behind.
+/// The version is a promise about a release. It rises once between two
+/// releases, when the boundary moved since the last one, and
+/// `rakko check-abi` refuses a moved boundary that kept the version of
+/// that release. A build from unpublished source does not claim the
+/// version alone, as [`Provenance`] says. [`AbiVersion`] says what a
+/// version looks like in each era.
 ///
 /// [`LintPass`]: crate::LintPass
 ///
@@ -76,12 +83,46 @@ pub use self::fingerprint::{decoration_fingerprint, stable_fingerprint};
 /// ```
 /// use stiles_types::plugin::{ABI_VERSION, AbiVersion};
 ///
-/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 11 });
+/// assert_eq!(ABI_VERSION, AbiVersion { major: 0, minor: 12 });
 /// ```
 pub const ABI_VERSION: AbiVersion = AbiVersion {
     major: 0,
-    minor: 11,
+    minor: 12,
 };
+
+/// Whether this crate is a build of published source
+///
+/// The build script sets the flag when cargo packaged this crate.
+/// [`Provenance`] says what the value licenses.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_types::plugin::{PROVENANCE, Provenance};
+///
+/// let joined = Provenance::all(&[PROVENANCE]);
+///
+/// assert_eq!(joined, PROVENANCE);
+/// ```
+#[cfg(stiles_published)]
+pub const PROVENANCE: Provenance = Provenance::PUBLISHED;
+
+/// Whether this crate is a build of published source
+///
+/// The build script sets the flag when cargo packaged this crate.
+/// [`Provenance`] says what the value licenses.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_types::plugin::{PROVENANCE, Provenance};
+///
+/// let joined = Provenance::all(&[PROVENANCE]);
+///
+/// assert_eq!(joined, PROVENANCE);
+/// ```
+#[cfg(not(stiles_published))]
+pub const PROVENANCE: Provenance = Provenance::UNPUBLISHED;
 
 /// A fingerprint of how this crate lays out the plugin boundary
 ///

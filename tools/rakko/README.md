@@ -39,8 +39,10 @@ The library of this package defines the checks that no bundle covers:
 - `bench` prepares a corpus of large projects, each pinned to one commit,
   for CodSpeed to time, and records the phases of stiles on each in
   `target/bench`. See [Benchmarks].
-- `check-abi` compares the record of the plugin boundary with the one on
-  `main`, and fails when a fingerprint moved and `ABI_VERSION` did not rise.
+- `check-abi` compares the record of the plugin boundary with the one at the
+  latest `stiles@` tag, and fails when `ABI_VERSION` breaks the promise of that
+  release: a fingerprint moved and the version did not rise, or the version
+  rose past the next one.
 - `check-features` checks each language crate without its default features,
   the way a lint plugin depends on it.
 - `check-self` builds stiles in release mode and checks this repository with

@@ -16,5 +16,8 @@ tree-sitter.workspace = true
 proptest.workspace = true
 tree-sitter-rust.workspace = true
 
+[build-dependencies]
+stiles-codegen.workspace = true
+
 [lints]
 workspace = true

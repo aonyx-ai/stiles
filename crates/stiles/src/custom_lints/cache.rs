@@ -190,7 +190,7 @@ fn present(value: Option<OsString>) -> Option<OsString> {
 
 #[cfg(test)]
 mod tests {
-    use stiles_plugin::AbiVersion;
+    use stiles_plugin::{AbiVersion, Provenance};
 
     use super::*;
     use crate::config::{GitRev, GitUrl};
@@ -218,6 +218,7 @@ mod tests {
                     .abi_version(AbiVersion { major: 0, minor: 1 })
                     .types_fingerprint(types)
                     .language_fingerprint(0)
+                    .provenance(Provenance::PUBLISHED)
                     .build(),
             )
             .target(target)
