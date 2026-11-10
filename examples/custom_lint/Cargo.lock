@@ -396,6 +396,8 @@ dependencies = [
  "stiles-codegen",
  "thiserror",
  "tree-sitter",
+ "tree-sitter-rust",
+ "tree-sitter-typescript",
 ]
 
 [[package]]

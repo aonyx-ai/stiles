@@ -1,8 +1,14 @@
 use std::path::Path;
+use std::ptr::{self, NonNull};
+use std::sync::{Mutex, PoisonError};
 
 use bon::bon;
 
+use crate::context::Context;
+use crate::ts_node::TsNode;
 use crate::{DecoratedNode, DecorationMap, FilePath, Language};
+
+mod table;
 
 /// A parsed syntax tree with an overlay of semantic decorations
 ///
@@ -10,6 +16,13 @@ use crate::{DecoratedNode, DecorationMap, FilePath, Language};
 /// and a [`DecorationMap`] that providers populate with per-node semantic
 /// information. The tree and decorations together form the input to lint
 /// rules.
+///
+/// The tree never crosses the plugin boundary. Its nodes do, and each one
+/// reads the tree through a table of the host's functions that the tree
+/// holds. The tree keeps everything a node reads in one allocation that
+/// never moves, so moving the tree leaves the table's pointer to it valid.
+/// The same allocation holds every snippet that a node parsed, so a
+/// snippet lives exactly as long as the tree.
 ///
 /// # Examples
 ///
@@ -31,12 +44,28 @@ use crate::{DecoratedNode, DecorationMap, FilePath, Language};
 ///
 /// [`Tree`]: tree_sitter::Tree
 pub struct DecoratedTree {
+    record: NonNull<Record>,
+}
+
+/// Everything the host's table reads for one tree
+///
+/// The record sits in an allocation of its own, which the tree owns as a
+/// [`Box`] would. Its table's `data` points back at it. A plugin holds a
+/// reference to the table, and only the host's functions follow `data`.
+struct Record {
+    context: Context,
     tree: tree_sitter::Tree,
     language: Language,
     source: String,
     file: FilePath,
     decorations: DecorationMap,
+    snippets: Mutex<Vec<DecoratedTree>>,
 }
+
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<Record>();
+};
 
 #[bon]
 impl DecoratedTree {
@@ -69,13 +98,27 @@ impl DecoratedTree {
         source: String,
         file: impl Into<FilePath>,
     ) -> Self {
-        Self {
+        let record = Box::into_raw(Box::new(Record {
+            context: self::table::context(ptr::null()),
             tree,
             language,
             source,
             file: file.into(),
             decorations: DecorationMap::new(),
+            snippets: Mutex::new(Vec::new()),
+        }));
+
+        // SAFETY: `Box::into_raw` returned a valid pointer that nothing else
+        // holds yet. The table keeps the same pointer, so the record and its
+        // table share one provenance.
+        unsafe {
+            (*record).context.data = record.cast_const().cast();
         }
+
+        // SAFETY: `Box::into_raw` never returns null.
+        let record = unsafe { NonNull::new_unchecked(record) };
+
+        Self { record }
     }
 
     /// Returns a mutable reference to the decoration map for providers to
@@ -116,7 +159,7 @@ impl DecoratedTree {
     /// assert!(tree.root_node().get::<Root>().is_some());
     /// ```
     pub fn decorations_mut(&mut self) -> &mut DecorationMap {
-        &mut self.decorations
+        &mut self.record_mut().decorations
     }
 
     /// Merges provider decorations into this tree
@@ -160,7 +203,7 @@ impl DecoratedTree {
     /// assert!(tree.root_node().get::<Root>().is_some());
     /// ```
     pub fn merge_decorations(&mut self, decorations: DecorationMap) {
-        self.decorations.merge(decorations);
+        self.record_mut().decorations.merge(decorations);
     }
 
     /// Returns the root node wrapped as a [`DecoratedNode`]
@@ -183,12 +226,7 @@ impl DecoratedTree {
     /// assert_eq!(tree.root_node().text(), source);
     /// ```
     pub fn root_node(&self) -> DecoratedNode<'_> {
-        DecoratedNode::builder()
-            .node(self.tree.root_node())
-            .source(&self.source)
-            .file(&self.file)
-            .decorations(self.decorations.lookup())
-            .build()
+        self.record().root_node()
     }
 
     /// Returns the language the tree was parsed as
@@ -211,7 +249,7 @@ impl DecoratedTree {
     /// assert_eq!(tree.language(), Language::Rust);
     /// ```
     pub fn language(&self) -> Language {
-        self.language
+        self.record().language
     }
 
     /// Returns the source text of the file
@@ -234,7 +272,7 @@ impl DecoratedTree {
     /// assert_eq!(tree.source(), "fn main() {}");
     /// ```
     pub fn source(&self) -> &str {
-        &self.source
+        &self.record().source
     }
 
     /// Returns the file path
@@ -257,16 +295,113 @@ impl DecoratedTree {
     /// assert_eq!(tree.file(), std::path::Path::new("src/main.rs"));
     /// ```
     pub fn file(&self) -> &Path {
-        self.file.as_path()
+        self.record().file.as_path()
+    }
+
+    /// Returns the record this tree owns
+    fn record(&self) -> &Record {
+        // SAFETY: the record lives until `drop` frees it, and a shared borrow
+        // of the tree is a shared borrow of the record.
+        unsafe { self.record.as_ref() }
+    }
+
+    /// Returns the record this tree owns, for a change
+    fn record_mut(&mut self) -> &mut Record {
+        // SAFETY: the record lives until `drop` frees it, and the tree owns it
+        // alone. A unique borrow of the tree is therefore a unique borrow of
+        // the record, and no node of it is alive.
+        unsafe { self.record.as_mut() }
     }
 }
 
+impl Record {
+    /// Returns the root of the tree as a node that reads through this record
+    fn root_node(&self) -> DecoratedNode<'_> {
+        DecoratedNode::builder()
+            .node(TsNode::from(self.tree.root_node()))
+            .context(&self.context)
+            .build()
+    }
+
+    /// Parses `text` as `language`, and keeps the tree as long as this record
+    ///
+    /// The snippet takes this record's grammar when it is of the same
+    /// language. A file of another dialect, such as TSX, therefore parses
+    /// its snippets as the file itself parsed. The snippet has no
+    /// decorations, and it names this record's file.
+    ///
+    /// The result is [`None`] when tree-sitter refuses the grammar, or
+    /// stops before it finishes.
+    fn parse_snippet(&self, language: Language, text: &str) -> Option<&Record> {
+        let own = self.tree.language();
+        let other = grammar_of(language);
+        let grammar = match language == self.language {
+            true => &*own,
+            false => &other,
+        };
+
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(grammar).ok()?;
+        let tree = parser.parse(text, None)?;
+
+        let snippet = DecoratedTree::builder()
+            .tree(tree)
+            .language(language)
+            .source(text.to_owned())
+            .file(self.file.clone())
+            .build();
+        let record = snippet.record;
+        self.snippets
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(snippet);
+
+        // SAFETY: the snippet's record stays at its address until the
+        // snippet drops, and the snippet drops only with this record.
+        Some(unsafe { record.as_ref() })
+    }
+}
+
+/// Returns the grammar the host parses `language` with by default
+///
+/// TypeScript takes the grammar without JSX, as `stiles_testing::parse`
+/// does.
+fn grammar_of(language: Language) -> tree_sitter::Language {
+    match language {
+        Language::Rust => tree_sitter_rust::LANGUAGE.into(),
+        Language::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+    }
+}
+
+impl Drop for DecoratedTree {
+    fn drop(&mut self) {
+        // SAFETY: `new` made the pointer with `Box::into_raw`, and only this
+        // drop frees it. No node outlives the tree, so nothing reads the
+        // record afterwards.
+        drop(unsafe { Box::from_raw(self.record.as_ptr()) });
+    }
+}
+
+// SAFETY: the tree owns its record as a `Box` would, and the record is
+// `Send`, as the assertion beside it checks.
+unsafe impl Send for DecoratedTree {}
+// SAFETY: a shared borrow of the tree only reads the record, or locks the
+// mutex around its snippets, and the record is `Sync`.
+unsafe impl Sync for DecoratedTree {}
+
 impl std::fmt::Debug for DecoratedTree {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Record {
+            file,
+            language,
+            source,
+            ..
+        } = self.record();
+
         f.debug_struct("DecoratedTree")
-            .field("file", &self.file)
-            .field("language", &self.language)
-            .field("source_len", &self.source.len())
+            .field("file", file)
+            .field("language", language)
+            .field("source_len", &source.len())
             .finish()
     }
 }
@@ -403,21 +538,39 @@ mod tests {
     }
 
     #[test]
-    fn trait_send() {
+    fn trait_send_decorated_tree() {
         fn assert_send<T: Send>() {}
         assert_send::<DecoratedTree>();
     }
 
     #[test]
-    fn trait_sync() {
+    fn trait_send_record() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Record>();
+    }
+
+    #[test]
+    fn trait_sync_decorated_tree() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<DecoratedTree>();
     }
 
     #[test]
-    fn trait_unpin() {
+    fn trait_sync_record() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Record>();
+    }
+
+    #[test]
+    fn trait_unpin_decorated_tree() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<DecoratedTree>();
+    }
+
+    #[test]
+    fn trait_unpin_record() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Record>();
     }
 
     mod prop {

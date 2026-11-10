@@ -643,7 +643,9 @@ fn text_range_from(range: Range<usize>) -> Option<TextRange> {
 
 /// Converts a tree-sitter node's byte range into rust-analyzer's
 fn text_range_of(node: &DecoratedNode<'_>) -> Option<TextRange> {
-    text_range_from(node.raw().byte_range())
+    let span = node.span();
+
+    text_range_from(span.start()..span.end())
 }
 
 fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &mut Vec<Target>) {

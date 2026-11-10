@@ -2,5 +2,5 @@
 # fails when these values differ from the code, and `rakko check-abi`
 # fails when the version breaks the promise of the latest release.
 version = "0.12"
-types-fingerprint = "f063eff53a8bcf01"
+types-fingerprint = "728eb42a6cbb8dad"
 language-fingerprint = "87e24521b8535eb0"

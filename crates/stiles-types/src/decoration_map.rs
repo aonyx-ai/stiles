@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 
 use crate::decoration_entry::Entry;
-use crate::{Decoration, DecorationLookup};
+use crate::{Decoration, DecorationKey};
 
 /// Storage for per-node decorations on a syntax tree
 ///
@@ -15,9 +15,10 @@ use crate::{Decoration, DecorationLookup};
 /// seal. Sealing reads the entries and never moves them, so a shared
 /// borrow is enough to build it.
 ///
-/// A plugin searches the sealed index itself. The alternative is to hand a
-/// plugin a pointer to a [`HashMap`] and a function of the host that reads
-/// it. That needs a raw pointer and a cast that the compiler cannot check.
+/// The map stays on the host's side of the plugin boundary. A plugin asks
+/// the host's table for an entry, and stabby checks the entry's type when
+/// the plugin reads it. A sorted list serves that lookup with a binary
+/// search, and needs no hash of the host's own.
 ///
 /// # Examples
 ///
@@ -44,7 +45,6 @@ use crate::{Decoration, DecorationLookup};
 /// assert_eq!(map.get::<Name>(7).map(|Name(name)| *name), Some(1));
 /// ```
 ///
-/// [`HashMap`]: std::collections::HashMap
 #[derive(Debug, Default)]
 pub struct DecorationMap {
     entries: Vec<Entry>,
@@ -144,7 +144,9 @@ impl DecorationMap {
     /// assert_eq!(map.get::<Name>(7).map(|Name(name)| *name), Some(1));
     /// ```
     pub fn get<T: Decoration>(&self, node_id: usize) -> Option<&T> {
-        self.lookup().first::<T>(node_id)
+        self.on(node_id)
+            .find(|entry| entry.key() == T::KEY)?
+            .read::<T>()
     }
 
     /// Retrieves all decorations of type `T` attached to the given node
@@ -175,7 +177,10 @@ impl DecorationMap {
     /// assert_eq!(map.get_all::<Name>(7).len(), 2);
     /// ```
     pub fn get_all<T: Decoration>(&self, node_id: usize) -> Vec<&T> {
-        self.lookup().get_all::<T>(node_id)
+        self.on(node_id)
+            .filter(|entry| entry.key() == T::KEY)
+            .filter_map(Entry::read::<T>)
+            .collect()
     }
 
     /// Merges another map into this one
@@ -217,23 +222,33 @@ impl DecorationMap {
         self.sealed.take();
     }
 
-    /// Returns a handle that reads this map, sealing the index if needed
+    /// Returns the entries under `key` on the node `node_id`, in insertion order
     ///
-    /// The handle crosses the plugin boundary inside every
-    /// [`DecoratedNode`], and it borrows this map for as long as it lives.
+    /// The host's table answers a plugin's lookup with these, and the
+    /// plugin checks an entry's type when it reads the value.
+    pub(crate) fn under(&self, node_id: usize, key: DecorationKey) -> impl Iterator<Item = &Entry> {
+        self.on(node_id).filter(move |entry| entry.key() == key)
+    }
+
+    /// Returns the entries that sit on `node_id`, in insertion order
     ///
-    /// [`DecoratedNode`]: crate::DecoratedNode
-    pub(crate) fn lookup(&self) -> DecorationLookup<'_> {
+    /// The first read seals the index, and a shared borrow is enough for
+    /// that because sealing never moves an entry.
+    fn on(&self, node_id: usize) -> impl Iterator<Item = &Entry> {
+        let entries = &self.entries;
         let order = self.sealed.get_or_init(|| {
-            let mut order: Vec<usize> = (0..self.entries.len()).collect();
-            order.sort_by_key(|&at| self.entries[at].node_id());
+            let mut order: Vec<usize> = (0..entries.len()).collect();
+            order.sort_by_key(|&at| entries[at].node_id());
             order
         });
+        let at = |position: &usize| entries[*position].node_id();
 
-        DecorationLookup::of()
-            .order(order)
-            .entries(&self.entries)
-            .call()
+        let start = order.partition_point(|position| at(position) < node_id);
+        let end = order.partition_point(|position| at(position) <= node_id);
+
+        order[start..end]
+            .iter()
+            .map(move |&position| &entries[position])
     }
 }
 
@@ -270,6 +285,32 @@ mod tests {
         fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
             node.decoration::<Self>()
         }
+    }
+
+    #[test]
+    fn an_insertion_after_a_read_is_visible() {
+        let mut map = DecorationMap::new();
+        map.insert(1, Scope(1));
+        let _ = map.get::<Scope>(1);
+
+        map.insert(1, Scope(2));
+
+        assert_eq!(map.get_all::<Scope>(1), [&Scope(1), &Scope(2)]);
+    }
+
+    #[test]
+    fn get_all_groups_entries_by_node() {
+        let mut map = DecorationMap::new();
+        map.insert(1, Scope(10));
+        map.insert(2, Scope(20));
+        map.insert(1, Scope(11));
+
+        let found = [1, 2, 3].map(|node| map.get_all::<Scope>(node));
+
+        assert_eq!(
+            found,
+            [vec![&Scope(10), &Scope(11)], vec![&Scope(20)], Vec::new()]
+        );
     }
 
     #[test]
@@ -470,6 +511,31 @@ mod tests {
     fn trait_unpin() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<DecorationMap>();
+    }
+
+    #[test]
+    fn under_skips_entries_under_another_key() {
+        let mut map = DecorationMap::new();
+        map.insert(1, Scope(1));
+        map.insert(1, TypeInfo("i32".into()));
+        map.insert(1, Scope(2));
+
+        let found: Vec<&Scope> = map
+            .under(1, Scope::KEY)
+            .filter_map(Entry::read::<Scope>)
+            .collect();
+
+        assert_eq!(found, [&Scope(1), &Scope(2)]);
+    }
+
+    #[test]
+    fn under_with_another_node_returns_nothing() {
+        let mut map = DecorationMap::new();
+        map.insert(1, Scope(1));
+
+        let found = map.under(2, Scope::KEY).count();
+
+        assert_eq!(found, 0);
     }
 
     mod prop {
