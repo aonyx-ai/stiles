@@ -586,10 +586,9 @@ fn build(
 /// plugin exported it. This is what makes an appended field cheap. The
 /// offsets of a `#[repr(C)]` struct are knowable per version. No step of
 /// the read depends on the agreement of the plugin about the size of the
-/// struct. Stiles is before 1.0, where the version of a plugin has to equal
-/// the version of this binary. Every field that a plugin exports is
-/// therefore one this version knows. The read stays field by field,
-/// because from 1.0 an older minor loads and ends sooner.
+/// struct. The version of a plugin has to equal the version of this
+/// binary, so every field that a plugin exports is one this version
+/// knows.
 ///
 /// The loader deliberately leaks the library. The factories that it hands
 /// over point into the image of the library. So does the `&'static str`
@@ -625,10 +624,10 @@ fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loade
     // SAFETY: `declaration` is the address `dlsym` gave for the loaded
     // library's `stiles_plugin_declaration` static.
     let plugin_abi_version = unsafe { abi_version(declaration) };
-    if !host.abi_version().accepts(plugin_abi_version) {
+    if host.abi_version() != plugin_abi_version {
         return Err(self::handshake::HandshakeMismatch::AbiVersion {
             plugin: plugin_abi_version,
-            host: host.abi_version(),
+            host: host.clone(),
         }
         .into());
     }
@@ -638,10 +637,14 @@ fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loade
     let types_fingerprint = unsafe { (&raw const (*declaration).types_fingerprint).read() };
     // SAFETY: as for `types_fingerprint` above.
     let language_fingerprint = unsafe { (&raw const (*declaration).language_fingerprint).read() };
+    // SAFETY: as for `types_fingerprint` above. Every bit pattern of the
+    // field is a valid `Provenance`, which wraps a `u32`.
+    let provenance = unsafe { (&raw const (*declaration).provenance).read() };
     let plugin = AbiIdentity::builder()
         .abi_version(plugin_abi_version)
         .types_fingerprint(types_fingerprint)
         .language_fingerprint(language_fingerprint)
+        .provenance(provenance)
         .build();
     self::handshake::validate(host, &plugin).context("failed the handshake with the plugin")?;
 

@@ -30,12 +30,15 @@ against the same Stiles source.
 
 <!--
 what decides agreement: what is actually compared. the stiles source each side
-was built from. three values: a version and two fingerprints.
+was built from. a version, two fingerprints, and whether a release vouches for
+the version.
 -->
 
-The Stiles source that each side compiles against. Each side carries three
-values: a protocol version and two fingerprints of that source. All three have
-to match.
+The Stiles source that each side compiles against. Each side carries a
+protocol version and two fingerprints of that source, and says whether it was
+built from published crates. The versions always have to match. When both sides
+are published, a release vouches that the version names one layout, so the
+version decides. Otherwise the fingerprints have to match too.
 
 ## The compiler is absent
 

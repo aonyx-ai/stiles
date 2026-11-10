@@ -27,11 +27,22 @@ To resolve this, you have two options:
 
 :::note
 
-While Stiles is still in pre-1.0 development, every change to the ABI raises
-its minor version, and Stiles loads only plugins built for its exact version.
-This means ABI version `0.3` is incompatible with ABI version `0.2`.
+Stiles loads only plugins built for its exact ABI version. Before 1.0 an ABI
+version is a minor, such as `0.12`. From 1.0 it is one integer, such as `2`.
+Each release that changes the ABI raises it once.
 
 :::
+
+## `plugin (ABI x.y-hash) built against another stiles-types`
+
+A hash after the ABI version marks a build from unpublished Stiles source, such
+as a git revision, a path, or a patch. Between two releases, one ABI version
+covers more than one layout, so Stiles compares the layouts of such a build,
+and they differ. The message names `stiles-rust` when the language crates
+differ.
+
+To resolve this, build the plugin and Stiles from the same Stiles source, or
+pin both to a published release.
 
 ## `the directory holds no dynamic library; delete it and run stiles again`
 

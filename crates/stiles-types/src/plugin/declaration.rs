@@ -1,4 +1,4 @@
-use crate::plugin::{AbiVersion, Loaded};
+use crate::plugin::{AbiVersion, Loaded, Provenance};
 
 /// The entry point a custom lint plugin exports
 ///
@@ -12,9 +12,13 @@ use crate::plugin::{AbiVersion, Loaded};
 ///   `#[repr(C)]` struct. The loader reads it whatever else changed.
 /// - [`types_fingerprint`] and [`language_fingerprint`] are plain `u64`,
 ///   readable under any pair of compilers.
+/// - [`provenance`] says whether the plugin was built from published
+///   crates. When it and the host both were, the version alone vouches
+///   for the layout, and the fingerprints are not compared.
 /// - [`load`] is an `extern "C"` function pointer that hands back values
-///   stabby lays out. Calling it is sound once the fingerprints prove
-///   that both images lay those values out the same way.
+///   stabby lays out. Calling it is sound once the version or the
+///   fingerprints prove that both images lay those values out the same
+///   way.
 ///
 /// The fields are public rather than accessed through getters, because
 /// this struct is a wire format. The exporting macro constructs it in a
@@ -23,7 +27,9 @@ use crate::plugin::{AbiVersion, Loaded};
 /// # Examples
 ///
 /// ```
-/// use stiles_types::plugin::{ABI_VERSION, Loaded, Plugin, PluginDeclaration, TYPES_FINGERPRINT};
+/// use stiles_types::plugin::{
+///     ABI_VERSION, Loaded, PROVENANCE, Plugin, PluginDeclaration, TYPES_FINGERPRINT,
+/// };
 ///
 /// /// Exports no lints
 /// extern "C" fn load() -> Loaded {
@@ -37,6 +43,7 @@ use crate::plugin::{AbiVersion, Loaded};
 ///     types_fingerprint: TYPES_FINGERPRINT,
 ///     language_fingerprint: 0,
 ///     load,
+///     provenance: PROVENANCE,
 /// };
 ///
 /// assert_eq!(DECLARATION.abi_version, ABI_VERSION);
@@ -45,6 +52,7 @@ use crate::plugin::{AbiVersion, Loaded};
 /// [`abi_version`]: PluginDeclaration::abi_version
 /// [`language_fingerprint`]: PluginDeclaration::language_fingerprint
 /// [`load`]: PluginDeclaration::load
+/// [`provenance`]: PluginDeclaration::provenance
 /// [`types_fingerprint`]: PluginDeclaration::types_fingerprint
 #[repr(C)]
 pub struct PluginDeclaration {
@@ -84,6 +92,17 @@ pub struct PluginDeclaration {
     ///
     /// [`Plugin`]: crate::plugin::Plugin
     pub load: extern "C" fn() -> Loaded,
+
+    /// Whether every boundary crate of the plugin was published
+    ///
+    /// stiles-plugin joins the [`PROVENANCE`] of every crate it builds
+    /// on, so a plugin that patched one of them is unpublished. The field
+    /// follows [`load`], because the version that precedes it says which
+    /// fields a declaration has.
+    ///
+    /// [`PROVENANCE`]: crate::plugin::PROVENANCE
+    /// [`load`]: PluginDeclaration::load
+    pub provenance: Provenance,
 }
 
 #[cfg(test)]
@@ -103,9 +122,10 @@ mod tests {
     /// inserted among them would move the rest, and stiles would read one
     /// plugin's data as another field. That is silent: the fields are
     /// integers and pointers, and a wrong one is a wrong answer rather than
-    /// a crash. A new field goes last, and this test fails if one does not.
+    /// a crash. A new field goes last, and a test pins each field behind
+    /// the ones before it.
     #[test]
-    fn load_sits_after_every_other_field() {
+    fn load_sits_after_every_field_before_it() {
         let load = offset_of!(PluginDeclaration, load);
 
         let before = [
@@ -116,6 +136,53 @@ mod tests {
         .map(|offset| offset < load);
 
         assert_eq!(before, [true; 3]);
+    }
+
+    /// A field appended later goes after this one, for the reason
+    /// [`load_sits_after_every_field_before_it`] gives
+    #[test]
+    fn provenance_sits_last() {
+        let provenance = offset_of!(PluginDeclaration, provenance);
+
+        let before = [
+            offset_of!(PluginDeclaration, abi_version),
+            offset_of!(PluginDeclaration, types_fingerprint),
+            offset_of!(PluginDeclaration, language_fingerprint),
+            offset_of!(PluginDeclaration, load),
+        ]
+        .map(|offset| offset < provenance);
+
+        assert_eq!(before, [true; 4]);
+    }
+
+    /// Ties the fields of the declaration to the version that names them
+    ///
+    /// No fingerprint reads the declaration, and two published sides
+    /// compare only their versions. A field appended without a new version
+    /// would make stiles read past the end of an older plugin's
+    /// declaration. The pattern below names every field, so an added or
+    /// removed one fails to compile here, next to the version it needs.
+    #[test]
+    fn the_fields_belong_to_the_abi_version() {
+        fn fields(declaration: &PluginDeclaration) {
+            let PluginDeclaration {
+                abi_version: _,
+                types_fingerprint: _,
+                language_fingerprint: _,
+                load: _,
+                provenance: _,
+            } = declaration;
+        }
+        let _ = fields;
+
+        assert_eq!(
+            crate::plugin::ABI_VERSION,
+            AbiVersion {
+                major: 0,
+                minor: 12
+            },
+            "the fields of the declaration moved; bump ABI_VERSION and update this test together",
+        );
     }
 
     #[test]

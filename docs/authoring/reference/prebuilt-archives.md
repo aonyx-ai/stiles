@@ -35,7 +35,7 @@ publish archives.
 
 <!--
 when do my archives stop being found. when the boundary moves, because the tag
-carries the fingerprints and the protocol floor. a stiles release that changes
+carries the fingerprints and the protocol version. a stiles release that changes
 either one wants a fresh archive.
 why does a bad archive fail loudly. a library that fails the handshake carries a
 tag that misdescribes it, so stiles ends the run rather than quietly compiling.

@@ -409,7 +409,7 @@ fn present(value: Option<String>) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use stiles_plugin::AbiVersion;
+    use stiles_plugin::{AbiVersion, Provenance};
 
     use super::*;
     use crate::config::GitRev;
@@ -425,6 +425,7 @@ mod tests {
                     .abi_version(AbiVersion { major: 0, minor: 1 })
                     .types_fingerprint(0)
                     .language_fingerprint(0)
+                    .provenance(Provenance::PUBLISHED)
                     .build(),
             )
             .target("aarch64-apple-darwin")

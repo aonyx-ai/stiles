@@ -21,7 +21,7 @@ mod export_lints;
 use stiles_types::plugin::stable_fingerprint;
 pub use stiles_types::plugin::{
     ABI_VERSION, AbiVersion, Constructed, ExportedLint, LintPassFactory, Loaded, Plugin,
-    PluginDeclaration, TYPES_FINGERPRINT, factory,
+    PluginDeclaration, Provenance, TYPES_FINGERPRINT, factory,
 };
 pub use stiles_types::{Language, Panic};
 
@@ -54,6 +54,36 @@ pub const LANGUAGE_FINGERPRINT: u64 = stable_fingerprint(&[
     stiles_typescript::LANGUAGE_FINGERPRINT,
 ]);
 
+/// Whether a plugin builds on published crates alone
+///
+/// A plugin is published only when every crate that shapes its boundary
+/// is: stiles-types, every language crate, and this crate, which writes
+/// the declaration. A plugin that patched one of them carries source no
+/// release vouches for, so stiles compares its fingerprints rather than
+/// trusting its version.
+///
+/// # Examples
+///
+/// ```
+/// use stiles_plugin::{PROVENANCE, Provenance};
+///
+/// assert_eq!(Provenance::all(&[PROVENANCE]), PROVENANCE);
+/// ```
+pub const PROVENANCE: Provenance = Provenance::all(&[
+    stiles_types::plugin::PROVENANCE,
+    stiles_rust::PROVENANCE,
+    stiles_typescript::PROVENANCE,
+    OWN_PROVENANCE,
+]);
+
+/// Whether this crate is a build of published source
+#[cfg(stiles_published)]
+const OWN_PROVENANCE: Provenance = Provenance::PUBLISHED;
+
+/// Whether this crate is a build of published source
+#[cfg(not(stiles_published))]
+const OWN_PROVENANCE: Provenance = Provenance::UNPUBLISHED;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,7 +93,7 @@ mod tests {
         format!(
             "# The plugin boundary as this commit builds it. A test in stiles-plugin\n\
              # fails when these values differ from the code, and `rakko check-abi`\n\
-             # fails when a fingerprint moves and the version does not.\n\
+             # fails when the version breaks the promise of the latest release.\n\
              version = \"{ABI_VERSION}\"\n\
              types-fingerprint = \"{TYPES_FINGERPRINT:016x}\"\n\
              language-fingerprint = \"{LANGUAGE_FINGERPRINT:016x}\"\n"

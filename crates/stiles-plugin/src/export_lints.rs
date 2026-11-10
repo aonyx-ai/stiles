@@ -52,6 +52,7 @@ macro_rules! export_lints {
                 types_fingerprint: $crate::TYPES_FINGERPRINT,
                 language_fingerprint: $crate::LANGUAGE_FINGERPRINT,
                 load: __stiles_load,
+                provenance: $crate::PROVENANCE,
             };
 
         #[doc(hidden)]

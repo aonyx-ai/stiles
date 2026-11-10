@@ -18,6 +18,7 @@
 mod adapter;
 pub mod decorations;
 mod language_fingerprint;
+mod provenance;
 #[cfg(feature = "provider")]
 mod provider;
 #[cfg(feature = "provider")]
@@ -25,6 +26,7 @@ mod queries;
 
 pub use self::adapter::TypeScriptLintPassAdapter;
 pub use self::language_fingerprint::LANGUAGE_FINGERPRINT;
+pub use self::provenance::PROVENANCE;
 #[cfg(feature = "provider")]
 pub use self::provider::{
     ChangeTypeScriptFilesError, LoadTypeScriptProjectError, TypeScriptDecorationProvider,

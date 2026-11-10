@@ -32,7 +32,9 @@ fingerprints of stiles's own source. the compiler is not one of them, so any
 rustc can have built either side.
 -->
 
-Three values that identify the Stiles source each side was built from.
+An ABI version, and two fingerprints of the Stiles source each side was built
+from. When both sides come from published crates, the ABI version decides,
+because a release vouches for it. Otherwise the fingerprints decide too.
 [The plugin boundary](/authoring/explanation/plugin-boundary) explains them. Any
 `rustc` can build either side.
 
@@ -48,8 +50,9 @@ Before 1.0, on every Stiles release. Version 0 has no compatibility guarantee,
 so a rule loads only on the Stiles its publisher built it for. When you upgrade
 Stiles, you also move your rules pin to a commit built for the new release.
 
-From 1.0, only a major version can change the boundary. A minor release adds
-only types and functions that old rules do not use.
+From 1.0, an ABI version is one integer, and a rule still loads only on its own
+ABI version. A Stiles release that leaves the boundary alone keeps the ABI
+version of the release before it, so your rules pin does not have to move.
 
 ## The order
 

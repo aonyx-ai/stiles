@@ -1,6 +1,7 @@
 mod adapter;
 pub mod decorations;
 mod language_fingerprint;
+mod provenance;
 #[cfg(feature = "provider")]
 mod provider;
 
@@ -8,6 +9,7 @@ pub use stiles_types::RuleId;
 
 pub use self::adapter::RustLintPassAdapter;
 pub use self::language_fingerprint::LANGUAGE_FINGERPRINT;
+pub use self::provenance::PROVENANCE;
 #[cfg(feature = "provider")]
 pub use self::provider::{ChangeRustFilesError, LoadRustWorkspaceError, RustDecorationProvider};
 

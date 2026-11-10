@@ -61,7 +61,7 @@ impl fmt::Display for AssetName {
 
 #[cfg(test)]
 mod tests {
-    use stiles_plugin::AbiVersion;
+    use stiles_plugin::{AbiVersion, Provenance};
 
     use super::*;
     use crate::custom_lints::handshake::AbiIdentity;
@@ -75,6 +75,7 @@ mod tests {
                     .abi_version(AbiVersion { major: 0, minor: 1 })
                     .types_fingerprint(0)
                     .language_fingerprint(0)
+                    .provenance(Provenance::PUBLISHED)
                     .build(),
             )
             .target("aarch64-apple-darwin")

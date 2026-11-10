@@ -371,11 +371,14 @@ says.
 
 The plugin exports a declaration. The loader reads its leading protocol
 version through a raw pointer, and only a matching version licenses a
-reference to the whole struct. It then compares two fingerprints: one for
-stiles-types and one that stiles-plugin joins from every language crate.
-The first mismatch refuses the library with an error that says what to
-rebuild. Only then does the loader ask the plugin for its lints: a factory,
-a language, and the declared rules of each.
+read of the rest. The declaration also says whether the plugin was built
+from published crates. When both the plugin and stiles were, a release
+vouches that the version names one layout, and the version decides. When
+either side was built from unpublished source, the loader compares two
+fingerprints too: one for stiles-types and one that stiles-plugin joins
+from every language crate. The first mismatch refuses the library with an
+error that says what to rebuild. Only then does the loader ask the plugin
+for its lints: a factory, a language, and the declared rules of each.
 
 The handshake guards against silence. A plugin built against drifted
 source would mostly work, and rules fail open, so a wrong answer would
@@ -406,35 +409,34 @@ belongs to the declaration's `ABI_VERSION`. A test scans the trait's
 source and fails when its method list moves, so the test reminds a
 contributor to bump it.
 
-`ABI_VERSION` is a major and a minor, and the two say different things.
-Two kinds of change reach the declaration, and they cost differently. A
-field appended to it is readable by version, because the struct is
-`#[repr(C)]` and stiles knows where each version's fields end. A plugin
-that stops sooner offers less rather than being refused, so such a change
-raises the minor. A method added to the pass trait is not readable that
-way, because stiles cannot measure a vtable, so such a change raises the
-major and every older plugin stops loading. An optional capability
-therefore belongs in the declaration rather than on the trait.
-
-Major 0 is the exception, and stiles is in it. Nothing is promised
-before 1.0: a plugin loads only on the stiles it was built for, and
-every change to the boundary costs one minor. From 1.0 the major carries
-the promise, and a plugin built for any minor of it keeps loading.
+`ABI_VERSION` is a promise about a release, and a plugin loads only on
+the version it was built for. Before 1.0 a version is a minor such as
+`0.12`. From 1.0 it is one integer. A release that changed the boundary
+raises the version once, however many pull requests moved it, and a
+release that left the boundary alone keeps the version of the one before.
 
 `crates/stiles-plugin/abi-surface.toml` records the version and both
 fingerprints, and a test in stiles-plugin fails when the record and the
-code differ. A change to the boundary therefore changes the record, and
-`rakko check-abi` compares the record with the one on `main`. A moved
-fingerprint with the same version fails the check. From 1.0, a moved
-fingerprint with the same major fails it too, because a fingerprinted type
-that changed refuses every older plugin.
+code differ. `rakko check-abi` compares the record with the one at the
+latest `stiles@` tag. A moved fingerprint needs the version after that
+release's, and a version may only ever rise to that one. The version may
+also rise with no moved fingerprint, because it guards what no
+fingerprint reads: the shape of the declaration and the signatures of
+the pass trait.
 
-The tag a publisher names an archive with carries the floor of that
-range rather than the version, for the same reason. Two stiles builds that
-read the same protocols accept each other's archives, so from 1.0 a
-protocol that only appends a field does not strand what a publisher
-already built. Before 1.0 the floor is the version itself, so each
-release asks for archives of its own.
+Between two releases, one version therefore holds more than one layout.
+A build from unpublished source cannot vouch for its version, so its
+fingerprints decide, and messages name it by the version and a short
+hash of its fingerprints, such as `0.12-7b711703`. A boundary crate
+learns that cargo packaged it from `.cargo_vcs_info.json`, which cargo
+writes into every packaged crate and nowhere else. A git source, a path
+source, and a patch are therefore unpublished. A plugin is published
+only when every boundary crate it builds on is.
+
+The tag a publisher names an archive with carries the version and both
+fingerprints. A release fixes the fingerprints of its version, so the
+tag of a published stiles names the same archives either way, and every
+version asks for archives of its own.
 
 The fingerprints stop at stiles's own layout. A contributor maintains
 each list of types by hand. A fieldless enum keeps its size and alignment
