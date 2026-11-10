@@ -70,7 +70,7 @@ pub use self::provenance::Provenance;
 /// else.
 ///
 /// The version is a promise about a release. It rises once between two
-/// releases, when the boundary moved since the last one, and
+/// releases, when the boundary moved since the last one.
 /// `rakko check-abi` refuses a moved boundary that kept the version of
 /// that release. A build from unpublished source does not claim the
 /// version alone, as [`Provenance`] says. [`AbiVersion`] says what a

@@ -32,9 +32,25 @@ pub struct Provenance(u32);
 
 impl Provenance {
     /// A build from crates that cargo packaged
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::plugin::Provenance;
+    ///
+    /// assert!(Provenance::PUBLISHED.is_published());
+    /// ```
     pub const PUBLISHED: Self = Self(1);
 
     /// A build from source that no release vouches for
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::plugin::Provenance;
+    ///
+    /// assert!(!Provenance::UNPUBLISHED.is_published());
+    /// ```
     pub const UNPUBLISHED: Self = Self(0);
 
     /// Returns the provenance of a build that joins several crates

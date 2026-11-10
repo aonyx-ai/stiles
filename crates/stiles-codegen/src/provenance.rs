@@ -35,7 +35,7 @@ const VCS_INFO: &str = ".cargo_vcs_info.json";
 ///
 /// The function writes no `rerun-if-changed` directive. Whether a
 /// directory holds a packaged crate does not change while cargo builds
-/// from it, and a directive for a file that is absent would rerun the
+/// from it. A directive for a file that is absent would also rerun the
 /// script on every build.
 ///
 /// # Errors
