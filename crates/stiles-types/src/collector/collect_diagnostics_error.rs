@@ -58,6 +58,19 @@ pub enum CollectDiagnosticsError {
         /// How many diagnostics the sink had started by then
         started: usize,
     },
+    /// A pass reported a diagnostic with a severity this stiles does not know
+    ///
+    /// A plugin built against a newer stiles may name a severity that this
+    /// one lacks. The host refuses the report rather than guess its weight.
+    #[error(
+        "a lint pass reported `{rule}` with severity byte {byte}, which this stiles does not know"
+    )]
+    UnknownSeverity {
+        /// The rule of the diagnostic
+        rule: RuleId,
+        /// The byte the pass sent
+        byte: u8,
+    },
 
     /// A pass edited a fix and never gave it a message
     #[error("a lint pass edited a fix for `{rule}` without naming the fix")]

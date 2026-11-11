@@ -99,7 +99,7 @@ impl<'a> Sink<'a> {
         let handle = (table.report)(
             table,
             &diagnostic.rule_id(),
-            diagnostic.severity(),
+            diagnostic.severity().to_byte(),
             Str::new(diagnostic.message()),
             diagnostic.span(),
         );

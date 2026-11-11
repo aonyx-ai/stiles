@@ -2,11 +2,10 @@ use std::ffi::c_void;
 
 use stabby::str::Str;
 
-use crate::{RuleId, Severity, Span};
+use crate::{RuleId, Span};
 
 /// Starts a diagnostic, and returns the handle that names it
-pub(crate) type ReportFn =
-    for<'n> extern "C" fn(&SinkTable, &RuleId, Severity, Str<'n>, &Span) -> usize;
+pub(crate) type ReportFn = for<'n> extern "C" fn(&SinkTable, &RuleId, u8, Str<'n>, &Span) -> usize;
 
 /// Attaches a span and a text to the diagnostic behind a handle
 pub(crate) type AttachFn = for<'n> extern "C" fn(&SinkTable, usize, &Span, Str<'n>);

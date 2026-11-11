@@ -432,21 +432,22 @@ A rule that needs a snippet read as code, such as the body of a comment,
 asks the table to parse it. The host parses it with its own grammar, and
 the tree it builds lives as long as the file's tree.
 
-A pass reports through a sink, a second `#[repr(C)]` table of host
-functions that the host lends to each check. `report` starts a diagnostic
-from its rule, severity, message, and span, and hands back a handle.
+A pass reports through a sink, a second `#[repr(C)]` table of host functions
+that the host lends to each check. `report` starts a diagnostic from its rule,
+severity, message, and span, and hands back a handle. The severity crosses as a
+byte that `Severity` pins, and the host refuses a byte it does not know.
 `origin`, `related`, `fix_message`, and `edit` add to the diagnostic that a
 handle names. The host builds its own diagnostics from the calls, so no
 diagnostic crosses as a laid-out value. A field added to one therefore moves
 nothing that a plugin reads. A rule never sees the sink. Its methods still
 return diagnostics, and the adapter that `lint_pass_adapter!` writes reports
 each one. The host checks the parts once the pass returns: one file for each
-fix, edits that do not overlap, and only handles that the sink handed out.
-An `extern "C"` function must not panic, so the sink keeps a bad handle and
-the walk turns it into an error after the call. Each call of a pass gets a
-collector of its own, on the thread that walks the file, so files that run
-in parallel never share one. A test in stiles-types fails when the sink's
-entries move, as it does for the node's table.
+fix, edits that do not overlap, and only handles that the sink handed out. An
+`extern "C"` function must not panic, so the sink keeps a bad handle and the
+walk turns it into an error after the call. Each call of a pass gets a collector
+of its own, on the thread that walks the file, so files that run in parallel
+never share one. A test in stiles-types fails when the sink's entries move, as
+it does for the node's table.
 
 A factory is a plain `extern "C"` function of the plugin's. It builds a pass
 inside its language adapter, boxes it with the plugin's allocator, and writes

@@ -46,8 +46,8 @@ use stabby::IStable;
 
 use crate::decoration_entry::Entry;
 use crate::{
-    DecoratedNode, DecorationKey, FilePath, Panic, Position, RuleId, RuleOption, RuleOptions,
-    Severity, Sink, Span,
+    DecoratedNode, DecorationKey, FilePath, Panic, Position, RuleId, RuleOption, RuleOptions, Sink,
+    Span,
 };
 
 mod abi_version;
@@ -157,8 +157,9 @@ pub const PROVENANCE: Provenance = Provenance::UNPUBLISHED;
 /// [`RuleId`] values.
 ///
 /// A pass reports each diagnostic through the sink's table, one part for
-/// each call. The calls take a [`RuleId`], a [`Severity`], and a [`Span`]
-/// by value or by reference, so those three are on the list. The
+/// each call. The calls take a [`RuleId`] and a [`Span`] by reference, so
+/// those two are on the list. A [`Severity`] crosses as a fixed byte, as a
+/// [`Language`] does, so neither is on the list. The
 /// diagnostic, its fix, its edits, and its locations do not cross. Each
 /// side lays them out its own way, so they are not here.
 ///
@@ -180,6 +181,7 @@ pub const PROVENANCE: Provenance = Provenance::UNPUBLISHED;
 /// entries move, so the bump is not left to memory.
 ///
 /// [`Language`]: crate::Language
+/// [`Severity`]: crate::Severity
 ///
 /// # Examples
 ///
@@ -200,7 +202,6 @@ pub const TYPES_FINGERPRINT: u64 = stable_fingerprint(&[
     <Span as IStable>::ID,
     <Position as IStable>::ID,
     <RuleId as IStable>::ID,
-    <Severity as IStable>::ID,
 ]);
 
 #[cfg(test)]
@@ -330,7 +331,7 @@ mod tests {
         assert_eq!(
             sink,
             [
-                "pub(crate) type ReportFn = for<'n> extern \"C\" fn(&SinkTable, &RuleId, Severity, Str<'n>, &Span) -> usize;",
+                "pub(crate) type ReportFn = for<'n> extern \"C\" fn(&SinkTable, &RuleId, u8, Str<'n>, &Span) -> usize;",
                 "pub(crate) type AttachFn = for<'n> extern \"C\" fn(&SinkTable, usize, &Span, Str<'n>);",
                 "pub(crate) type NameFn = for<'n> extern \"C\" fn(&SinkTable, usize, Str<'n>);",
                 "pub struct SinkTable { pub(crate) length: usize, pub(crate) data: *const c_void, \

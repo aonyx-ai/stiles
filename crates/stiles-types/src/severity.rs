@@ -27,9 +27,66 @@ pub enum Severity {
     Error,
 }
 
+impl Severity {
+    /// The byte that names [`Severity::Help`] at the plugin boundary
+    ///
+    /// Each byte is written out rather than taken from the discriminant.
+    /// A plugin built against a newer stiles may name a severity this one
+    /// lacks. The host must read that as unknown, not as a variant.
+    const HELP: u8 = 1;
+    /// The byte that names [`Severity::Info`] at the plugin boundary
+    const INFO: u8 = 2;
+    /// The byte that names [`Severity::Warn`] at the plugin boundary
+    const WARN: u8 = 3;
+    /// The byte that names [`Severity::Error`] at the plugin boundary
+    const ERROR: u8 = 4;
+
+    /// Returns the byte that names this severity at the plugin boundary
+    pub(crate) const fn to_byte(self) -> u8 {
+        match self {
+            Self::Help => Self::HELP,
+            Self::Info => Self::INFO,
+            Self::Warn => Self::WARN,
+            Self::Error => Self::ERROR,
+        }
+    }
+
+    /// Returns the severity that `byte` names, or [`None`] for an unknown byte
+    pub(crate) const fn from_byte(byte: u8) -> Option<Self> {
+        match byte {
+            Self::HELP => Some(Self::Help),
+            Self::INFO => Some(Self::Info),
+            Self::WARN => Some(Self::Warn),
+            Self::ERROR => Some(Self::Error),
+            _ => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn from_byte_with_an_unknown_byte_returns_none() {
+        let read = Severity::from_byte(0);
+
+        assert_eq!(read, None);
+    }
+
+    #[test]
+    fn from_byte_with_the_byte_of_a_severity_returns_it() {
+        let severities = [
+            Severity::Help,
+            Severity::Info,
+            Severity::Warn,
+            Severity::Error,
+        ];
+
+        let read = severities.map(|severity| Severity::from_byte(severity.to_byte()));
+
+        assert_eq!(read, severities.map(Some));
+    }
 
     #[test]
     fn ordering_puts_error_above_warn() {
@@ -44,6 +101,21 @@ mod tests {
     #[test]
     fn ordering_puts_warn_above_info() {
         assert!(Severity::Warn > Severity::Info);
+    }
+
+    /// A plugin and the host agree on these bytes whatever order the
+    /// variants are declared in
+    #[test]
+    fn to_byte_names_each_severity_by_a_fixed_byte() {
+        let bytes = [
+            Severity::Help,
+            Severity::Info,
+            Severity::Warn,
+            Severity::Error,
+        ]
+        .map(Severity::to_byte);
+
+        assert_eq!(bytes, [1, 2, 3, 4]);
     }
 
     #[test]
