@@ -355,7 +355,6 @@ dependencies = [
 name = "stiles-plugin"
 version = "0.6.0"
 dependencies = [
- "stabby",
  "stiles-codegen",
  "stiles-rust",
  "stiles-types",

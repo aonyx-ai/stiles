@@ -25,20 +25,29 @@
 ///
 /// The macro writes the `stiles_plugin_declaration` static that stiles's
 /// loader looks up, filling in the handshake constants of the stiles
-/// crates this plugin was compiled against. Each lint becomes a factory,
-/// because passes are stateful and the check command constructs a fresh
-/// set for every file. The factories are plain function pointers, so each
-/// expression must construct its lint from nothing; an expression that
-/// captures its surroundings does not compile.
+/// crates this plugin was compiled against. It also writes the `register`
+/// function the declaration names. That function registers each lint
+/// through the host's [`Registrar`], with its language, its rules, and a
+/// factory. Passes are stateful, and the check command constructs a fresh
+/// set for every file. Each factory is a plain `extern "C"` function, so
+/// each expression must construct its lint from nothing; an expression
+/// that captures its surroundings does not compile.
+///
+/// A factory hands stiles a [`PassInstance`]: the rule inside its adapter,
+/// boxed in the plugin, and the table of `extern "C"` entries that run it.
+/// The host frees the pass through that table, so the plugin's allocator
+/// frees what it allocated.
 ///
 /// Every function the macro exports is `extern "C"` and runs the plugin's
 /// own code under [`Panic::catch`]. A panic can happen in a constructor, in
-/// the listing of the factories, or in a rule's declaration. It comes back
-/// to stiles as a value rather than unwinding across the boundary.
+/// the registration, or in a rule's declaration. It comes back to stiles
+/// as a value rather than unwinding across the boundary.
 ///
 /// [`DeclaresRules`]: crate::DeclaresRules
 /// [`LintPass`]: stiles_types::LintPass
 /// [`Panic::catch`]: crate::Panic::catch
+/// [`PassInstance`]: crate::PassInstance
+/// [`Registrar`]: crate::Registrar
 /// [`RustLintPass`]: stiles_rust::RustLintPass
 /// [`TypeScriptLintPass`]: stiles_typescript::TypeScriptLintPass
 #[macro_export]
@@ -51,26 +60,29 @@ macro_rules! export_lints {
                 abi_version: $crate::ABI_VERSION,
                 types_fingerprint: $crate::TYPES_FINGERPRINT,
                 language_fingerprint: $crate::LANGUAGE_FINGERPRINT,
-                load: __stiles_load,
+                register: __stiles_register,
                 provenance: $crate::PROVENANCE,
             };
 
         #[doc(hidden)]
-        extern "C" fn __stiles_load() -> $crate::Loaded {
+        extern "C" fn __stiles_register(registrar: &$crate::Registrar) -> $crate::Registered {
             $crate::Panic::catch(|| {
-                let mut lints = ::std::vec::Vec::new();
-                $($(
-                    lints.push($crate::ExportedLint {
-                        factory: $crate::factory(|| {
-                            $crate::Panic::catch(|| $crate::__adapter!($language)($lint)).into()
-                        }),
-                        language: $crate::__language!($language),
-                        rules: $crate::DeclaresRules::rules(&$lint).into_iter().collect(),
-                    });
-                )+)+
-                $crate::Plugin {
-                    lints: lints.into_iter().collect(),
-                }
+                $($({
+                    extern "C" fn build(
+                        out: &mut ::core::mem::MaybeUninit<$crate::PassInstance>,
+                    ) -> $crate::Built {
+                        $crate::Panic::catch(|| {
+                            out.write($crate::__adapter!($language)($lint));
+                        })
+                        .into()
+                    }
+
+                    let rules = $crate::DeclaresRules::rules(&$lint);
+                    // SAFETY: `build` writes the instance before it returns
+                    // `Ok`, and returns the panic instead when construction
+                    // panics.
+                    unsafe { registrar.lint($crate::__language!($language), build, &rules) };
+                })+)+
             })
             .into()
         }
@@ -89,15 +101,15 @@ macro_rules! __language {
     };
 }
 
-/// Names the function that boxes a lint of one language for the boundary
+/// Names the function that wraps a lint of one language for the boundary
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __adapter {
     (rust) => {
-        $crate::__private::stiles_rust::RustLintPassAdapter::boxed
+        $crate::__private::stiles_rust::RustLintPassAdapter::instance
     };
     (typescript) => {
-        $crate::__private::stiles_typescript::TypeScriptLintPassAdapter::boxed
+        $crate::__private::stiles_typescript::TypeScriptLintPassAdapter::instance
     };
 }
 
@@ -105,15 +117,14 @@ macro_rules! __adapter {
 mod tests {
     use std::path::PathBuf;
 
-    use stabby::closure::Call0Dyn;
     use stiles_rust::{RuleId, RustLintPass};
+    use stiles_types::plugin::{LoadedPass, RegisteredLint, Registrations};
     use stiles_types::{
-        BoxedLintPass, Collector, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass,
-        Panic, Severity,
+        Collector, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic, Severity,
     };
     use stiles_typescript::TypeScriptLintPass;
 
-    use crate::{ABI_VERSION, DeclaresRules, LANGUAGE_FINGERPRINT, Plugin, TYPES_FINGERPRINT};
+    use crate::{ABI_VERSION, DeclaresRules, LANGUAGE_FINGERPRINT, TYPES_FINGERPRINT};
 
     struct FlagEveryFunction;
 
@@ -196,16 +207,22 @@ mod tests {
             .build()
     }
 
-    fn loaded() -> Plugin {
-        let loaded: Result<_, Panic> = (stiles_plugin_declaration.load)().into();
+    fn registered() -> Vec<RegisteredLint> {
+        let registrations = Registrations::new();
+        let registered: Result<(), Panic> = registrations
+            .lend(|registrar| (stiles_plugin_declaration.register)(registrar))
+            .into();
+        registered.expect("registering the plugin should not panic");
 
-        loaded.expect("loading the plugin should not panic")
+        registrations
+            .finish()
+            .expect("the registration should be whole")
     }
 
-    fn built(index: usize) -> BoxedLintPass {
-        let constructed: Result<_, Panic> = loaded().lints[index].factory.call().into();
-
-        constructed.expect("construction should not panic")
+    fn built(index: usize) -> LoadedPass {
+        registered()[index]
+            .build()
+            .expect("construction should not panic")
     }
 
     #[test]
@@ -283,13 +300,10 @@ mod tests {
     }
 
     #[test]
-    fn load_carries_the_rules_of_each_lint() {
-        let lints = loaded().lints;
+    fn register_carries_the_rules_of_each_lint() {
+        let lints = registered();
 
-        let rules: Vec<Vec<RuleId>> = lints
-            .iter()
-            .map(|lint| lint.rules.iter().copied().collect())
-            .collect();
+        let rules: Vec<Vec<RuleId>> = lints.iter().map(|lint| lint.rules().to_vec()).collect();
 
         assert_eq!(
             rules,
@@ -303,10 +317,10 @@ mod tests {
     }
 
     #[test]
-    fn load_tags_each_lint_with_its_group_language() {
-        let lints = loaded().lints;
+    fn register_tags_each_lint_with_its_group_language() {
+        let lints = registered();
 
-        let languages: Vec<Language> = lints.iter().map(|lint| lint.language).collect();
+        let languages: Vec<Language> = lints.iter().map(RegisteredLint::language).collect();
 
         assert_eq!(
             languages,
@@ -320,8 +334,8 @@ mod tests {
     }
 
     #[test]
-    fn load_yields_one_lint_per_listed_entry() {
-        let lints = loaded().lints;
+    fn register_yields_one_lint_per_listed_entry() {
+        let lints = registered();
 
         assert_eq!(lints.len(), 4);
     }

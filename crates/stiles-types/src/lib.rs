@@ -46,7 +46,7 @@ pub use self::edit::Edit;
 pub use self::file_path::FilePath;
 pub use self::fix::{BuildFixError, Fix};
 pub use self::language::Language;
-pub use self::lint_pass::{BoxedLintPass, Checked, Configured, LintPass, boxed_lint_pass};
+pub use self::lint_pass::{Checked, Configured, LintPass};
 pub use self::location::Location;
 pub use self::panic::Panic;
 pub use self::position::Position;

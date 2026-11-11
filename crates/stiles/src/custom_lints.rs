@@ -8,8 +8,10 @@ use bon::bon;
 use getset::{CopyGetters, Getters};
 use libloading::Library;
 use stiles_core::Lint;
-use stiles_types::plugin::{AbiVersion, LintPassFactory, PluginDeclaration, construct};
-use stiles_types::{BoxedLintPass, Language, LintPass, Panic, RuleId, RuleOptions};
+use stiles_types::plugin::{
+    AbiVersion, PluginDeclaration, Registered, RegisteredLint, Registrar, Registrations,
+};
+use stiles_types::{Language, LintPass, Panic, RuleId, RuleOptions};
 
 use self::handshake::AbiIdentity;
 use crate::config::{GitLintSource, LintSource, StilesConfig};
@@ -115,14 +117,18 @@ impl CustomLints {
     pub(crate) fn instantiate(&self, options: &RuleOptions) -> anyhow::Result<Vec<Lint<'static>>> {
         self.lints
             .iter()
-            .map(|lint| {
-                let constructed: Result<BoxedLintPass, Panic> = construct(&lint.factory).into();
-                let pass = constructed.context("a lint pass panicked while it was constructed")?;
+            .map(|LoadedLint { lint, .. }| {
+                let pass = lint
+                    .build()
+                    .context("a lint pass panicked while it was constructed")?;
                 let mut pass: Box<dyn LintPass> = Box::new(pass);
                 let configured: Result<(), Panic> =
-                    pass.configure(&options.for_rules(&lint.rules)).into();
+                    pass.configure(&options.for_rules(lint.rules())).into();
                 configured.context("a lint pass panicked while reading the project's options")?;
-                Ok(Lint::builder().pass(pass).rules(lint.rules.clone()).build())
+                Ok(Lint::builder()
+                    .pass(pass)
+                    .rules(lint.rules().to_vec())
+                    .build())
             })
             .collect()
     }
@@ -131,7 +137,10 @@ impl CustomLints {
     ///
     /// A provider computes decorations only for these languages.
     pub(crate) fn languages(&self) -> HashSet<Language> {
-        self.lints.iter().map(|lint| lint.language).collect()
+        self.lints
+            .iter()
+            .map(|LoadedLint { lint, .. }| lint.language())
+            .collect()
     }
 
     /// Returns every rule the loaded plugins declare
@@ -144,7 +153,7 @@ impl CustomLints {
     pub(crate) fn declared(&self) -> BTreeSet<String> {
         self.lints
             .iter()
-            .flat_map(|lint| &lint.rules)
+            .flat_map(|LoadedLint { lint, .. }| lint.rules())
             .map(|rule| rule.as_str().to_owned())
             .collect()
     }
@@ -156,13 +165,13 @@ impl CustomLints {
     pub(crate) fn rules(&self) -> Vec<DeclaredRule> {
         let mut rules: Vec<DeclaredRule> = Vec::new();
 
-        for lint in &self.lints {
-            for rule in &lint.rules {
+        for LoadedLint { lint, .. } in &self.lints {
+            for rule in lint.rules() {
                 match rules.iter_mut().find(|known| known.rule == *rule) {
-                    Some(known) => known.languages.push(lint.language),
+                    Some(known) => known.languages.push(lint.language()),
                     None => rules.push(DeclaredRule {
                         rule: *rule,
-                        languages: vec![lint.language],
+                        languages: vec![lint.language()],
                     }),
                 }
             }
@@ -185,14 +194,12 @@ pub(crate) struct DeclaredRule {
     languages: Vec<Language>,
 }
 
-/// One lint a plugin exported, as stiles keeps it
+/// One lint a plugin registered, as stiles keeps it
 ///
 /// The library it came from stays with it, so an error about the lint can
 /// say where to look.
 struct LoadedLint {
-    factory: LintPassFactory,
-    language: Language,
-    rules: Vec<RuleId>,
+    lint: RegisteredLint,
     library: PathBuf,
 }
 
@@ -208,20 +215,28 @@ struct LoadedLint {
 ///
 /// Returns an error that names the rule, the language, and both libraries.
 fn refuse_shared_rules(lints: &[LoadedLint]) -> anyhow::Result<()> {
-    for (index, lint) in lints.iter().enumerate() {
-        for other in &lints[index + 1..] {
-            if lint.language != other.language {
+    for (index, LoadedLint { lint, library }) in lints.iter().enumerate() {
+        for LoadedLint {
+            lint: other,
+            library: other_library,
+        } in &lints[index + 1..]
+        {
+            if lint.language() != other.language() {
                 continue;
             }
-            let Some(shared) = lint.rules.iter().find(|rule| other.rules.contains(rule)) else {
+            let Some(shared) = lint
+                .rules()
+                .iter()
+                .find(|rule| other.rules().contains(rule))
+            else {
                 continue;
             };
             anyhow::bail!(
                 "two lints declare `{shared}` for {}: one in {}, one in {}. A rule id names one \
                  lint per language, so rename one of them",
-                lint.language,
-                lint.library.display(),
-                other.library.display(),
+                lint.language(),
+                library.display(),
+                other_library.display(),
             );
         }
     }
@@ -572,7 +587,7 @@ fn build(
     self::artifact::cdylib_artifacts(&stdout, directory)
 }
 
-/// Opens the built library, performs the handshake, and collects factories
+/// Opens the built library, performs the handshake, and registers its lints
 ///
 /// The loader never forms a `&PluginDeclaration`. A plugin built against
 /// an older protocol exports a shorter static. A reference asserts that
@@ -590,17 +605,23 @@ fn build(
 /// binary, so every field that a plugin exports is one this version
 /// knows.
 ///
-/// The loader deliberately leaks the library. The factories that it hands
-/// over point into the image of the library. So does the `&'static str`
-/// inside every [`RuleId`] that a plugin lint mints. An unload would leave
-/// dangling references behind values that outlive this function. The leak
-/// is bounded by the number of configured plugins in a short-lived process.
+/// The loader deliberately leaks the library. The factories that the
+/// plugin registers, and the table of every pass they build, point into
+/// the image of the library. So does the `&'static str` inside every
+/// [`RuleId`] that a plugin lint mints. An unload would leave dangling
+/// references behind values that outlive this function. A library that
+/// fails registration stays loaded too. The [`Panic`] in its error is a
+/// stabby string, which frees itself through an allocator table in the
+/// plugin's image. The leak is bounded by the number of configured plugins
+/// in a short-lived process.
 ///
 /// # Errors
 ///
 /// Returns an error if the library cannot be opened, exports no plugin
-/// declaration, fails the ABI handshake, or exports no lints.
+/// declaration, or fails the ABI handshake. Returns an error too for
+/// every refusal of [`register_lints`].
 ///
+/// [`Panic`]: stiles_types::Panic
 /// [`RuleId`]: stiles_types::RuleId
 fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loaded> {
     // SAFETY: opening a library runs its initializers, which is unsound
@@ -649,19 +670,42 @@ fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loade
     self::handshake::validate(host, &plugin).context("failed the handshake with the plugin")?;
 
     // SAFETY: the handshake passed, so the plugin lays the declaration
-    // out the way this binary does, and `load` holds a function this
+    // out the way this binary does, and `register` holds a function this
     // binary can call.
-    let load = unsafe { (&raw const (*declaration).load).read() };
-    let loaded: Result<_, Panic> = load().into();
-    let loaded = loaded.context("the plugin panicked while listing what it exports")?;
-    let lints: Vec<LoadedLint> = loaded
-        .lints
+    let register = unsafe { (&raw const (*declaration).register).read() };
+    let lints = register_lints(register, library_path);
+
+    std::mem::forget(library);
+
+    lints.map(|lints| Loaded { lints })
+}
+
+/// Runs a plugin's `register`, and checks the lints it registered
+///
+/// The plugin calls the host's registrar once for each lint, and the
+/// registrations keep a copy of each call. The checks that need the whole
+/// list run once `register` returns.
+///
+/// # Errors
+///
+/// Returns an error if `register` panics, or if it registers a lint for a
+/// language this stiles does not know. Returns an error too if it
+/// registers no lint, or a lint that declares no rules.
+fn register_lints(
+    register: extern "C" fn(&Registrar) -> Registered,
+    library: &Path,
+) -> anyhow::Result<Vec<LoadedLint>> {
+    let registrations = Registrations::new();
+
+    let registered: Result<(), Panic> = registrations.lend(|registrar| register(registrar)).into();
+    registered.context("the plugin panicked while listing what it exports")?;
+    let lints: Vec<LoadedLint> = registrations
+        .finish()
+        .context("failed to read what the plugin exports")?
         .into_iter()
         .map(|lint| LoadedLint {
-            factory: lint.factory,
-            language: lint.language,
-            rules: lint.rules.into_iter().collect(),
-            library: library_path.to_path_buf(),
+            lint,
+            library: library.to_path_buf(),
         })
         .collect();
 
@@ -671,14 +715,14 @@ fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loade
          works, so this is treated as a mistake"
     );
     anyhow::ensure!(
-        lints.iter().all(|lint| !lint.rules.is_empty()),
+        lints
+            .iter()
+            .all(|LoadedLint { lint, .. }| !lint.rules().is_empty()),
         "the plugin exported a lint that declares no rules; stiles refuses every diagnostic \
          such a lint reports, so give it a `DeclaresRules` implementation that names them"
     );
 
-    std::mem::forget(library);
-
-    Ok(Loaded { lints })
+    Ok(lints)
 }
 
 /// Reads the protocol version at the head of a plugin declaration
@@ -706,9 +750,11 @@ unsafe fn abi_version(declaration: *const PluginDeclaration) -> AbiVersion {
 
 #[cfg(test)]
 mod tests {
+    use std::mem::MaybeUninit;
     use std::path::PathBuf;
 
     use kawauso_project::project::ProjectRoot;
+    use stiles_types::plugin::{Built, PassInstance};
 
     use super::*;
     use crate::config::LintPath;
@@ -869,16 +915,52 @@ mod tests {
         assert!(passes.is_empty());
     }
 
+    /// Builds nothing, because no test here calls it
+    extern "C" fn never(_out: &mut MaybeUninit<PassInstance>) -> Built {
+        Panic::catch(|| unreachable!("never built")).into()
+    }
+
     /// Describes a lint whose factory is never called
     fn loaded_lint(language: Language, rules: &[&'static str], library: &str) -> LoadedLint {
+        let rules: Vec<RuleId> = rules.iter().map(|rule| RuleId::new(rule)).collect();
+        let registrations = Registrations::new();
+        // SAFETY: `never` never returns `Ok`.
+        registrations.lend(|registrar| unsafe { registrar.lint(language, never, &rules) });
+
+        let mut lints = registrations
+            .finish()
+            .expect("the registration should be whole");
+
         LoadedLint {
-            factory: stiles_types::plugin::factory(|| {
-                Panic::catch(|| -> BoxedLintPass { unreachable!("never built") }).into()
-            }),
-            language,
-            rules: rules.iter().map(|rule| RuleId::new(rule)).collect(),
+            lint: lints.remove(0),
             library: PathBuf::from(library),
         }
+    }
+
+    /// Registers one Rust lint that declares no rules
+    extern "C" fn register_a_lint_without_rules(registrar: &Registrar) -> Registered {
+        // SAFETY: `never` never returns `Ok`.
+        unsafe { registrar.lint(Language::Rust, never, &[]) };
+
+        Registered::Ok(())
+    }
+
+    /// Registers nothing
+    extern "C" fn register_nothing(_registrar: &Registrar) -> Registered {
+        Registered::Ok(())
+    }
+
+    /// Panics before it registers anything
+    extern "C" fn register_panicking(_registrar: &Registrar) -> Registered {
+        Panic::catch(|| panic!("no lints today")).into()
+    }
+
+    /// Registers one Rust lint with one rule
+    extern "C" fn register_one_lint(registrar: &Registrar) -> Registered {
+        // SAFETY: `never` never returns `Ok`.
+        unsafe { registrar.lint(Language::Rust, never, &[RuleId::new("lint.a")]) };
+
+        Registered::Ok(())
     }
 
     #[test]
@@ -908,6 +990,52 @@ mod tests {
             .filter(|part| !message.contains(part))
             .collect();
         assert_eq!(missing, Vec::<&str>::new(), "{message}");
+    }
+
+    #[test]
+    fn register_lints_keeps_the_library_of_each_lint() {
+        let lints =
+            register_lints(register_one_lint, Path::new("one.so")).expect("should register");
+
+        let libraries: Vec<&Path> = lints.iter().map(|lint| lint.library.as_path()).collect();
+
+        assert_eq!(libraries, [Path::new("one.so")]);
+    }
+
+    #[test]
+    fn register_lints_with_a_lint_without_rules_fails() {
+        let error = register_lints(register_a_lint_without_rules, Path::new("bare.so"))
+            .err()
+            .expect("should refuse");
+
+        assert!(
+            format!("{error:#}").contains("declares no rules"),
+            "unexpected: {error:#}"
+        );
+    }
+
+    #[test]
+    fn register_lints_with_a_panic_names_it() {
+        let error = register_lints(register_panicking, Path::new("panicking.so"))
+            .err()
+            .expect("should refuse");
+
+        assert_eq!(
+            format!("{error:#}"),
+            "the plugin panicked while listing what it exports: no lints today"
+        );
+    }
+
+    #[test]
+    fn register_lints_with_nothing_registered_fails() {
+        let error = register_lints(register_nothing, Path::new("empty.so"))
+            .err()
+            .expect("should refuse");
+
+        assert!(
+            format!("{error:#}").contains("exported no lints"),
+            "unexpected: {error:#}"
+        );
     }
 
     #[test]

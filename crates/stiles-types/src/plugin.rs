@@ -2,13 +2,16 @@
 //!
 //! A custom lint plugin is a dynamic library that stiles compiles and
 //! loads at check time, given only a path. Rust has no stable ABI of its
-//! own, so stabby lays out every type that crosses the boundary. Those
-//! layouts hold under any compiler. A loaded library is coherent with the
-//! stiles binary when both lay those types out the same way. That is a
-//! property of the source each was built from, not of the rustc that
-//! built it. This module defines the declaration a plugin exports and the
-//! constants stiles compares to establish exactly that before it trusts
-//! anything else in the library.
+//! own, so two kinds of layout cross the boundary. Stabby lays out the
+//! values, such as a span or a rule id, and those layouts hold under any
+//! compiler. A `#[repr(C)]` table of `extern "C"` functions carries every
+//! call, such as the host's [`Registrar`] or the table of a plugin's
+//! [`PassInstance`]. A later version appends entries to a table. A loaded
+//! library is coherent with the stiles binary when both lay these out the
+//! same way. That is a property of the source each was built from, not of
+//! the rustc that built it. This module defines the declaration a plugin
+//! exports and the constants stiles compares to establish exactly that
+//! before it trusts anything else in the library.
 //!
 //! The handshake proceeds in order of decreasing layout stability:
 //!
@@ -19,15 +22,15 @@
 //!    readable under any pair of compilers.
 //! 3. When both sides are published, the matching version vouches for the
 //!    layout. Otherwise the fingerprints must match the host's own
-//!    constants too. Only then may [`PluginDeclaration::load`] be called.
-//!    What it hands back is only meaningful once the two images are known
-//!    to lay it out the same way.
+//!    constants too. Only then may [`PluginDeclaration::register`] be
+//!    called. The plugin registers each lint through the host's
+//!    [`Registrar`], and the host keeps a [`RegisteredLint`] for each.
 //!
-//! Stabby lays out every value that crosses the boundary. Every allocation
-//! among them carries the function that frees it. The side that allocated
-//! a value is the side that frees it, whatever the allocator of
-//! the other side is. A plugin may therefore set its own
-//! `#[global_allocator]`.
+//! The side that allocated a value is the side that frees it, whatever the
+//! allocator of the other side is. Every stabby allocation that crosses
+//! carries the function that frees it. A pass's state goes back to the
+//! plugin's own `drop` entry, which frees it in the plugin's image. A
+//! plugin may therefore set its own `#[global_allocator]`.
 //!
 //! The handshake compares how both sides lay out the boundary. It does not
 //! compare the source they compiled, the compiler, or the dependency graph
@@ -43,30 +46,38 @@ use stabby::IStable;
 
 use crate::decoration_entry::Entry;
 use crate::{
-    BoxedLintPass, DecoratedNode, DecorationKey, FilePath, Language, Panic, Position, RuleId,
-    RuleOption, RuleOptions, Severity, Sink, Span,
+    DecoratedNode, DecorationKey, FilePath, Panic, Position, RuleId, RuleOption, RuleOptions,
+    Severity, Sink, Span,
 };
 
 mod abi_version;
 mod declaration;
-mod factory;
 mod fingerprint;
+mod loaded_pass;
+mod pass_instance;
+mod pass_table;
 mod provenance;
+mod registered_lint;
+mod registrar;
+mod registrations;
 
 pub use self::abi_version::AbiVersion;
 pub use self::declaration::PluginDeclaration;
-pub use self::factory::{
-    Constructed, ExportedLint, LintPassFactory, Loaded, Plugin, construct, factory,
-};
 pub use self::fingerprint::{decoration_fingerprint, stable_fingerprint};
+pub use self::loaded_pass::LoadedPass;
+pub use self::pass_instance::{Built, PassInstance};
 pub use self::provenance::Provenance;
+pub use self::registered_lint::RegisteredLint;
+pub use self::registrar::{Registered, Registrar};
+pub use self::registrations::{RegisterLintsError, Registrations};
 
 /// The version of the plugin declaration protocol this crate speaks
 ///
 /// This guards what no fingerprint can read back. That is the shape of
-/// [`PluginDeclaration`], the meaning of its fields, and the signatures of
-/// [`LintPass`]'s methods. It is also the entries of the tables behind a
-/// node and a sink. The two fingerprints guard everything else.
+/// [`PluginDeclaration`] and the meaning of its fields. It is also the
+/// entries of every table: the [`Registrar`], the table of a pass, and the
+/// tables behind a node and a sink. The two fingerprints guard everything
+/// else.
 ///
 /// The version is a promise about a release. It rises once between two
 /// releases, when the boundary moved since the last one.
@@ -74,8 +85,6 @@ pub use self::provenance::Provenance;
 /// that release. A build from unpublished source does not claim the
 /// version alone, as [`Provenance`] says. [`AbiVersion`] says what a
 /// version looks like in each era.
-///
-/// [`LintPass`]: crate::LintPass
 ///
 /// # Examples
 ///
@@ -142,10 +151,10 @@ pub const PROVENANCE: Provenance = Provenance::UNPUBLISHED;
 /// receives a [`DecoratedNode`], a [`Sink`], and the [`RuleOptions`] a
 /// project set. The node's table hands back a [`FilePath`], a
 /// [`Position`], and the entry of a decoration by [`DecorationKey`]. An
-/// entry is hidden, but its layout crosses, so it is on the list. A pass
-/// names its [`Language`], and returns nothing or the [`Panic`] that
-/// stopped it. A plugin hands its exports over as a [`Plugin`], and each
-/// factory builds a [`BoxedLintPass`].
+/// entry is hidden, but its layout crosses, so it is on the list. Every
+/// entry of a pass's table and every factory returns nothing or the
+/// [`Panic`] that stopped it. A plugin registers each lint's rules as
+/// [`RuleId`] values.
 ///
 /// A pass reports each diagnostic through the sink's table, one part for
 /// each call. The calls take a [`RuleId`], a [`Severity`], and a [`Span`]
@@ -157,27 +166,20 @@ pub const PROVENANCE: Provenance = Provenance::UNPUBLISHED;
 /// are stabby's own layouts, which the stabby every plugin shares
 /// decides, so the list names their payloads instead. The tree, the
 /// decoration map, the collector, and the coverage types stay on the
-/// host's side of the boundary, so they are not here.
+/// host's side of the boundary, and so do the registrations.
+/// A language crosses as a byte, so [`Language`] is not here either.
 ///
-/// The tables of host functions behind the node and the sink are not on
-/// the list either. Each is a `#[repr(C)]` struct, not a stabby type,
-/// because stabby cannot describe a function whose arguments borrow for a
-/// lifetime of its own. The identities of the node and the sink record
-/// each table only as a reference. A change to a table's entries
-/// therefore belongs in [`ABI_VERSION`], as a change to a signature of
-/// [`LintPass`] does.
+/// The tables are not on the list. The [`Registrar`], the table of a
+/// pass, and the tables behind the node and the sink are `#[repr(C)]`
+/// structs, not stabby types. Stabby cannot describe a function whose
+/// arguments borrow for a lifetime of its own. A
+/// [`PassInstance`] holds its table as a raw pointer, and the identities
+/// of the node and the sink record each table only as a reference. A
+/// change to a table's entries therefore belongs in [`ABI_VERSION`]. A
+/// test in this module scans each table's source and fails when its
+/// entries move, so the bump is not left to memory.
 ///
-/// What it does not cover is the signatures of [`LintPass`]'s methods.
-/// The identity of the factory reaches the vtable and names its methods in
-/// order, so a method added, removed, or moved is refused. The report
-/// records each method as a pointer, though, and not what it takes and
-/// returns. A
-/// changed signature is a change to the protocol and belongs in
-/// [`ABI_VERSION`]. The `abi_version_covers_the_boundary_traits` test in
-/// this module fails when the trait's method list moves, so the bump is
-/// not left to memory.
-///
-/// [`LintPass`]: crate::LintPass
+/// [`Language`]: crate::Language
 ///
 /// # Examples
 ///
@@ -191,14 +193,9 @@ pub const TYPES_FINGERPRINT: u64 = stable_fingerprint(&[
     <DecorationKey as IStable>::ID,
     <Entry as IStable>::ID,
     <FilePath as IStable>::ID,
-    <Language as IStable>::ID,
     <RuleOptions as IStable>::ID,
     <RuleOption as IStable>::ID,
     <Panic as IStable>::ID,
-    <LintPassFactory as IStable>::ID,
-    <Plugin as IStable>::ID,
-    <ExportedLint as IStable>::ID,
-    <BoxedLintPass as IStable>::ID,
     <Sink<'static> as IStable>::ID,
     <Span as IStable>::ID,
     <Position as IStable>::ID,
@@ -210,39 +207,18 @@ pub const TYPES_FINGERPRINT: u64 = stable_fingerprint(&[
 mod tests {
     use super::*;
 
-    /// Returns each method signature `LintPass` declares, in declaration order
-    ///
-    /// The scan takes the lines inside the block of the trait that open a
-    /// method, and squeezes their whitespace. A doc comment or a reflowed
-    /// line therefore changes nothing. An added, removed, reordered, or
-    /// re-signed method does.
-    fn lint_pass_methods() -> Vec<String> {
-        let body = include_str!("lint_pass.rs")
-            .split_once("pub trait LintPass: Send + Sync {")
-            .expect("the trait should be declared in this source")
-            .1;
-        let body = body
-            .split_once("\n}")
-            .expect("the trait block should be closed")
-            .0;
-
-        body.lines()
-            .map(str::trim)
-            .filter(|line| line.starts_with("fn ") || line.starts_with("extern \"C\" fn "))
-            .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
-            .collect()
-    }
-
-    /// Returns each declaration of a table of host functions, in source order
+    /// Returns each declaration of a table of functions, in source order
     ///
     /// The scan takes the function types and the struct of `source`, up to
-    /// the table's first `impl` block. It drops the doc comments and the
+    /// the table's first `impl` block. A source that declares no function
+    /// type starts at its struct. The scan drops the doc comments and the
     /// attributes, and squeezes the whitespace. Each type comes out whole,
     /// and the struct comes out last.
     fn table_declarations(source: &str) -> Vec<String> {
         let start = source
             .find("pub(crate) type ")
-            .expect("the table's function types should be declared in this source");
+            .or_else(|| source.find("#[repr(C)]"))
+            .expect("the table should be declared in this source");
         let end = source
             .find("\nimpl ")
             .expect("the table should have an impl block");
@@ -263,24 +239,6 @@ mod tests {
         code.split_inclusive(';')
             .map(|declaration| declaration.trim().to_owned())
             .collect()
-    }
-
-    #[test]
-    fn abi_version_covers_the_boundary_traits() {
-        let lint_pass = lint_pass_methods();
-
-        assert_eq!(
-            lint_pass,
-            vec![
-                "extern \"C\" fn language(&self) -> Language;".to_owned(),
-                "extern \"C\" fn configure(&mut self, options: &RuleOptions) -> Configured;"
-                    .to_owned(),
-                "extern \"C\" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked;"
-                    .to_owned()
-            ],
-            "the boundary trait's methods moved, which changes its vtable; \
-             bump ABI_VERSION and update this test together",
-        );
     }
 
     #[test]
@@ -313,6 +271,54 @@ mod tests {
                  pub(crate) decoration: DecorationFn, pub(crate) parse: ParseFn, }",
             ],
             "the node's table moved, which no fingerprint reads; \
+             bump ABI_VERSION and update this test together",
+        );
+    }
+
+    #[test]
+    fn abi_version_covers_the_pass_instance() {
+        let instance = table_declarations(include_str!("plugin/pass_instance.rs"));
+
+        assert_eq!(
+            instance,
+            ["pub struct PassInstance { data: *mut c_void, table: *const PassTable, }"],
+            "a pass's instance moved, which no fingerprint reads; \
+             bump ABI_VERSION and update this test together",
+        );
+    }
+
+    #[test]
+    fn abi_version_covers_the_pass_table() {
+        let pass = table_declarations(include_str!("plugin/pass_table.rs"));
+
+        assert_eq!(
+            pass,
+            [
+                "pub(crate) type DropFn = extern \"C\" fn(*mut c_void);",
+                "pub(crate) type ConfigureFn = extern \"C\" fn(*mut c_void, &RuleOptions) -> Configured;",
+                "pub(crate) type CheckNodeFn = extern \"C\" fn(*mut c_void, &DecoratedNode<'_>, &Sink<'_>) -> Checked;",
+                "pub struct PassTable { pub(crate) length: usize, pub(crate) drop: DropFn, \
+                 pub(crate) configure: Option<ConfigureFn>, \
+                 pub(crate) check_node: Option<CheckNodeFn>, }",
+            ],
+            "a pass's table moved, which no fingerprint reads; \
+             bump ABI_VERSION and update this test together",
+        );
+    }
+
+    #[test]
+    fn abi_version_covers_the_registrar() {
+        let registrar = table_declarations(include_str!("plugin/registrar.rs"));
+
+        assert_eq!(
+            registrar,
+            [
+                "pub(crate) type BuildFn = extern \"C\" fn(&mut MaybeUninit<PassInstance>) -> Built;",
+                "pub(crate) type LintFn = extern \"C\" fn(&Registrar, u8, BuildFn, *const RuleId, usize) -> usize;",
+                "pub struct Registrar { pub(crate) length: usize, pub(crate) data: *const c_void, \
+                 pub(crate) lint: LintFn, }",
+            ],
+            "the registrar moved, which no fingerprint reads; \
              bump ABI_VERSION and update this test together",
         );
     }
