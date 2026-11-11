@@ -1,3 +1,4 @@
+mod collector;
 mod context;
 mod coverage;
 mod coverage_gap;
@@ -24,10 +25,13 @@ mod provider_name;
 mod rule_id;
 mod rule_options;
 mod severity;
+mod sink;
+mod sink_table;
 mod span;
 mod ts_node;
 mod uncovered_file;
 
+pub use self::collector::{CollectDiagnosticsError, Collector};
 pub use self::coverage::Coverage;
 pub use self::coverage_gap::CoverageGap;
 pub use self::decorated_node::DecoratedNode;
@@ -50,5 +54,6 @@ pub use self::provider_name::ProviderName;
 pub use self::rule_id::RuleId;
 pub use self::rule_options::{RuleOption, RuleOptions, ValidateRuleOptionsError};
 pub use self::severity::Severity;
+pub use self::sink::Sink;
 pub use self::span::Span;
 pub use self::uncovered_file::UncoveredFile;

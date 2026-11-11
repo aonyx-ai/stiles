@@ -1,5 +1,6 @@
 use stiles_types::{
     Checked, Configured, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, RuleOptions,
+    Sink,
 };
 
 use crate::Lint;
@@ -17,15 +18,16 @@ pub use self::walk_lints_error::WalkLintsError;
 ///
 /// Returns [`WalkLintsError::Panicked`] when a pass panics, naming the
 /// node it was checking. The walk stops there, for the reason
-/// [`PassPanic`] gives.
+/// [`PassPanic`] gives. Returns [`WalkLintsError::Reported`] when a pass
+/// reports what the host cannot build into diagnostics, such as a fix
+/// whose edits overlap.
 ///
 /// # Examples
 ///
 /// ```
-/// use stabby::vec;
 /// use stiles_types::{
 ///     Checked, Configured, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, RuleId,
-///     RuleOptions, Severity,
+///     RuleOptions, Severity, Sink,
 /// };
 ///
 /// /// Reports every function
@@ -40,11 +42,10 @@ pub use self::walk_lints_error::WalkLintsError;
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-///         let mut diagnostics = vec::Vec::new();
+///     extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked {
 ///         if node.kind() == "function_item" {
-///             diagnostics.push(
-///                 Diagnostic::builder()
+///             sink.report(
+///                 &Diagnostic::builder()
 ///                     .rule_id(RuleId::new("lint.functions"))
 ///                     .severity(Severity::Warn)
 ///                     .message("a function")
@@ -52,7 +53,7 @@ pub use self::walk_lints_error::WalkLintsError;
 ///                     .build(),
 ///             );
 ///         }
-///         Checked::Ok(diagnostics)
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -95,19 +96,19 @@ pub fn walk(
 /// # Errors
 ///
 /// Returns [`WalkLintsError::Panicked`] when a pass panics, and the error
-/// names the node it was checking. Returns [`WalkLintsError::Undeclared`]
-/// when a pass reports a rule its plugin did not declare for it. The walk
-/// stops at either one, for the reasons [`PassPanic`] and
-/// [`UndeclaredRule`] give.
+/// names the node it was checking. Returns [`WalkLintsError::Reported`]
+/// when a pass reports what the host cannot build into diagnostics.
+/// Returns [`WalkLintsError::Undeclared`] when a pass reports a rule its
+/// plugin did not declare for it. The walk stops at the first of these,
+/// for the reasons [`PassPanic`] and [`UndeclaredRule`] give.
 ///
 /// # Examples
 ///
 /// ```
 /// use stiles_core::Lint;
-/// use stabby::vec;
 /// use stiles_types::{
 ///     Checked, Configured, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, RuleId,
-///     RuleOptions, Severity,
+///     RuleOptions, Severity, Sink,
 /// };
 ///
 /// /// Reports every function
@@ -122,11 +123,10 @@ pub fn walk(
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-///         let mut diagnostics = vec::Vec::new();
+///     extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked {
 ///         if node.kind() == "function_item" {
-///             diagnostics.push(
-///                 Diagnostic::builder()
+///             sink.report(
+///                 &Diagnostic::builder()
 ///                     .rule_id(RuleId::new("lint.functions"))
 ///                     .severity(Severity::Warn)
 ///                     .message("a function")
@@ -134,7 +134,7 @@ pub fn walk(
 ///                     .build(),
 ///             );
 ///         }
-///         Checked::Ok(diagnostics)
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -190,8 +190,8 @@ impl LintPass for BorrowedPass<'_> {
         self.0.configure(options)
     }
 
-    extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-        self.0.check_node(node)
+    extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked {
+        self.0.check_node(node, sink)
     }
 }
 
@@ -219,7 +219,6 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use stabby::vec;
     use stiles_types::{Panic, RuleId};
 
     use super::*;
@@ -286,9 +285,13 @@ mod tests {
             Configured::Ok(())
         }
 
-        extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+        extern "C" fn check_node(
+            &mut self,
+            _node: &DecoratedNode<'_>,
+            _sink: &Sink<'_>,
+        ) -> Checked {
             self.visited.fetch_add(1, Ordering::Relaxed);
-            Checked::Ok(vec::Vec::new())
+            Checked::Ok(())
         }
     }
 
@@ -324,19 +327,22 @@ mod tests {
                 Configured::Ok(())
             }
 
-            extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-                let found = match node.kind() == "function_item" {
-                    true => vec![
-                        Diagnostic::builder()
+            extern "C" fn check_node(
+                &mut self,
+                node: &DecoratedNode<'_>,
+                sink: &Sink<'_>,
+            ) -> Checked {
+                if node.kind() == "function_item" {
+                    sink.report(
+                        &Diagnostic::builder()
                             .rule_id(RuleId::new(self.0))
                             .severity(Severity::Warn)
                             .message(format!("{} found fn", self.0))
                             .span(node.span())
                             .build(),
-                    ],
-                    false => Vec::new(),
-                };
-                Checked::Ok(found.into_iter().collect())
+                    );
+                }
+                Checked::Ok(())
             }
         }
 
@@ -385,9 +391,13 @@ mod tests {
             Configured::Ok(())
         }
 
-        extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+        extern "C" fn check_node(
+            &mut self,
+            _node: &DecoratedNode<'_>,
+            _sink: &Sink<'_>,
+        ) -> Checked {
             self.0 += 1;
-            Checked::Ok(vec::Vec::new())
+            Checked::Ok(())
         }
     }
 
@@ -494,9 +504,13 @@ mod tests {
                 Configured::Ok(())
             }
 
-            extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+            extern "C" fn check_node(
+                &mut self,
+                _node: &DecoratedNode<'_>,
+                _sink: &Sink<'_>,
+            ) -> Checked {
                 COUNT.fetch_add(1, Ordering::Relaxed);
-                Checked::Ok(vec::Vec::new())
+                Checked::Ok(())
             }
         }
 
@@ -522,9 +536,13 @@ mod tests {
                 Configured::Ok(())
             }
 
-            extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+            extern "C" fn check_node(
+                &mut self,
+                _node: &DecoratedNode<'_>,
+                _sink: &Sink<'_>,
+            ) -> Checked {
                 DEEP_COUNT.fetch_add(1, Ordering::Relaxed);
-                Checked::Ok(vec::Vec::new())
+                Checked::Ok(())
             }
         }
 
@@ -552,17 +570,16 @@ mod tests {
             Configured::Ok(())
         }
 
-        extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-            Checked::Ok(
-                [Diagnostic::builder()
+        extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked {
+            sink.report(
+                &Diagnostic::builder()
                     .rule_id(RuleId::new("test"))
                     .severity(stiles_types::Severity::Info)
                     .message("span check")
                     .span(node.span())
-                    .build()]
-                .into_iter()
-                .collect(),
-            )
+                    .build(),
+            );
+            Checked::Ok(())
         }
     }
 
@@ -580,9 +597,13 @@ mod tests {
                 Configured::Ok(())
             }
 
-            extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
+            extern "C" fn check_node(
+                &mut self,
+                _node: &DecoratedNode<'_>,
+                _sink: &Sink<'_>,
+            ) -> Checked {
                 NESTED_COUNT.fetch_add(1, Ordering::Relaxed);
-                Checked::Ok(vec::Vec::new())
+                Checked::Ok(())
             }
         }
 
@@ -624,15 +645,13 @@ mod tests {
             Configured::Ok(())
         }
 
-        extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+        extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>, _sink: &Sink<'_>) -> Checked {
             let kind = node.kind();
-            Panic::catch(move || -> Vec<Diagnostic> {
-                match kind == "function_item" {
-                    true => panic!("no functions"),
-                    false => Vec::new(),
+            Panic::catch(move || {
+                if kind == "function_item" {
+                    panic!("no functions");
                 }
             })
-            .map(|found| found.into_iter().collect())
             .into()
         }
     }
@@ -668,19 +687,22 @@ mod tests {
                 Configured::Ok(())
             }
 
-            extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-                let found = match node.kind() == "function_item" {
-                    true => vec![
-                        Diagnostic::builder()
+            extern "C" fn check_node(
+                &mut self,
+                node: &DecoratedNode<'_>,
+                sink: &Sink<'_>,
+            ) -> Checked {
+                if node.kind() == "function_item" {
+                    sink.report(
+                        &Diagnostic::builder()
                             .rule_id(RuleId::new("pass.copied"))
                             .severity(Severity::Warn)
                             .message("found fn")
                             .span(node.span())
                             .build(),
-                    ],
-                    false => Vec::new(),
-                };
-                Checked::Ok(found.into_iter().collect())
+                    );
+                }
+                Checked::Ok(())
             }
         }
 
@@ -741,17 +763,17 @@ mod tests {
                     extern "C" fn check_node(
                         &mut self,
                         node: &DecoratedNode<'_>,
+                        sink: &Sink<'_>,
                     ) -> Checked {
-                        Checked::Ok(
-                            [Diagnostic::builder()
+                        sink.report(
+                            &Diagnostic::builder()
                                 .rule_id(stiles_types::RuleId::new("test"))
                                 .severity(stiles_types::Severity::Warn)
                                 .message("hit")
                                 .span(node.span())
-                                .build()]
-                            .into_iter()
-                            .collect(),
-                        )
+                                .build(),
+                        );
+                        Checked::Ok(())
                     }
                 }
 

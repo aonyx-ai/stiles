@@ -51,7 +51,7 @@ flowchart LR
    Decorations merge in provider order, and the first decoration of a type
    on a node is the one rules see.
 3. **Execute.** A depth-first walk over the named nodes offers every node
-   to every lint pass and collects the diagnostics they return.
+   to every lint pass and collects the diagnostics they report.
 4. **Report.** After the last file, the command writes every diagnostic to
    stdout, rendered with its span, its supporting annotations, and its
    fix, or as one JSON object per line with `--json`.
@@ -361,8 +361,9 @@ every body stiles reads has a size limit.
 
 Rust has no stable ABI of its own, so every value that crosses between
 stiles and a plugin is laid out by stabby, whose layouts hold under any
-compiler. The one exception is the node's table of host functions, a
-`#[repr(C)]` struct that a later paragraph describes. A loaded library is
+compiler. The exceptions are the two tables of host functions behind a node
+and a sink, `#[repr(C)]` structs that later paragraphs describe. A loaded
+library is
 coherent with the stiles binary when both lay the boundary out the same
 way, which is a property of the stiles source each was built from and not
 of the rustc that built it. The loader establishes that before it calls
@@ -421,6 +422,22 @@ A rule that needs a snippet read as code, such as the body of a comment,
 asks the table to parse it. The host parses it with its own grammar, and
 the tree it builds lives as long as the file's tree.
 
+A pass reports through a sink, a second `#[repr(C)]` table of host
+functions that the host lends to each check. `report` starts a diagnostic
+from its rule, severity, message, and span, and hands back a handle.
+`origin`, `related`, `fix_message`, and `edit` add to the diagnostic that a
+handle names. The host builds its own diagnostics from the calls, so no
+diagnostic crosses as a laid-out value. A field added to one therefore moves
+nothing that a plugin reads. A rule never sees the sink. Its methods still
+return diagnostics, and the adapter that `lint_pass_adapter!` writes reports
+each one. The host checks the parts once the pass returns: one file for each
+fix, edits that do not overlap, and only handles that the sink handed out.
+An `extern "C"` function must not panic, so the sink keeps a bad handle and
+the walk turns it into an error after the call. Each call of a pass gets a
+collector of its own, on the thread that walks the file, so files that run
+in parallel never share one. A test in stiles-types fails when the sink's
+entries move, as it does for the node's table.
+
 The factory's identity reaches the pass's vtable and names its methods
 in order, so a method added or moved is refused. It records each method
 as a pointer, not what it takes and returns, so a changed signature
@@ -441,7 +458,7 @@ latest `stiles@` tag. A moved fingerprint needs the version after that
 release's, and a version may only ever rise to that one. The version may
 also rise with no moved fingerprint, because it guards what no
 fingerprint reads: the shape of the declaration, the signatures of the
-pass trait, and the entries of the node's table.
+pass trait, and the entries of the node's table and the sink's table.
 
 Between two releases, one version therefore holds more than one layout.
 A build from unpublished source cannot vouch for its version, so its

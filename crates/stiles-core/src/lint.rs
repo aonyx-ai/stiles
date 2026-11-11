@@ -1,5 +1,5 @@
 use bon::bon;
-use stiles_types::{DecoratedNode, Diagnostic, Language, LintPass, Panic, RuleId};
+use stiles_types::{Collector, DecoratedNode, Diagnostic, Language, LintPass, Panic, RuleId};
 
 use crate::{PassPanic, UndeclaredRule, WalkLintsError};
 
@@ -107,26 +107,38 @@ impl<'pass> Lint<'pass> {
     /// Checks one node, and refuses a diagnostic under a rule the pass did
     /// not declare
     ///
+    /// The pass reports through a sink over a [`Collector`] of this call's
+    /// own. A collector therefore never outlives one node of one file, and
+    /// files that walk in parallel never share one. What a pass reported
+    /// before it panicked is dropped with the collector.
+    ///
     /// # Errors
     ///
-    /// Returns [`WalkLintsError::Panicked`] if the pass panicked, or
-    /// [`WalkLintsError::Undeclared`] if it reported a rule it did not
-    /// declare.
+    /// Returns [`WalkLintsError::Panicked`] if the pass panicked, and
+    /// [`WalkLintsError::Reported`] if the host cannot build what it
+    /// reported. Returns [`WalkLintsError::Undeclared`] if it reported a
+    /// rule it did not declare.
     pub(crate) fn check_node(
         &mut self,
         node: &DecoratedNode<'_>,
     ) -> Result<Vec<Diagnostic>, WalkLintsError> {
-        let checked: Result<_, Panic> = self.pass.check_node(node).into();
-        let found: Vec<Diagnostic> = checked
-            .map_err(|panic| WalkLintsError::Panicked {
-                source: PassPanic::builder()
-                    .kind(node.kind())
-                    .span(node.span())
-                    .panic(panic)
-                    .build(),
-            })?
-            .into_iter()
-            .collect();
+        let collector = Collector::new();
+        let checked: Result<(), Panic> = collector
+            .lend(|sink| self.pass.check_node(node, sink))
+            .into();
+        checked.map_err(|panic| WalkLintsError::Panicked {
+            source: PassPanic::builder()
+                .kind(node.kind())
+                .span(node.span())
+                .panic(panic)
+                .build(),
+        })?;
+        let found = collector
+            .finish()
+            .map_err(|source| WalkLintsError::Reported {
+                span: node.span(),
+                source,
+            })?;
 
         let Declared::Rules(rules) = &self.declared else {
             return Ok(found);

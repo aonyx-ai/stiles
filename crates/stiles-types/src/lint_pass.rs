@@ -1,6 +1,6 @@
-use stabby::{result, vec};
+use stabby::result;
 
-use crate::{DecoratedNode, Diagnostic, Language, Panic, RuleOptions};
+use crate::{DecoratedNode, Language, Panic, RuleOptions, Sink};
 
 /// A lint rule that inspects decorated syntax tree nodes
 ///
@@ -19,8 +19,7 @@ use crate::{DecoratedNode, Diagnostic, Language, Panic, RuleOptions};
 /// # Examples
 ///
 /// ```
-/// use stabby::vec;
-/// use stiles_types::{Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions};
+/// use stiles_types::{Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions, Sink};
 ///
 /// /// Reports nothing, on Rust trees only
 /// struct Quiet;
@@ -34,8 +33,12 @@ use crate::{DecoratedNode, Diagnostic, Language, Panic, RuleOptions};
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-///         Checked::Ok(vec::Vec::new())
+///     extern "C" fn check_node(
+///         &mut self,
+///         _node: &DecoratedNode<'_>,
+///         _sink: &Sink<'_>,
+///     ) -> Checked {
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -62,12 +65,13 @@ pub trait LintPass: Send + Sync {
     /// reads exactly like configuration that works.
     extern "C" fn configure(&mut self, options: &RuleOptions) -> Configured;
 
-    /// Inspects a single node and returns any diagnostics found
+    /// Inspects a single node and reports any diagnostics through `sink`
     ///
     /// Called by the tree walker for every named node in the syntax tree.
-    /// Implementations should return an empty list for nodes they do not
-    /// care about.
-    extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked;
+    /// Implementations report nothing for nodes they do not care about.
+    /// The host builds its own diagnostics from what the pass reports, so
+    /// no diagnostic crosses the boundary as a laid-out value.
+    extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked;
 }
 
 /// What [`LintPass::configure`] hands back: nothing, or the panic that stopped it
@@ -84,24 +88,22 @@ pub trait LintPass: Send + Sync {
 /// ```
 pub type Configured = result::Result<(), Panic>;
 
-/// What [`LintPass::check_node`] hands back: diagnostics, or the panic that stopped it
+/// What [`LintPass::check_node`] hands back: nothing, or the panic that stopped it
 ///
-/// The list is stabby's, because it crosses the boundary. The plugin
-/// allocates it and stiles frees it, which is sound because every
-/// allocation stabby makes carries its own release function.
+/// The diagnostics go through the [`Sink`] instead, so this carries only
+/// whether the check ran to its end.
 ///
 /// # Examples
 ///
 /// ```
-/// use stabby::vec;
-/// use stiles_types::{Checked, Diagnostic, Panic};
+/// use stiles_types::{Checked, Panic};
 ///
-/// let checked: Checked = Checked::Ok(vec::Vec::new());
-/// let checked: Result<vec::Vec<Diagnostic>, Panic> = checked.into();
+/// let checked: Checked = Checked::Ok(());
+/// let checked: Result<(), Panic> = checked.into();
 ///
-/// assert!(checked.is_ok_and(|diagnostics| diagnostics.is_empty()));
+/// assert!(checked.is_ok());
 /// ```
-pub type Checked = result::Result<vec::Vec<Diagnostic>, Panic>;
+pub type Checked = result::Result<(), Panic>;
 
 /// A pass boxed for the boundary: a stabby box with a stabby vtable
 ///
@@ -114,9 +116,8 @@ pub type Checked = result::Result<vec::Vec<Diagnostic>, Panic>;
 /// # Examples
 ///
 /// ```
-/// use stabby::vec;
 /// use stiles_types::{
-///     BoxedLintPass, Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions,
+///     BoxedLintPass, Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions, Sink,
 ///     boxed_lint_pass,
 /// };
 ///
@@ -132,8 +133,12 @@ pub type Checked = result::Result<vec::Vec<Diagnostic>, Panic>;
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-///         Checked::Ok(vec::Vec::new())
+///     extern "C" fn check_node(
+///         &mut self,
+///         _node: &DecoratedNode<'_>,
+///         _sink: &Sink<'_>,
+///     ) -> Checked {
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -148,9 +153,8 @@ pub type BoxedLintPass = stabby::dynptr!(stabby::boxed::Box<dyn LintPass + Send 
 /// # Examples
 ///
 /// ```
-/// use stabby::vec;
 /// use stiles_types::{
-///     Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions, boxed_lint_pass,
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions, Sink, boxed_lint_pass,
 /// };
 ///
 /// struct Quiet;
@@ -164,8 +168,12 @@ pub type BoxedLintPass = stabby::dynptr!(stabby::boxed::Box<dyn LintPass + Send 
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-///         Checked::Ok(vec::Vec::new())
+///     extern "C" fn check_node(
+///         &mut self,
+///         _node: &DecoratedNode<'_>,
+///         _sink: &Sink<'_>,
+///     ) -> Checked {
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -188,8 +196,8 @@ impl LintPass for BoxedLintPass {
         LintPassDynMut::configure(self, options)
     }
 
-    extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-        LintPassDynMut::check_node(self, node)
+    extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked {
+        LintPassDynMut::check_node(self, node, sink)
     }
 }
 
@@ -198,6 +206,16 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     use super::*;
+    use crate::{Collector, DecoratedTree, Diagnostic, RuleId, Severity};
+
+    fn rust_tree(source: &str) -> tree_sitter::Tree {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&tree_sitter_rust::LANGUAGE.into())
+            .expect("the grammar should load");
+
+        parser.parse(source, None).expect("the source should parse")
+    }
 
     struct Dummy;
 
@@ -210,8 +228,12 @@ mod tests {
             Configured::Ok(())
         }
 
-        extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-            Checked::Ok(vec::Vec::new())
+        extern "C" fn check_node(
+            &mut self,
+            _node: &DecoratedNode<'_>,
+            _sink: &Sink<'_>,
+        ) -> Checked {
+            Checked::Ok(())
         }
     }
 
@@ -230,8 +252,12 @@ mod tests {
                 Configured::Ok(())
             }
 
-            extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-                Checked::Ok(vec::Vec::new())
+            extern "C" fn check_node(
+                &mut self,
+                _node: &DecoratedNode<'_>,
+                _sink: &Sink<'_>,
+            ) -> Checked {
+                Checked::Ok(())
             }
         }
 
@@ -258,6 +284,51 @@ mod tests {
         let configured: Result<(), Panic> = pass.configure(&RuleOptions::default()).into();
 
         assert!(configured.is_ok());
+    }
+
+    #[test]
+    fn a_boxed_pass_forwards_the_sink_to_the_pass() {
+        struct Reporting;
+
+        impl LintPass for Reporting {
+            extern "C" fn language(&self) -> Language {
+                Language::Rust
+            }
+
+            extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+                Configured::Ok(())
+            }
+
+            extern "C" fn check_node(
+                &mut self,
+                node: &DecoratedNode<'_>,
+                sink: &Sink<'_>,
+            ) -> Checked {
+                sink.report(
+                    &Diagnostic::builder()
+                        .rule_id(RuleId::new("test.rule"))
+                        .severity(Severity::Warn)
+                        .message("found")
+                        .span(node.span())
+                        .build(),
+                );
+                Checked::Ok(())
+            }
+        }
+
+        let tree = DecoratedTree::builder()
+            .tree(rust_tree("fn main() {}"))
+            .language(Language::Rust)
+            .source("fn main() {}".to_owned())
+            .file("test.rs")
+            .build();
+        let mut pass: Box<dyn LintPass> = Box::new(boxed_lint_pass(Reporting));
+        let collector = Collector::new();
+
+        let _checked = collector.lend(|sink| pass.check_node(&tree.root_node(), sink));
+
+        let collected = collector.finish().expect("the report should be whole");
+        assert_eq!(collected.len(), 1);
     }
 
     #[test]

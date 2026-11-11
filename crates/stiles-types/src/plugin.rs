@@ -43,8 +43,8 @@ use stabby::IStable;
 
 use crate::decoration_entry::Entry;
 use crate::{
-    BoxedLintPass, DecoratedNode, DecorationKey, Diagnostic, Edit, FilePath, Fix, Language,
-    Location, Panic, Position, RuleId, RuleOption, RuleOptions, Severity, Span,
+    BoxedLintPass, DecoratedNode, DecorationKey, FilePath, Language, Panic, Position, RuleId,
+    RuleOption, RuleOptions, Severity, Sink, Span,
 };
 
 mod abi_version;
@@ -64,9 +64,9 @@ pub use self::provenance::Provenance;
 /// The version of the plugin declaration protocol this crate speaks
 ///
 /// This guards what no fingerprint can read back. That is the shape of
-/// [`PluginDeclaration`], the meaning of its fields, the signatures of
-/// [`LintPass`]'s methods, and the entries of the node's table. The two
-/// fingerprints guard everything else.
+/// [`PluginDeclaration`], the meaning of its fields, and the signatures of
+/// [`LintPass`]'s methods. It is also the entries of the tables behind a
+/// node and a sink. The two fingerprints guard everything else.
 ///
 /// The version is a promise about a release. It rises once between two
 /// releases, when the boundary moved since the last one.
@@ -139,26 +139,33 @@ pub const PROVENANCE: Provenance = Provenance::UNPUBLISHED;
 /// changed to another of the same size.
 ///
 /// The list names every value that crosses, and nothing else. A pass
-/// receives a [`DecoratedNode`] and the [`RuleOptions`] a project set. The
-/// node's table hands back a [`FilePath`], a [`Position`], and the entry of
-/// a decoration by [`DecorationKey`]. An entry is hidden, but its layout
-/// crosses, so it is on the list. A pass names its [`Language`], and returns
-/// [`Diagnostic`]s or the [`Panic`] that stopped it. A plugin hands its
-/// exports over as a [`Plugin`], and each factory builds a
-/// [`BoxedLintPass`].
+/// receives a [`DecoratedNode`], a [`Sink`], and the [`RuleOptions`] a
+/// project set. The node's table hands back a [`FilePath`], a
+/// [`Position`], and the entry of a decoration by [`DecorationKey`]. An
+/// entry is hidden, but its layout crosses, so it is on the list. A pass
+/// names its [`Language`], and returns nothing or the [`Panic`] that
+/// stopped it. A plugin hands its exports over as a [`Plugin`], and each
+/// factory builds a [`BoxedLintPass`].
+///
+/// A pass reports each diagnostic through the sink's table, one part for
+/// each call. The calls take a [`RuleId`], a [`Severity`], and a [`Span`]
+/// by value or by reference, so those three are on the list. The
+/// diagnostic, its fix, its edits, and its locations do not cross. Each
+/// side lays them out its own way, so they are not here.
 ///
 /// A stabby result is not on the list, and neither is a stabby list. Both
 /// are stabby's own layouts, which the stabby every plugin shares
 /// decides, so the list names their payloads instead. The tree, the
-/// decoration map, and the coverage types stay on the host's side of the
-/// boundary, so they are not here.
+/// decoration map, the collector, and the coverage types stay on the
+/// host's side of the boundary, so they are not here.
 ///
-/// The node's table of host functions is not on the list either. It is a
-/// `#[repr(C)]` struct, not a stabby type, because stabby cannot describe
-/// a function whose arguments borrow for a lifetime of its own. The
-/// node's identity records the table only as a reference. A change to the
-/// table's entries therefore belongs in [`ABI_VERSION`], as a change to a
-/// signature of [`LintPass`] does.
+/// The tables of host functions behind the node and the sink are not on
+/// the list either. Each is a `#[repr(C)]` struct, not a stabby type,
+/// because stabby cannot describe a function whose arguments borrow for a
+/// lifetime of its own. The identities of the node and the sink record
+/// each table only as a reference. A change to a table's entries
+/// therefore belongs in [`ABI_VERSION`], as a change to a signature of
+/// [`LintPass`] does.
 ///
 /// What it does not cover is the signatures of [`LintPass`]'s methods.
 /// The identity of the factory reaches the vtable and names its methods in
@@ -192,11 +199,8 @@ pub const TYPES_FINGERPRINT: u64 = stable_fingerprint(&[
     <Plugin as IStable>::ID,
     <ExportedLint as IStable>::ID,
     <BoxedLintPass as IStable>::ID,
-    <Diagnostic as IStable>::ID,
+    <Sink<'static> as IStable>::ID,
     <Span as IStable>::ID,
-    <Fix as IStable>::ID,
-    <Edit as IStable>::ID,
-    <Location as IStable>::ID,
     <Position as IStable>::ID,
     <RuleId as IStable>::ID,
     <Severity as IStable>::ID,
@@ -229,18 +233,18 @@ mod tests {
             .collect()
     }
 
-    /// Returns each declaration of the node's table, in source order
+    /// Returns each declaration of a table of host functions, in source order
     ///
-    /// The scan takes the function types and the struct of `context.rs`,
-    /// drops the doc comments and the attributes, and squeezes the
-    /// whitespace. Each type comes out whole, and the struct comes out last.
-    fn context_declarations() -> Vec<String> {
-        let source = include_str!("context.rs");
+    /// The scan takes the function types and the struct of `source`, up to
+    /// the table's first `impl` block. It drops the doc comments and the
+    /// attributes, and squeezes the whitespace. Each type comes out whole,
+    /// and the struct comes out last.
+    fn table_declarations(source: &str) -> Vec<String> {
         let start = source
             .find("pub(crate) type ")
             .expect("the table's function types should be declared in this source");
         let end = source
-            .find("impl Context {")
+            .find("\nimpl ")
             .expect("the table should have an impl block");
 
         let code = source[start..end]
@@ -271,7 +275,7 @@ mod tests {
                 "extern \"C\" fn language(&self) -> Language;".to_owned(),
                 "extern \"C\" fn configure(&mut self, options: &RuleOptions) -> Configured;"
                     .to_owned(),
-                "extern \"C\" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked;"
+                "extern \"C\" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked;"
                     .to_owned()
             ],
             "the boundary trait's methods moved, which changes its vtable; \
@@ -281,7 +285,7 @@ mod tests {
 
     #[test]
     fn abi_version_covers_the_node_table() {
-        let context = context_declarations();
+        let context = table_declarations(include_str!("context.rs"));
 
         assert_eq!(
             context,
@@ -314,8 +318,28 @@ mod tests {
     }
 
     #[test]
+    fn abi_version_covers_the_sink_table() {
+        let sink = table_declarations(include_str!("sink_table.rs"));
+
+        assert_eq!(
+            sink,
+            [
+                "pub(crate) type ReportFn = for<'n> extern \"C\" fn(&SinkTable, &RuleId, Severity, Str<'n>, &Span) -> usize;",
+                "pub(crate) type AttachFn = for<'n> extern \"C\" fn(&SinkTable, usize, &Span, Str<'n>);",
+                "pub(crate) type NameFn = for<'n> extern \"C\" fn(&SinkTable, usize, Str<'n>);",
+                "pub struct SinkTable { pub(crate) length: usize, pub(crate) data: *const c_void, \
+                 pub(crate) report: ReportFn, pub(crate) origin: AttachFn, \
+                 pub(crate) related: AttachFn, pub(crate) fix_message: NameFn, \
+                 pub(crate) edit: AttachFn, }",
+            ],
+            "the sink's table moved, which no fingerprint reads; \
+             bump ABI_VERSION and update this test together",
+        );
+    }
+
+    #[test]
     fn types_fingerprint_covers_every_boundary_type() {
-        let one = stable_fingerprint(&[<Diagnostic as IStable>::ID]);
+        let one = stable_fingerprint(&[<Span as IStable>::ID]);
 
         let all = TYPES_FINGERPRINT;
 
