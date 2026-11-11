@@ -389,7 +389,11 @@ fn check_package_whose_sources_the_configuration_excludes_fails() {
 #[test]
 fn check_package_whose_sources_the_global_gitignore_excludes_fails() {
     let package = package(CLEAN_SOURCE);
-    let git = tempfile::tempdir().expect("temporary directory should be created");
+    // The ignore crate expands every `~` in the path of the excludes file, and
+    // Windows names the temporary directory of a runner `RUNNER~1`. The
+    // directory that Cargo keeps for integration tests has no such name.
+    let git = tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR"))
+        .expect("temporary directory should be created");
     let excludes = git.path().join("ignore");
     std::fs::write(&excludes, "src/\n").expect("global gitignore should be written");
     let config = git.path().join("config");
@@ -403,10 +407,9 @@ fn check_package_whose_sources_the_global_gitignore_excludes_fails() {
     .expect("git configuration should be written");
 
     stiles()
-        .current_dir(package.path())
         .env("GIT_CONFIG_GLOBAL", &config)
         .arg("check")
-        .arg(".")
+        .arg(package.path())
         .assert()
         .code(1)
         .stderr(predicate::str::contains("analyzed no files"));
