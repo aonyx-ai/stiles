@@ -66,8 +66,8 @@ was renamed.
 3. **Freeze small values.** The values that do cross as laid-out data are small,
    and each one is frozen for the life of a major. A change makes a new value
    under a new name, beside the old one.
-4. **No closed enum crosses.** An enum that crosses is an integer newtype, and
-   an unknown value reads as unknown.
+4. **No closed enum crosses by value.** An enum that a table call passes
+   crosses as a fixed byte, and an unknown byte reads as unknown.
 
 ## The design
 
@@ -261,10 +261,16 @@ against declarations, not source.
 
 ### Enums
 
-`Language`, `Severity`, and every enum inside a decoration become integer
-newtypes with named constants. A reader that meets an unknown value treats it as
-unknown: a pass skips a language it does not know, and the host refuses a
-severity it does not know.
+`Language` and `Severity` stay enums in Rust, and each crosses a table call as
+a fixed byte. The host reads a byte it does not know as unknown: it refuses a
+lint of a language it does not know, and it refuses a severity it does not know.
+Rules keep matching on the variants.
+
+An enum inside a decoration stays an enum too. A rule matches its variants
+exhaustively, which the conventions of stiles require. A new variant changes the
+decoration's definition, so it makes a new key. A plugin that declares the old
+key therefore loads only where a provider still offers it, and it never reads a
+variant it does not know.
 
 ## What stays
 

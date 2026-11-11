@@ -49,11 +49,23 @@ fn state(table: &SinkTable) -> MutexGuard<'_, State> {
 extern "C" fn report(
     table: &SinkTable,
     rule: &RuleId,
-    severity: Severity,
+    severity: u8,
     message: Str<'_>,
     span: &Span,
 ) -> usize {
-    state(table).start(Pending {
+    let mut state = state(table);
+    let severity = match Severity::from_byte(severity) {
+        Some(severity) => severity,
+        None => {
+            state.keep(CollectDiagnosticsError::UnknownSeverity {
+                rule: *rule,
+                byte: severity,
+            });
+            Severity::Error
+        }
+    };
+
+    state.start(Pending {
         rule: *rule,
         severity,
         message: message.as_str().to_owned(),
@@ -159,7 +171,7 @@ mod tests {
         report(
             table,
             &RULE,
-            Severity::Warn,
+            Severity::Warn.to_byte(),
             Str::new("found"),
             &span("test.rs", 0..4),
         )
@@ -472,6 +484,30 @@ mod tests {
         .expect("the report should be whole");
 
         assert_eq!(collected[0].span(), &span("test.rs", 0..4));
+    }
+
+    /// A plugin built against a newer stiles may send a severity that this
+    /// one lacks, and the host refuses it rather than guess its weight
+    #[test]
+    fn report_with_an_unknown_severity_byte_keeps_the_fault() {
+        let error = collect(|table| {
+            report(
+                table,
+                &RULE,
+                u8::MAX,
+                Str::new("found"),
+                &span("test.rs", 0..4),
+            );
+        })
+        .expect_err("the severity is unknown");
+
+        assert_eq!(
+            error,
+            CollectDiagnosticsError::UnknownSeverity {
+                rule: RULE,
+                byte: u8::MAX,
+            }
+        );
     }
 
     #[test]
