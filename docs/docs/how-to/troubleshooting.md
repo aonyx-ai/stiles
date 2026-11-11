@@ -93,6 +93,36 @@ anything.
 Report this to the rule author. If the lint is yours, implement `DeclaresRules`
 for it and return the IDs it reports.
 
+## ``the lint of RULES reads the decoration `KEY`, which no ... offers``
+
+A rule declares the decorations it reads, and this Stiles computes none under
+that key. The rule was built against another Stiles release: a decoration whose
+definition changed has a new key, and a newer release may offer one this release
+lacks.
+
+Pin the rule to the Stiles release you run, or upgrade Stiles to the release the
+rule was built for. If the rule is yours, rebuild it against your Stiles.
+
+## ``the lint of RULES reads the decoration `KEY` at a layout that differs``
+
+A rule declares a decoration that this Stiles offers under the same name, but
+the decoration holds a type that changed between the two releases. The rule was
+built against another Stiles release.
+
+Pin the rule to the Stiles release you run, or upgrade Stiles to the release the
+rule was built for. If the rule is yours, rebuild it against your Stiles.
+
+## `the plugin registered lints without naming the TABLE it was built against`
+
+The plugin did not say which Stiles functions it was built against. Every
+plugin that `stiles_plugin::export_lints!` writes says so, so the plugin was
+written by hand or by an older tool. Rebuild it with `export_lints!`.
+
+## `the plugin was built against a TABLE of N entries, and this stiles has M`
+
+The plugin was built against a newer Stiles, which offers functions this Stiles
+lacks. Upgrade Stiles, or pin the plugin to a release built for your Stiles.
+
 ## ``a lint pass reported `RULE` ..., but its plugin declares only RULES``
 
 A rule reported a diagnostic under an ID it did not declare. Stiles could not

@@ -4651,6 +4651,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "stabby",
  "stiles-core",
  "stiles-plugin",
  "stiles-reporting",

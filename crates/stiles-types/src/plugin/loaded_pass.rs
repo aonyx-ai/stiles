@@ -56,9 +56,10 @@ use crate::{Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions,
 /// }
 ///
 /// let registrations = Registrations::new();
-/// // SAFETY: `build` writes a pass whenever it returns `Ok`.
-/// registrations.lend(|registrar| unsafe {
-///     registrar.lint(Language::TypeScript, build, &[RuleId::new("lint.quiet")])
+/// registrations.lend(|registrar| {
+///     registrar.require_host_tables();
+///     // SAFETY: `build` writes a pass whenever it returns `Ok`.
+///     unsafe { registrar.lint(Language::TypeScript, build, &[RuleId::new("lint.quiet")]) };
 /// });
 /// let lints = registrations.finish().expect("the registration should be whole");
 ///

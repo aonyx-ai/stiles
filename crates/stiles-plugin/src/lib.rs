@@ -5,7 +5,7 @@
 //! [`RustLintPass`], and this crate hands them to stiles. [`export_lints!`]
 //! writes the declaration stiles looks up, and the function that registers
 //! each lint through the host's [`Registrar`]. [`DeclaresRules`] says which
-//! rule names a pass reports.
+//! rule names a pass reports, and which decorations it reads.
 //!
 //! The crate also owns [`LANGUAGE_FINGERPRINT`], which joins the
 //! fingerprints of every language crate. One plugin may export passes of
@@ -21,8 +21,8 @@ mod export_lints;
 
 use stiles_types::plugin::stable_fingerprint;
 pub use stiles_types::plugin::{
-    ABI_VERSION, AbiVersion, Built, PassInstance, PluginDeclaration, Provenance, Registered,
-    Registrar, TYPES_FINGERPRINT,
+    ABI_VERSION, AbiVersion, Built, HostTable, PassInstance, PluginDeclaration, Provenance, Reads,
+    Registered, Registrar, TYPES_FINGERPRINT,
 };
 pub use stiles_types::{Language, Panic};
 
@@ -36,12 +36,18 @@ pub mod __private {
 
 /// A fingerprint of the language support a plugin was built against
 ///
-/// Each language crate fingerprints the part of it that shapes the
-/// boundary: its generated lint pass trait and its decoration types. This
+/// Each language crate fingerprints its generated lint pass trait. This
 /// constant joins them in a fixed order. A plugin carries it in its
 /// declaration, and stiles refuses a plugin whose value differs from its
-/// own. A pass generated from another grammar would load and never fire,
-/// and a decoration read at another layout is unsound.
+/// own. A pass generated from another grammar would load and never fire.
+///
+/// The decorations are not part of it. A lint declares each decoration it
+/// reads by its key and the fingerprint of its layout. Stiles refuses a
+/// read that no provider offers at both, and names the decoration a plugin
+/// needs. A lint whose reads are undeclared escapes it until
+/// [stiles#651].
+///
+/// [stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
 ///
 /// # Examples
 ///

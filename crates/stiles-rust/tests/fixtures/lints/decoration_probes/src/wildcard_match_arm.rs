@@ -1,5 +1,6 @@
 use stiles_rust::decorations::{AdtFlags, ResolvedType};
 use stiles_rust::{RustLintPass, RustLintPassAdapter};
+use stiles_types::plugin::Reads;
 use stiles_types::{DecoratedNode, Diagnostic, LintPass, RuleId, Severity};
 
 /// The rule id this probe reports under
@@ -29,6 +30,10 @@ impl WildcardMatchArm {
 impl stiles_plugin::DeclaresRules for WildcardMatchArm {
     fn rules(&self) -> Vec<RuleId> {
         vec![RuleId::new("fixture.wildcard-match-arm")]
+    }
+
+    fn reads(&self) -> Reads {
+        Reads::of::<ResolvedType>().and::<AdtFlags>()
     }
 }
 

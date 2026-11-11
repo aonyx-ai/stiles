@@ -1,5 +1,6 @@
 use stiles_rust::RustLintPass;
 use stiles_rust::decorations::{FnSignature, ResolvedType, TypePathRef};
+use stiles_types::plugin::Reads;
 use stiles_types::{DecoratedNode, Diagnostic, LintPass, RuleId, Severity};
 
 /// The rule id this probe reports under
@@ -42,6 +43,10 @@ impl AnyhowBareTry {
 impl stiles_plugin::DeclaresRules for AnyhowBareTry {
     fn rules(&self) -> Vec<RuleId> {
         vec![RuleId::new("fixture.anyhow-bare-try")]
+    }
+
+    fn reads(&self) -> Reads {
+        Reads::of::<FnSignature>().and::<ResolvedType>()
     }
 }
 

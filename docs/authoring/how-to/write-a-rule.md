@@ -83,6 +83,49 @@ impl stiles_plugin::DeclaresRules for DocSummaryBreak {
 stiles_plugin::export_lints![rust: [DocSummaryBreak]];
 ```
 
+## Read a decoration
+
+A decoration is a fact that the language's toolchain records on a node, such as
+the type of an expression. The [API reference][api] lists the decorations of
+each language. Name every decoration your rule reads in `DeclaresRules::reads`,
+beside its rules:
+
+```rust
+use stiles_rust::decorations::{AdtFlags, ResolvedType};
+use stiles_types::plugin::Reads;
+
+impl stiles_plugin::DeclaresRules for WildcardMatchArm {
+    fn rules(&self) -> Vec<RuleId> {
+        vec![RULE_ID]
+    }
+
+    fn reads(&self) -> Reads {
+        Reads::of::<ResolvedType>().and::<AdtFlags>()
+    }
+}
+```
+
+A rule that reads no decoration returns `Reads::none()`. Stiles computes only
+the decorations that a loaded rule declares, so a lookup of an undeclared one
+may find nothing. It refuses to load your rule when it offers no decoration
+with a declared name and layout, which happens when your rule was built against
+another Stiles release.
+
+A rule that leaves out `reads` is undeclared, and still receives every
+decoration of its language. That stops with [stiles#651], so declare your reads
+now.
+
+Read a decoration from the node it describes:
+
+```rust
+let Some(resolved) = scrutinee.decoration::<ResolvedType>() else {
+    return Vec::new();
+};
+```
+
+A test attaches the decorations it needs with `stiles_testing::decorate`, so
+declared reads do not apply there.
+
 ## Test the rule
 
 ```rust
@@ -196,4 +239,6 @@ where now. api, configuration, shared-rules, prebuilt archives.
 - [Prebuilt archives](/authoring/reference/prebuilt-archives) so the people who
   use your rules download them compiled.
 
+[api]: /authoring/reference/api
+[stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
 [supported-languages]: /docs/reference/supported-languages

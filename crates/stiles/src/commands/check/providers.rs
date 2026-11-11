@@ -1,16 +1,18 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::Context as _;
 use bon::bon;
 use stiles_rust::RustDecorationProvider;
+use stiles_types::plugin::RegisteredLint;
 use stiles_types::{
-    Coverage, CoverageGap, DecorateTreeError, DecoratedTree, DecorationKey, DecorationProvider,
-    DecorationSet, Language, ProviderName,
+    Coverage, CoverageGap, DecorateTreeError, DecoratedTree, DecorationIdentity,
+    DecorationProvider, DecorationSet, Language, ProviderName,
 };
 use stiles_typescript::TypeScriptDecorationProvider;
 
 use super::grammar::Grammar;
+use crate::custom_lints::offered;
 
 /// The decoration providers a run loaded, for the languages it found
 ///
@@ -31,9 +33,10 @@ use super::grammar::Grammar;
 /// cannot analyze, so one stray script does not stop the check of every
 /// other file.
 ///
-/// A provider computes decorations only for a language that a loaded pass
-/// inspects. For any other language it still decides coverage, because a
-/// file that no toolchain covers is an error whether or not a rule reads it.
+/// A provider computes only the decorations that the loaded passes of its
+/// language read. For a language that no pass inspects, it computes none.
+/// It still decides coverage, because a file that no toolchain covers is an
+/// error whether or not a rule reads it.
 pub(super) struct Providers {
     rust: Option<RustDecorationProvider>,
     typescript: HashMap<PathBuf, TypeScriptDecorationProvider>,
@@ -44,8 +47,9 @@ impl Providers {
     /// Loads the providers for every language among `files`, for a check
     /// of `path`
     ///
-    /// `inspected` holds the languages that at least one loaded pass
-    /// inspects. A provider of any other language answers for coverage
+    /// `lints` holds every loaded lint. A provider computes the decorations
+    /// that the lints of its language read, as [`wanted`] decides. A
+    /// provider of a language that no lint inspects answers for coverage
     /// alone.
     ///
     /// # Errors
@@ -58,7 +62,7 @@ impl Providers {
     pub(super) fn load(
         path: &Path,
         files: &[PathBuf],
-        inspected: &HashSet<Language>,
+        lints: &[&RegisteredLint],
     ) -> anyhow::Result<Self> {
         let mut has_rust = false;
         let mut typescript = HashMap::new();
@@ -70,11 +74,7 @@ impl Providers {
             match grammar.language() {
                 Language::Rust => has_rust = true,
                 Language::TypeScript => {
-                    let wanted = wanted(
-                        inspected,
-                        Language::TypeScript,
-                        TypeScriptDecorationProvider::DECORATIONS,
-                    );
+                    let wanted = wanted(lints, Language::TypeScript);
                     load_typescript_project(file, &wanted, &mut typescript)
                         .context("failed to load the TypeScript project for analysis")?;
                 }
@@ -85,11 +85,7 @@ impl Providers {
             true => Some(
                 RustDecorationProvider::load(path)
                     .context("failed to load the target project for analysis")?
-                    .wanting(wanted(
-                        inspected,
-                        Language::Rust,
-                        RustDecorationProvider::DECORATIONS,
-                    )),
+                    .wanting(wanted(lints, Language::Rust)),
             ),
             false => None,
         };
@@ -221,25 +217,68 @@ fn load_typescript_project(
 
 /// Returns the decoration types that a provider of `language` computes
 ///
-/// A language that a loaded pass inspects gets every type of its provider,
-/// because a pass does not yet declare which of them it reads. Any other
-/// language gets none.
-fn wanted(
-    inspected: &HashSet<Language>,
-    language: Language,
-    every: impl IntoIterator<Item = DecorationKey>,
-) -> DecorationSet {
-    match inspected.contains(&language) {
-        true => every.into_iter().collect(),
-        false => DecorationSet::default(),
+/// The set is the union of the keys that the loaded lints of `language`
+/// declare. A language that no lint inspects gets none.
+///
+/// A lint that declares [`Reads::none`] adds nothing. A lint whose reads
+/// are [`Reads::undeclared`] gets every type of its provider. One such
+/// lint therefore makes the provider compute all of them for its language. That
+/// fallback is staged, and [stiles#651] removes it.
+///
+/// [`Reads::none`]: stiles_types::plugin::Reads::none
+/// [`Reads::undeclared`]: stiles_types::plugin::Reads::undeclared
+///
+/// [stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
+fn wanted(lints: &[&RegisteredLint], language: Language) -> DecorationSet {
+    let mut keys = Vec::new();
+
+    for lint in lints.iter().filter(|lint| lint.language() == language) {
+        let Some(identities) = lint.reads().declared() else {
+            return offered(language)
+                .iter()
+                .map(DecorationIdentity::key)
+                .collect();
+        };
+        keys.extend(identities.iter().map(DecorationIdentity::key));
     }
+
+    keys.into_iter().collect()
 }
 
 #[cfg(test)]
 mod tests {
+    use std::mem::MaybeUninit;
+
     use stiles_core::RunPipelineError;
+    use stiles_rust::RuleId;
+    use stiles_rust::decorations::{FnSignature, ResolvedType};
+    use stiles_types::plugin::{Built, PassInstance, Reads, Registrations};
+    use stiles_types::{Decoration, Panic};
+    use stiles_typescript::decorations::TypeText;
 
     use super::*;
+
+    /// Builds nothing, because no test here calls it
+    extern "C" fn never(_out: &mut MaybeUninit<PassInstance>) -> Built {
+        Panic::catch(|| unreachable!("never built")).into()
+    }
+
+    /// Returns a lint of `language` that declares it reads `reads`
+    fn registered(language: Language, reads: Reads) -> RegisteredLint {
+        let registrations = Registrations::new();
+        registrations.lend(|registrar| {
+            registrar.require_host_tables();
+            // SAFETY: `never` never returns `Ok`.
+            let lint = unsafe { registrar.lint(language, never, &[RuleId::new("test.rule")]) };
+            registrar.reads(lint, &reads);
+        });
+
+        let mut lints = registrations
+            .finish()
+            .expect("the registration should be whole");
+
+        lints.remove(0)
+    }
 
     /// Writes `(path, text)` files into a new temporary directory
     fn tree(files: &[(&str, &str)]) -> tempfile::TempDir {
@@ -266,7 +305,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(&[page.clone(), index])
-            .inspected(&HashSet::new())
+            .lints(&[])
             .call()
             .expect("both projects should load");
 
@@ -294,7 +333,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(std::slice::from_ref(&file))
-            .inspected(&HashSet::new())
+            .lints(&[])
             .call()
             .expect("a file without a project should not stop the load");
         let mut pipeline = Grammar::of(&file)
@@ -328,7 +367,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(&files)
-            .inspected(&HashSet::new())
+            .lints(&[])
             .call()
             .expect("the project should load");
 
@@ -343,7 +382,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(std::slice::from_ref(&file))
-            .inspected(&HashSet::new())
+            .lints(&[])
             .call()
             .expect("a file without a project should not stop the load");
 
@@ -357,7 +396,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(&[])
-            .inspected(&HashSet::new())
+            .lints(&[])
             .call()
             .expect("nothing should load");
 
@@ -371,7 +410,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(&[])
-            .inspected(&HashSet::new())
+            .lints(&[])
             .call()
             .expect("nothing should load");
 
@@ -386,7 +425,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(std::slice::from_ref(&file))
-            .inspected(&HashSet::new())
+            .lints(&[])
             .call()
             .expect("the TypeScript project should load");
 
@@ -401,7 +440,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(std::slice::from_ref(&file))
-            .inspected(&HashSet::new())
+            .lints(&[])
             .call()
             .expect("the TypeScript project should load");
 
@@ -422,7 +461,7 @@ mod tests {
         let providers = Providers::load()
             .path(directory.path())
             .files(&[page, index])
-            .inspected(&HashSet::new())
+            .lints(&[])
             .call()
             .expect("both projects should load");
 
@@ -465,32 +504,84 @@ mod tests {
         assert_unpin::<Providers>();
     }
 
-    #[test]
-    fn wanted_for_a_language_no_pass_inspects_is_empty() {
-        let inspected = HashSet::from([Language::Rust]);
+    /// Returns every key the Rust provider offers
+    fn every_rust_key() -> DecorationSet {
+        RustDecorationProvider::DECORATIONS
+            .iter()
+            .map(DecorationIdentity::key)
+            .collect()
+    }
 
-        let wanted = wanted(
-            &inspected,
-            Language::TypeScript,
-            TypeScriptDecorationProvider::DECORATIONS,
-        );
+    #[test]
+    fn wanted_for_a_language_no_lint_inspects_is_empty() {
+        let lint = registered(Language::Rust, Reads::undeclared());
+
+        let wanted = wanted(&[&lint], Language::TypeScript);
 
         assert!(wanted.is_empty());
     }
 
     #[test]
-    fn wanted_for_an_inspected_language_wants_every_type() {
-        let inspected = HashSet::from([Language::Rust]);
+    fn wanted_ignores_the_reads_of_another_language() {
+        let rust = registered(Language::Rust, Reads::of::<FnSignature>());
+        let typescript = registered(Language::TypeScript, Reads::of::<TypeText>());
 
-        let wanted = wanted(
-            &inspected,
+        let wanted = wanted(&[&rust, &typescript], Language::Rust);
+
+        assert_eq!(wanted, DecorationSet::from_iter([FnSignature::KEY]));
+    }
+
+    #[test]
+    fn wanted_with_a_lint_that_reads_none_adds_nothing() {
+        let signatures = registered(Language::Rust, Reads::of::<FnSignature>());
+        let silent = registered(Language::Rust, Reads::none());
+
+        let wanted = wanted(&[&signatures, &silent], Language::Rust);
+
+        assert_eq!(wanted, DecorationSet::from_iter([FnSignature::KEY]));
+    }
+
+    #[test]
+    fn wanted_with_an_undeclared_lint_wants_every_type() {
+        let lint = registered(Language::Rust, Reads::undeclared());
+
+        let wanted = wanted(&[&lint], Language::Rust);
+
+        assert_eq!(wanted, every_rust_key());
+    }
+
+    #[test]
+    fn wanted_with_declared_reads_wants_their_union() {
+        let signatures = registered(Language::Rust, Reads::of::<FnSignature>());
+        let types = registered(
             Language::Rust,
-            RustDecorationProvider::DECORATIONS,
+            Reads::of::<ResolvedType>().and::<FnSignature>(),
         );
+
+        let wanted = wanted(&[&signatures, &types], Language::Rust);
 
         assert_eq!(
             wanted,
-            DecorationSet::from_iter(RustDecorationProvider::DECORATIONS)
+            DecorationSet::from_iter([FnSignature::KEY, ResolvedType::KEY])
         );
+    }
+
+    #[test]
+    fn wanted_with_one_undeclared_lint_wants_every_type() {
+        let signatures = registered(Language::Rust, Reads::of::<FnSignature>());
+        let undeclared = registered(Language::Rust, Reads::undeclared());
+
+        let wanted = wanted(&[&signatures, &undeclared], Language::Rust);
+
+        assert_eq!(wanted, every_rust_key());
+    }
+
+    #[test]
+    fn wanted_with_only_lints_that_read_none_is_empty() {
+        let lint = registered(Language::Rust, Reads::none());
+
+        let wanted = wanted(&[&lint], Language::Rust);
+
+        assert!(wanted.is_empty());
     }
 }

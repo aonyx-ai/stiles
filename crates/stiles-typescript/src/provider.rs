@@ -13,7 +13,7 @@ use stiles_tsrs::tsrs_vfs::{FS, bundled, osvfs};
 use stiles_tsrs::{tsrs_ast, tsrs_astnav, tsrs_tsoptions};
 use stiles_types::{
     Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, Decoration as _,
-    DecorationKey, DecorationMap, DecorationProvider, DecorationSet, ProviderName,
+    DecorationIdentity, DecorationMap, DecorationProvider, DecorationSet, ProviderName,
 };
 
 use crate::decorations::{FnSignature, ImportSource, ResolvedType, StringUnion, TypeText};
@@ -117,7 +117,10 @@ impl TypeScriptDecorationProvider {
     /// The decoration types that this provider attaches to nodes
     ///
     /// A provider computes all of them unless [`wanting`] narrows the set.
-    /// The other decoration types of this crate are fields of these.
+    /// The other decoration types of this crate are fields of these. The
+    /// list is what this stiles offers a lint, each type by its key and its
+    /// layout. The loader refuses a plugin whose lint declares a decoration
+    /// that the list leaves out, or holds at another layout.
     ///
     /// # Examples
     ///
@@ -125,26 +128,30 @@ impl TypeScriptDecorationProvider {
     /// use stiles_types::DecorationSet;
     /// use stiles_typescript::TypeScriptDecorationProvider;
     ///
-    /// let every = DecorationSet::from_iter(TypeScriptDecorationProvider::DECORATIONS);
+    /// let every: DecorationSet = TypeScriptDecorationProvider::DECORATIONS
+    ///     .iter()
+    ///     .map(|identity| identity.key())
+    ///     .collect();
     ///
     /// assert!(!every.is_empty());
     /// ```
     ///
     /// [`wanting`]: TypeScriptDecorationProvider::wanting
-    pub const DECORATIONS: [DecorationKey; 5] = [
-        TypeText::KEY,
-        ResolvedType::KEY,
-        StringUnion::KEY,
-        FnSignature::KEY,
-        ImportSource::KEY,
+    pub const DECORATIONS: [DecorationIdentity; 5] = [
+        DecorationIdentity::of::<TypeText>(),
+        DecorationIdentity::of::<ResolvedType>(),
+        DecorationIdentity::of::<StringUnion>(),
+        DecorationIdentity::of::<FnSignature>(),
+        DecorationIdentity::of::<ImportSource>(),
     ];
 
     /// Returns the provider, computing only the decoration types of `wanted`
     ///
     /// Each kind of target yields some of [`DECORATIONS`], and the provider
-    /// skips a target whose types `wanted` leaves out. With an empty set,
-    /// the provider still decides whether it covers a file, and asks the
-    /// checker nothing about it.
+    /// skips a target whose types `wanted` leaves out. An identifier yields
+    /// three types, and the provider builds only the ones `wanted` holds.
+    /// With an empty set, the provider still decides whether it covers a
+    /// file, and asks the checker nothing about it.
     ///
     /// # Examples
     ///
@@ -241,7 +248,10 @@ impl TypeScriptDecorationProvider {
             root,
             fs,
             texts: HashMap::new(),
-            wanted: Self::DECORATIONS.into_iter().collect(),
+            wanted: Self::DECORATIONS
+                .iter()
+                .map(DecorationIdentity::key)
+                .collect(),
         })
     }
 
@@ -400,17 +410,22 @@ impl DecorationProvider for TypeScriptDecorationProvider {
             }
 
             let ty = checker.get_type_at_location(token);
-            let text = checker.type_to_string_exported(ty);
-            decorations.insert(node_id, TypeText::new(&text));
-
-            let declaration = checker
-                .get_symbol_at_location_exported(token)
-                .and_then(|symbol| symbol.value_declaration());
-            decorations.insert(
-                node_id,
-                queries::resolved_type(&mut checker, ty, declaration),
-            );
-            if let Some(union) = queries::string_union(ty) {
+            if self.wanted.contains_any(&[TypeText::KEY]) {
+                let text = checker.type_to_string_exported(ty);
+                decorations.insert(node_id, TypeText::new(&text));
+            }
+            if self.wanted.contains_any(&[ResolvedType::KEY]) {
+                let declaration = checker
+                    .get_symbol_at_location_exported(token)
+                    .and_then(|symbol| symbol.value_declaration());
+                decorations.insert(
+                    node_id,
+                    queries::resolved_type(&mut checker, ty, declaration),
+                );
+            }
+            if self.wanted.contains_any(&[StringUnion::KEY])
+                && let Some(union) = queries::string_union(ty)
+            {
                 decorations.insert(node_id, union);
             }
         }

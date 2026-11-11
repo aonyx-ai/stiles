@@ -25,6 +25,12 @@
 //!    constants too. Only then may [`PluginDeclaration::register`] be
 //!    called. The plugin registers each lint through the host's
 //!    [`Registrar`], and the host keeps a [`RegisteredLint`] for each.
+//! 4. The registration names what the plugin uses: the length of each
+//!    [`HostTable`] it was built against, and the decorations each lint
+//!    reads. The host refuses a table longer than its own, or one left
+//!    unnamed. The loader refuses a decoration that no provider offers at
+//!    the plugin's layout. Each refusal names
+//!    the item, so a newer plugin on an older stiles says what it needs.
 //!
 //! The side that allocated a value is the side that frees it, whatever the
 //! allocator of the other side is. Every stabby allocation that crosses
@@ -46,17 +52,19 @@ use stabby::IStable;
 
 use crate::decoration_entry::Entry;
 use crate::{
-    DecoratedNode, DecorationKey, FilePath, Panic, Position, RuleId, RuleOption, RuleOptions, Sink,
-    Span,
+    DecoratedNode, DecorationIdentity, DecorationKey, FilePath, Panic, Position, RuleId,
+    RuleOption, RuleOptions, Sink, Span,
 };
 
 mod abi_version;
 mod declaration;
 mod fingerprint;
+mod host_table;
 mod loaded_pass;
 mod pass_instance;
 mod pass_table;
 mod provenance;
+mod reads;
 mod registered_lint;
 mod registrar;
 mod registrations;
@@ -64,9 +72,11 @@ mod registrations;
 pub use self::abi_version::AbiVersion;
 pub use self::declaration::PluginDeclaration;
 pub use self::fingerprint::{decoration_fingerprint, stable_fingerprint};
+pub use self::host_table::HostTable;
 pub use self::loaded_pass::LoadedPass;
 pub use self::pass_instance::{Built, PassInstance};
 pub use self::provenance::Provenance;
+pub use self::reads::Reads;
 pub use self::registered_lint::RegisteredLint;
 pub use self::registrar::{Registered, Registrar};
 pub use self::registrations::{RegisterLintsError, Registrations};
@@ -154,7 +164,9 @@ pub const PROVENANCE: Provenance = Provenance::UNPUBLISHED;
 /// entry is hidden, but its layout crosses, so it is on the list. Every
 /// entry of a pass's table and every factory returns nothing or the
 /// [`Panic`] that stopped it. A plugin registers each lint's rules as
-/// [`RuleId`] values.
+/// [`RuleId`] values, and each decoration it reads as a
+/// [`DecorationIdentity`]. A [`HostTable`] crosses as a byte, so it is not
+/// on the list.
 ///
 /// A pass reports each diagnostic through the sink's table, one part for
 /// each call. The calls take a [`RuleId`] and a [`Span`] by reference, so
@@ -193,6 +205,7 @@ pub const PROVENANCE: Provenance = Provenance::UNPUBLISHED;
 pub const TYPES_FINGERPRINT: u64 = stable_fingerprint(&[
     <DecoratedNode<'static> as IStable>::ID,
     <DecorationKey as IStable>::ID,
+    <DecorationIdentity as IStable>::ID,
     <Entry as IStable>::ID,
     <FilePath as IStable>::ID,
     <RuleOptions as IStable>::ID,
@@ -316,8 +329,11 @@ mod tests {
             [
                 "pub(crate) type BuildFn = extern \"C\" fn(&mut MaybeUninit<PassInstance>) -> Built;",
                 "pub(crate) type LintFn = extern \"C\" fn(&Registrar, u8, BuildFn, *const RuleId, usize) -> usize;",
+                "pub(crate) type ReadsFn = extern \"C\" fn(&Registrar, usize, *const DecorationIdentity, usize);",
+                "pub(crate) type RequiresFn = extern \"C\" fn(&Registrar, u8, usize);",
                 "pub struct Registrar { pub(crate) length: usize, pub(crate) data: *const c_void, \
-                 pub(crate) lint: LintFn, }",
+                 pub(crate) lint: LintFn, pub(crate) reads: ReadsFn, \
+                 pub(crate) requires: RequiresFn, }",
             ],
             "the registrar moved, which no fingerprint reads; \
              bump ABI_VERSION and update this test together",

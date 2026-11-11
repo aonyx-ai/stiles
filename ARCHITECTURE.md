@@ -135,6 +135,15 @@ set belongs to the provider, and a rule that needs a decoration on another node
 kind needs a change to the language crate. A file the project leaves out gets
 the gap that names its remedy.
 
+A provider lists the decoration types it offers, and it computes only the types
+that the loaded passes of its language read. Each pass declares the types it
+reads, and the run asks the provider for the union. A pass that declares it
+reads none adds nothing. A pass whose reads are undeclared still gets every type
+of its language. That fallback is staged, and [stiles#651] removes it. A target
+that yields several types, such as a match scrutinee, builds only the ones a
+pass reads. A run whose passes read no types therefore asks the toolchain
+nothing, and still decides coverage.
+
 A provider and the syntax tree keep separate parses of the same file, so
 byte offsets tie them together. Each provider compares the text it analyzed
 with the text the pipeline parsed, and declines the file when they differ.
@@ -195,10 +204,10 @@ The platform does not change for a new language. These places do:
 - A new language crate keeps its grammars' `node-types.json`, calls
   `stiles_codegen::build_language` from its build script, and defines its
   adapter with `stiles_types::lint_pass_adapter!`. Its
-  `LANGUAGE_FINGERPRINT` joins the visitor fingerprint with the identity of
-  each decoration type it defines.
+  `LANGUAGE_FINGERPRINT` is the visitor fingerprint.
 - A decoration provider behind the crate's default `provider` feature, so a
-  plugin can build without it.
+  plugin can build without it. It lists the keys of the decoration types it
+  offers, and the loader checks each key a lint declares against that list.
 - stiles-plugin's `export_lints!` gains a group for the language, and its
   `LANGUAGE_FINGERPRINT` joins the new crate's.
 - The check command picks the grammar per file and loads the provider when
@@ -225,6 +234,13 @@ The decoration map recovers a value by a name-based key: the type's module
 path, its name, and a hash of its definition without its documentation.
 `TypeId` cannot serve, because it differs between separately compiled crate
 graphs, and a plugin is one.
+
+A pass names what it reads through `DeclaresRules::reads`, which returns
+`Reads`: none, exactly some decorations, or undeclared, the staged fallback that
+[stiles#651] removes. A provider computes only the types that some loaded pass
+names. A pass that reads a type it did not declare may therefore find nothing,
+and its rule fails open. A rule test decorates its tree by hand, so declared
+reads do not apply there.
 
 ## Lint rules
 
@@ -386,22 +402,38 @@ error that says what to rebuild. Only then does the loader call the plugin's
 the number of functions it holds. The plugin calls its `lint` entry once for
 each lint, with the language as a byte that `Language` pins, a factory, and
 the declared rules as a pointer and a count. The entry returns a handle that
-names the lint, so a later entry can declare more about it. A plugin never
+names the lint, so a later entry can declare more about it. The `reads` entry
+takes that handle and the decorations the lint's pass reads, as a pointer and a
+count. Each is a `DecorationIdentity`: its key, and a fingerprint of its layout
+joined with the key. A count of zero declares that the pass reads none, and a
+lint that never calls `reads` stays undeclared. A plugin never
 assembles a laid-out list of its lints, so registration grows by new
 functions, not new fields. The host keeps a copy of each call. It refuses the
 plugin when a language byte names no language it knows, when the plugin
-registers no lint, or when a lint declares no rule.
+registers no lint, or when a lint declares no rule. It also refuses a read that
+no provider of the lint's language offers, and a read that a provider offers
+under the same key at another layout. Each refusal names the key.
+
+Before it registers anything, the plugin calls `requires` once for each host
+table it calls into: the registrar, the node's table, and the sink's table. Each
+call names the table by a byte that `HostTable` pins, and the number of entries
+the plugin was built against. The host refuses the plugin when its own table is
+shorter, or when it does not know the byte. It also refuses a plugin that
+registers lints without naming every table it knows. The check is coarse,
+because a plugin built against a longer table needs a newer stiles even when it
+never calls the new entries.
 
 The handshake guards against silence. A plugin built against drifted
 source would mostly work, and rules fail open, so a wrong answer would
 pass unnoticed. The handshake turns it into a refusal.
 
-The fingerprints hash layout. Each names a list of types that cross the
+The types fingerprint hashes layout. It names a list of types that cross the
 boundary, and every one of them is laid out by stabby. Each contributes
 the identity stabby derives from its report, which covers the name and
 type of every field, so a field that moved or changed type is refused.
-Each language crate's fingerprint also hashes its generated lint pass
-trait as text, because a trait has no layout a const can read. Doc comments and
+The language fingerprint joins each language crate's, which hashes its
+generated lint pass trait as text, because a trait has no layout a const
+can read. Doc comments and
 private helpers move nothing, so a plugin stays loadable across most of
 stiles's own churn.
 
@@ -423,10 +455,16 @@ A node reaches the host's decorations through the same table, so no std
 collection crosses the boundary. The host compares the key and hands back
 the matching entry. The plugin reads the value through stabby's checked
 downcast, which compares the stored type with the one the plugin asks for.
-The language fingerprint also refuses a plugin whose decoration types
-differ from the host's. Each decoration's share of that fingerprint joins
-its layout with its key. A plugin that would look a decoration up under
-another key is therefore refused, rather than loaded to find nothing.
+No fingerprint covers the decorations, so adding one refuses no plugin. A
+decoration whose definition changed has a new key instead. The key hashes the
+decoration's own definition and not the types it holds, so a change to a held
+type, such as the `TypePath` inside a `FnSignature`, keeps the key. Each
+declared read therefore carries the decoration's fingerprint too, which stabby
+derives from every type it holds. The loader refuses a read that no provider
+offers at its key and fingerprint, so a plugin built against an old definition
+is refused by the decoration's name. A lint whose reads are undeclared escapes
+that check. It loads, and a lookup under a stale key or layout finds nothing,
+until [stiles#651] makes every lint declare its reads.
 
 A rule that needs a snippet read as code, such as the body of a comment,
 asks the table to parse it. The host parses it with its own grammar, and
@@ -556,4 +594,5 @@ loaded lints together.
 [tsrs]: https://github.com/oxc-project/tsrs
 [rules]: https://github.com/aonyx-ai/stiles-aonyx-rules
 [stiles#643]: https://github.com/aonyx-ai/stiles/issues/643
+[stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
 [ts]: https://tree-sitter.github.io/tree-sitter/

@@ -243,7 +243,7 @@ async fn run(
         Providers::load()
             .path(&path)
             .files(files)
-            .inspected(&custom_lints.languages())
+            .lints(&custom_lints.registered())
             .call()
     })?;
     let checks = FileChecks::run()
