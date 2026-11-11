@@ -386,12 +386,13 @@ fn check_package_whose_sources_the_configuration_excludes_fails() {
 ///
 /// The test points `GIT_CONFIG_GLOBAL` at a temporary config, so it neither
 /// reads nor disturbs the developer's own settings.
+///
+/// The config sits in the directory that Cargo keeps for integration tests.
+/// The ignore crate expands every `~` in the path of the excludes file, and
+/// Windows names the temporary directory of a runner `RUNNER~1`.
 #[test]
 fn check_package_whose_sources_the_global_gitignore_excludes_fails() {
     let package = package(CLEAN_SOURCE);
-    // The ignore crate expands every `~` in the path of the excludes file, and
-    // Windows names the temporary directory of a runner `RUNNER~1`. The
-    // directory that Cargo keeps for integration tests has no such name.
     let git = tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR"))
         .expect("temporary directory should be created");
     let excludes = git.path().join("ignore");
