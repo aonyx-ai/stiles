@@ -190,7 +190,7 @@ mod tests {
 
         let root = tree.root_node();
 
-        assert!(!root.raw().has_error());
+        assert!(!root.has_error());
     }
 
     #[test]
@@ -199,7 +199,7 @@ mod tests {
 
         let root = tree.root_node();
 
-        assert!(!root.raw().has_error());
+        assert!(!root.has_error());
     }
 
     #[test]

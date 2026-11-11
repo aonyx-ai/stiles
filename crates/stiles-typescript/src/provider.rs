@@ -469,10 +469,12 @@ impl Target {
     /// Returns the target for `node`, found in tsrs by the range of `found_by`
     #[builder]
     fn new(node: &DecoratedNode<'_>, found_by: &DecoratedNode<'_>) -> Option<Self> {
+        let span = found_by.span();
+
         Some(Self {
             node_id: node.id(),
-            start: u32::try_from(found_by.raw().start_byte()).ok()?,
-            end: u32::try_from(found_by.raw().end_byte()).ok()?,
+            start: u32::try_from(span.start()).ok()?,
+            end: u32::try_from(span.end()).ok()?,
         })
     }
 }

@@ -359,15 +359,16 @@ every body stiles reads has a size limit.
 
 ## The plugin boundary
 
-Rust has no stable ABI of its own, so every type that crosses between
+Rust has no stable ABI of its own, so every value that crosses between
 stiles and a plugin is laid out by stabby, whose layouts hold under any
-compiler. A loaded library is coherent with the stiles binary when both
-lay the boundary out the same way, which is a property of the stiles
-source each was built from and not of the rustc that built it. The loader
-establishes that before it calls anything the plugin defines. A `dlopen`
-runs the library's initializers, so the handshake is a compatibility
-gate, and trust comes from the configuration as the previous section
-says.
+compiler. The one exception is the node's table of host functions, a
+`#[repr(C)]` struct that a later paragraph describes. A loaded library is
+coherent with the stiles binary when both lay the boundary out the same
+way, which is a property of the stiles source each was built from and not
+of the rustc that built it. The loader establishes that before it calls
+anything the plugin defines. A `dlopen` runs the library's initializers,
+so the handshake is a compatibility gate, and trust comes from the
+configuration as the previous section says.
 
 The plugin exports a declaration. The loader reads its leading protocol
 version through a raw pointer, and only a matching version licenses a
@@ -393,14 +394,32 @@ trait as text, because a trait has no layout a const can read. Doc comments and
 private helpers move nothing, so a plugin stays loadable across most of
 stiles's own churn.
 
-A node reaches the host's decorations through a call rather than a
-reference to the map, so no std collection crosses the boundary. The host
-compares the key and hands back a pointer to the value; the plugin casts
-it under the `Decoration` contract, which the language fingerprint backs
-by refusing a plugin whose decoration types differ from the host's. Each
-decoration's share of that fingerprint joins its layout with its key. A
-plugin that would look a decoration up under another key is therefore
-refused, rather than loaded to find nothing.
+A node crosses as two fields: the bytes of a tree-sitter node, and a
+reference to a table of the host's functions for its tree. Every method of
+the node calls through that table, so the host's own tree-sitter reads the
+host's tree. The one exception is `DecoratedNode::raw`, which hands over the
+bare node for the plugin's own tree-sitter to read. It stays until
+stiles-aonyx-rules stops calling it, and [stiles#643] removes it. The table
+is `#[repr(C)]` and starts with the number of functions it holds, so a later
+version can append one.
+A function that may find no node writes it through an out-parameter and
+returns whether it did. Stabby cannot describe a function whose arguments
+borrow for a lifetime of their own, so no fingerprint covers the table.
+`ABI_VERSION` covers it instead, and a test in stiles-types fails when its
+entries move.
+
+A node reaches the host's decorations through the same table, so no std
+collection crosses the boundary. The host compares the key and hands back
+the matching entry. The plugin reads the value through stabby's checked
+downcast, which compares the stored type with the one the plugin asks for.
+The language fingerprint also refuses a plugin whose decoration types
+differ from the host's. Each decoration's share of that fingerprint joins
+its layout with its key. A plugin that would look a decoration up under
+another key is therefore refused, rather than loaded to find nothing.
+
+A rule that needs a snippet read as code, such as the body of a comment,
+asks the table to parse it. The host parses it with its own grammar, and
+the tree it builds lives as long as the file's tree.
 
 The factory's identity reaches the pass's vtable and names its methods
 in order, so a method added or moved is refused. It records each method
@@ -421,8 +440,8 @@ code differ. `rakko check-abi` compares the record with the one at the
 latest `stiles@` tag. A moved fingerprint needs the version after that
 release's, and a version may only ever rise to that one. The version may
 also rise with no moved fingerprint, because it guards what no
-fingerprint reads: the shape of the declaration and the signatures of
-the pass trait.
+fingerprint reads: the shape of the declaration, the signatures of the
+pass trait, and the entries of the node's table.
 
 Between two releases, one version therefore holds more than one layout.
 A build from unpublished source cannot vouch for its version, so its
@@ -438,18 +457,17 @@ fingerprints. A release fixes the fingerprints of its version, so the
 tag of a published stiles names the same archives either way, and every
 version asks for archives of its own.
 
-The fingerprints stop at stiles's own layout. A contributor maintains
-each list of types by hand. A fieldless enum keeps its size and alignment
-when its variants reorder, so the fingerprint does not see that change.
-The plugin's lockfile resolves its own `tree-sitter`. Its `Node` is a
-`#[repr(transparent)]` wrapper around a `#[repr(C)]` struct of the C
-library, so a version difference moves no field. Each image still carries
-its own copy of that library. A pass catches its own panics at the boundary
-and hands them back as values, because an unwind must not cross between two
-panic runtimes. That catch rests on the plugin unwinding: a plugin built
-with `panic = "abort"` still takes the process down, and nothing checks
-the strategy. Every allocation that crosses is stabby's and carries the
-function that frees it, so a plugin may set its own `#[global_allocator]`.
+The fingerprints stop at stiles's own layout. A contributor maintains each
+list of types by hand. A fieldless enum keeps its size and alignment when
+its variants reorder, so the fingerprint does not see that change. The
+plugin's lockfile resolves its own `tree-sitter`, and that choice does not
+reach the host's tree, which only the host's functions read. A pass
+catches its own panics at the boundary and hands them back as values,
+because an unwind must not cross between two panic runtimes. That catch
+rests on the plugin unwinding: a plugin built with `panic = "abort"` still
+takes the process down, and nothing checks the strategy. Every allocation
+that crosses is stabby's and carries the function that frees it, so a
+plugin may set its own `#[global_allocator]`.
 
 The loader keeps every library loaded for the life of the process. The
 lints a plugin hands over and every `RuleId` it mints point into the
@@ -495,4 +513,5 @@ loaded lints together.
 [ra]: https://rust-analyzer.github.io/
 [tsrs]: https://github.com/oxc-project/tsrs
 [rules]: https://github.com/aonyx-ai/stiles-aonyx-rules
+[stiles#643]: https://github.com/aonyx-ai/stiles/issues/643
 [ts]: https://tree-sitter.github.io/tree-sitter/

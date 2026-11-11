@@ -1,6 +1,5 @@
 #![cfg(feature = "provider")]
 
-use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -273,7 +272,9 @@ fn flagged_within<'a>(
     diagnostics: &[Diagnostic],
     func: &DecoratedNode<'_>,
 ) -> Vec<&'a str> {
-    let Range { start, end } = func.raw().byte_range();
+    let span = func.span();
+    let start = span.start();
+    let end = span.end();
 
     diagnostics
         .iter()
@@ -906,7 +907,9 @@ fn flagged_within_with_a_span_past_the_function_end_returns_nothing() {
     let tree = parse_fixture_file("src/lib.rs");
     let root = tree.root_node();
     let func = find_function_by_name(&root, "match_on_enum").expect("should find match_on_enum");
-    let Range { start, end } = func.raw().byte_range();
+    let span = func.span();
+    let start = span.start();
+    let end = span.end();
     let diagnostics = vec![
         Diagnostic::builder()
             .rule_id(RuleId::new("lint.test"))

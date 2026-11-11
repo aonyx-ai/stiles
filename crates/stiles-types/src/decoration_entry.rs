@@ -23,11 +23,10 @@ pub(crate) type Erased = stabby::dynptr!(Box<dyn stabby::Any + Send + Sync>);
 /// entry out. The node id sits in the entry, not in a separate table. A
 /// sealed index is therefore one list of positions into one list of entries.
 ///
-/// The type is public because [`DecorationLookup`] names it in the layout
-/// stabby records. Its module is not, so nothing outside this crate can
+/// The host's table hands a plugin a reference to an entry, and the plugin
+/// reads the value through [`Entry::read`]. The type is public because the
+/// table names it. Its module is not, so nothing outside this crate can
 /// name it, and it stays out of the documentation.
-///
-/// [`DecorationLookup`]: crate::DecorationLookup
 #[doc(hidden)]
 #[stabby::stabby]
 pub struct Entry {
