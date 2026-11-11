@@ -359,17 +359,17 @@ every body stiles reads has a size limit.
 
 ## The plugin boundary
 
-Rust has no stable ABI of its own, so every value that crosses between
-stiles and a plugin is laid out by stabby, whose layouts hold under any
-compiler. The exceptions are the two tables of host functions behind a node
-and a sink, `#[repr(C)]` structs that later paragraphs describe. A loaded
-library is
-coherent with the stiles binary when both lay the boundary out the same
-way, which is a property of the stiles source each was built from and not
-of the rustc that built it. The loader establishes that before it calls
-anything the plugin defines. A `dlopen` runs the library's initializers,
-so the handshake is a compatibility gate, and trust comes from the
-configuration as the previous section says.
+Rust has no stable ABI of its own, so two kinds of layout cross between
+stiles and a plugin. Stabby lays out every value that crosses, such as a span
+or a rule id, and its layouts hold under any compiler. Every call goes through
+a `#[repr(C)]` table of `extern "C"` functions, which later paragraphs
+describe: the registrar, the table of a pass, and the tables behind a node and
+a sink. A loaded library is coherent with the stiles binary when both lay the
+boundary out the same way, which is a property of the stiles source each was
+built from and not of the rustc that built it. The loader establishes that
+before it calls anything the plugin defines. A `dlopen` runs the library's
+initializers, so the handshake is a compatibility gate, and trust comes from
+the configuration as the previous section says.
 
 The plugin exports a declaration. The loader reads its leading protocol
 version through a raw pointer, and only a matching version licenses a
@@ -379,8 +379,18 @@ vouches that the version names one layout, and the version decides. When
 either side was built from unpublished source, the loader compares two
 fingerprints too: one for stiles-types and one that stiles-plugin joins
 from every language crate. The first mismatch refuses the library with an
-error that says what to rebuild. Only then does the loader ask the plugin
-for its lints: a factory, a language, and the declared rules of each.
+error that says what to rebuild. Only then does the loader call the plugin's
+`register`.
+
+`register` takes the host's registrar, a `#[repr(C)]` table that starts with
+the number of functions it holds. The plugin calls its `lint` entry once for
+each lint, with the language as a byte that `Language` pins, a factory, and
+the declared rules as a pointer and a count. The entry returns a handle that
+names the lint, so a later entry can declare more about it. A plugin never
+assembles a laid-out list of its lints, so registration grows by new
+functions, not new fields. The host keeps a copy of each call. It refuses the
+plugin when a language byte names no language it knows, when the plugin
+registers no lint, or when a lint declares no rule.
 
 The handshake guards against silence. A plugin built against drifted
 source would mostly work, and rules fail open, so a wrong answer would
@@ -438,12 +448,24 @@ collector of its own, on the thread that walks the file, so files that run
 in parallel never share one. A test in stiles-types fails when the sink's
 entries move, as it does for the node's table.
 
-The factory's identity reaches the pass's vtable and names its methods
-in order, so a method added or moved is refused. It records each method
-as a pointer, not what it takes and returns, so a changed signature
-belongs to the declaration's `ABI_VERSION`. A test scans the trait's
-source and fails when its method list moves, so the test reminds a
-contributor to bump it.
+A factory is a plain `extern "C"` function of the plugin's. It builds a pass
+inside its language adapter, boxes it with the plugin's allocator, and writes
+a pass instance: a pointer to that state and a pointer to the pass's table in
+the plugin's image. The table holds `drop`, then a length, then the optional
+`configure` and `check_node` hooks. A hook added later, such as `finish_file`,
+goes at the end. The host reads the table through a raw pointer, and reads a
+hook only when the plugin's length covers it, so an older plugin's shorter
+table simply lacks the hook. Every entry catches a panic and hands it back as
+a value. Dropping the instance calls the plugin's `drop`, so the plugin frees
+the state it allocated.
+
+`LintPass` stays an ordinary Rust trait, and never crosses. The host wraps a
+loaded instance in a type that implements it with the registered language, so
+the walk runs a plugin's pass like any of its own. Passes are built for each
+file, and files run in parallel. An instance is `Send` because the pass it
+holds is, and every call into it takes the instance exclusively. A test in
+stiles-types fails when the entries of the registrar, the pass's table, or the
+instance move, as it does for the node's table and the sink's.
 
 `ABI_VERSION` is a promise about a release, and a plugin loads only on
 the version it was built for. Before 1.0 a version is a minor such as
@@ -457,8 +479,8 @@ code differ. `rakko check-abi` compares the record with the one at the
 latest `stiles@` tag. A moved fingerprint needs the version after that
 release's, and a version may only ever rise to that one. The version may
 also rise with no moved fingerprint, because it guards what no
-fingerprint reads: the shape of the declaration, the signatures of the
-pass trait, and the entries of the node's table and the sink's table.
+fingerprint reads: the shape of the declaration and the entries of every
+table.
 
 Between two releases, one version therefore holds more than one layout.
 A build from unpublished source cannot vouch for its version, so its
@@ -482,13 +504,15 @@ reach the host's tree, which only the host's functions read. A pass
 catches its own panics at the boundary and hands them back as values,
 because an unwind must not cross between two panic runtimes. That catch
 rests on the plugin unwinding: a plugin built with `panic = "abort"` still
-takes the process down, and nothing checks the strategy. Every allocation
-that crosses is stabby's and carries the function that frees it, so a
-plugin may set its own `#[global_allocator]`.
+takes the process down, and nothing checks the strategy. The side that
+allocated a value frees it. Every stabby allocation that crosses carries the
+function that frees it, and a pass's state goes back to the plugin's `drop`.
+A plugin may therefore set its own `#[global_allocator]`.
 
-The loader keeps every library loaded for the life of the process. The
-lints a plugin hands over and every `RuleId` it mints point into the
-library's image.
+The loader keeps every library loaded for the life of the process, including
+one it refused after registration. The factories a plugin registers, the
+table of every pass, and every `RuleId` it mints point into the library's
+image. A caught panic frees its message through an allocator table there too.
 
 ## Workspace layout
 
