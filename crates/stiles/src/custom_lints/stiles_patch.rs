@@ -187,9 +187,10 @@ mod tests {
 
         let config = patch.config(Path::new("/stiles"));
 
+        let path = Path::new("/stiles").join("crates").join("stiles-types");
         assert_eq!(
             config,
-            "patch.crates-io.stiles-types.path='/stiles/crates/stiles-types'"
+            format!("patch.crates-io.stiles-types.path='{}'", path.display())
         );
     }
 
@@ -202,9 +203,10 @@ mod tests {
 
         let config = patch.config(Path::new("/stiles"));
 
+        let path = Path::new("/stiles").join("crates").join("stiles-rust");
         assert_eq!(
             config,
-            format!("patch.'{STILES_GIT}'.stiles-rust.path='/stiles/crates/stiles-rust'")
+            format!("patch.'{STILES_GIT}'.stiles-rust.path='{}'", path.display())
         );
     }
 

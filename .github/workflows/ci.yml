@@ -224,7 +224,10 @@ jobs:
 
       - name: Test the binary
         shell: bash
-        run: cargo test --locked -p stiles
+        # The tests of the library and of each binary are separate targets, and
+        # the tests that load rules are among the last. A failure in one target
+        # would otherwise hide the result of every target after it.
+        run: cargo test --locked --no-fail-fast -p stiles
 
   success:
     name: All checks succeeded

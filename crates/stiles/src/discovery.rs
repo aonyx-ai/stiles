@@ -287,6 +287,7 @@ mod tests {
     /// # Panics
     ///
     /// Panics if `directory` cannot be read, or if it reads back sorted.
+    #[cfg(not(windows))]
     fn assert_stored_out_of_order(directory: &Path) {
         let names: Vec<String> = std::fs::read_dir(directory)
             .expect("directory should be read")
@@ -1260,6 +1261,11 @@ mod tests {
         assert_unpin::<Discovery>();
     }
 
+    /// Shows that the tree of the sorting tests reads back out of order
+    ///
+    /// NTFS lists a directory in sorted order, so no tree reads back out of
+    /// order on Windows, and the test has nothing to prove there.
+    #[cfg(not(windows))]
     #[test]
     fn unsorted_tree_reads_back_out_of_order() {
         let directory = unsorted_tree();
