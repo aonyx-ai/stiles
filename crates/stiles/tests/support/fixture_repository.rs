@@ -160,8 +160,8 @@ pub(crate) fn write_lint_package(
         format!(
             "{workspace}[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \
              \"2024\"\npublish = false\n\n[lib]\ncrate-type = [\"cdylib\"]\n\n[dependencies]\n\
-             stiles-plugin = {{ path = \"{crates}/stiles-plugin\" }}\nstiles-rust = {{ path = \
-             \"{crates}/stiles-rust\", default-features = false }}\nstiles-types = {{ path = \"{crates}/stiles-types\" }}\n"
+             stiles-plugin = {{ path = '{crates}/stiles-plugin' }}\nstiles-rust = {{ path = \
+             '{crates}/stiles-rust', default-features = false }}\nstiles-types = {{ path = '{crates}/stiles-types' }}\n"
         ),
     )
     .expect("the manifest should be written");

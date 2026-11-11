@@ -31,13 +31,30 @@ jobs:
         # oldest runner sets the oldest distribution that can run it.
         # Ubuntu 24.04 carries glibc 2.39, which refuses Ubuntu 22.04 LTS
         # and Debian 12. Ubuntu 22.04 carries 2.35, which both accept.
+        #
+        # `mise.lock` records no download for Windows, so mise installs only
+        # Rust there, which needs none. The runner of Windows already carries
+        # jq for the task that the install starts.
         include:
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-22.04
+            tools: jq rust
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-22.04-arm
+            tools: jq rust
           - target: aarch64-apple-darwin
             runner: macos-latest
+            tools: jq rust
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            tools: rust
+
+    # Every step below is written for bash, which each runner carries,
+    # Windows included. A step without this default runs in PowerShell on
+    # Windows.
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout code
@@ -57,7 +74,7 @@ jobs:
         with:
           # renovate: datasource=github-releases depName=jdx/mise extractVersion=^v(?<version>.+)$
           version: 2026.11.6
-          install_args: jq rust
+          install_args: ${{ matrix.tools }}
           cache: false
 
       - name: Add the target to the toolchain
@@ -86,6 +103,13 @@ jobs:
           version="${TAG#stiles@}"
           target="${TARGET}"
 
+          # Windows names an executable with an extension, and the copy below
+          # needs the full name of the file.
+          case "${target}" in
+              *-windows-*) executable="stiles.exe" ;;
+              *) executable="stiles" ;;
+          esac
+
           # The tag names the version, and `Cargo.toml` names it too. A tag that
           # disagrees would ship an archive whose name promises a version the
           # binary does not report, so the disagreement stops the release here.
@@ -100,7 +124,7 @@ jobs:
           fi
 
           cargo build --release --locked -p stiles --target "${target}"
-          stiles="target/${target}/release/stiles"
+          stiles="target/${target}/release/${executable}"
           "${stiles}" --version
 
           # The archive's name promises a platform, and the binary decides which
@@ -116,7 +140,7 @@ jobs:
           name="stiles-${version}-${target}"
           rm -rf "dist/${name}"
           mkdir -p "dist/${name}"
-          cp "target/${target}/release/stiles" "dist/${name}/"
+          cp "${stiles}" "dist/${name}/"
           cp LICENSE-APACHE LICENSE-MIT README.md "dist/${name}/"
 
           # Short flags, because macOS ships bsdtar and its support for the
