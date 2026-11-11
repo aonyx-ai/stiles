@@ -36,12 +36,18 @@ pub mod __private {
 
 /// A fingerprint of the language support a plugin was built against
 ///
-/// Each language crate fingerprints the part of it that shapes the
-/// boundary: its generated lint pass trait and its decoration types. This
+/// Each language crate fingerprints its generated lint pass trait. This
 /// constant joins them in a fixed order. A plugin carries it in its
 /// declaration, and stiles refuses a plugin whose value differs from its
-/// own. A pass generated from another grammar would load and never fire,
-/// and a decoration read at another layout is unsound.
+/// own. A pass generated from another grammar would load and never fire.
+///
+/// The decorations are not part of it. A lint declares each decoration it
+/// reads by its key and the fingerprint of its layout. Stiles refuses a
+/// read that no provider offers at both, and names the decoration a plugin
+/// needs. A lint whose reads are undeclared escapes it until
+/// [stiles#651].
+///
+/// [stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
 ///
 /// # Examples
 ///
