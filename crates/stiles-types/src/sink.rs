@@ -42,7 +42,7 @@ use crate::sink_table::SinkTable;
 ///
 /// [`Collector`]: crate::Collector
 /// [`LintPass::check_node`]: crate::LintPass::check_node
-/// [`lint_pass_adapter!`]: crate::lint_pass_adapter
+/// [`lint_pass_adapter!`]: crate::lint_pass_adapter!
 /// [`StableLike`]: stabby::abi::StableLike
 #[stabby::stabby]
 #[derive(Copy, Clone)]
