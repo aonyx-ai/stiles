@@ -189,6 +189,43 @@ jobs:
           path: ~/.cache/stiles
           key: lints-${{ runner.os }}-${{ hashFiles('.config/stiles.toml', 'mise.toml') }}
 
+  # Stiles publishes a binary for Windows, and on Windows it builds each rule
+  # as a DLL and loads it at run time. The harness runs every other check on
+  # Linux, so this job runs the tests of the binary on Windows. They build
+  # rules, load them, and check projects with them.
+  windows:
+    name: Test stiles on Windows
+    runs-on: windows-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The setup cleans the tree itself.
+          clean: false
+          persist-credentials: false
+
+      # `mise.lock` records no download for Windows, so the shared setup
+      # cannot install the tools here. Mise installs only Rust, which needs no
+      # download from the lockfile, and the runner already carries jq for the
+      # task that the install starts.
+      - name: Install the pinned toolchain
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          # renovate: datasource=github-releases depName=jdx/mise extractVersion=^v(?<version>.+)$
+          version: 2026.11.6
+          install_args: rust
+          cache: false
+
+      - name: Test the binary
+        shell: bash
+        run: cargo test --locked -p stiles
+
   success:
     name: All checks succeeded
     runs-on: ubuntu-latest
@@ -196,7 +233,7 @@ jobs:
     permissions:
       pull-requests: read # Required to find an open release pull request
 
-    needs: checks
+    needs: [checks, windows]
     if: always()
 
     steps:
