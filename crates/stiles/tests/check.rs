@@ -403,9 +403,10 @@ fn check_package_whose_sources_the_global_gitignore_excludes_fails() {
     .expect("git configuration should be written");
 
     stiles()
+        .current_dir(package.path())
         .env("GIT_CONFIG_GLOBAL", &config)
         .arg("check")
-        .arg(package.path())
+        .arg(".")
         .assert()
         .code(1)
         .stderr(predicate::str::contains("analyzed no files"));

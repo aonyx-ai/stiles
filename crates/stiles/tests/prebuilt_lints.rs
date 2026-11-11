@@ -297,7 +297,10 @@ fn check_with_a_prebuilt_that_fails_the_handshake_fails() {
         .code(1)
         .stderr(predicate::str::contains("incompatible with stiles"))
         .stderr(predicate::str::contains(
-            destination.to_string_lossy().into_owned(),
+            std::fs::canonicalize(&destination)
+                .expect("the seeded directory should exist")
+                .to_string_lossy()
+                .into_owned(),
         ));
 }
 
