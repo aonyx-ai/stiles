@@ -4,7 +4,7 @@
 $ stiles --help
 Write your own lint rules for the style conventions of your project
 
-Usage: stiles [OPTIONS] [COMMAND]
+Usage: stiles[EXE] [OPTIONS] [COMMAND]
 
 Commands:
   abi        Print the tag that names the prebuilt lints this stiles can load

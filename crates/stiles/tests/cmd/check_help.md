@@ -4,7 +4,7 @@
 $ stiles check --help
 Run stiles lints against a project
 
-Usage: stiles check [OPTIONS] [PATH]
+Usage: stiles[EXE] check [OPTIONS] [PATH]
 
 Arguments:
   [PATH]  Path to the target project directory [default: .]

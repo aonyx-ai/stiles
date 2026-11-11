@@ -4,7 +4,7 @@
 $ stiles reference --help
 Generate a reference page for a set of rules
 
-Usage: stiles reference [OPTIONS] --package <PACKAGE> --output <OUTPUT> [PATH]
+Usage: stiles[EXE] reference [OPTIONS] --package <PACKAGE> --output <OUTPUT> [PATH]
 
 Arguments:
   [PATH]  Path to the project that holds the package [default: .]

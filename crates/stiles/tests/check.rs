@@ -210,6 +210,12 @@ fn unreachable_help_count(stdout: &str) -> usize {
         .count()
 }
 
+/// Returns the error that names the file that holds text that is not UTF-8
+///
+/// Stiles writes the path with the separator of the platform.
+fn not_utf8_error() -> String {
+    format!("error: {}", Path::new("src").join("not_utf8.rs").display())
+}
 #[test]
 fn check_directory_without_sources_fails() {
     let directory = tempfile::tempdir().expect("temporary directory should be created");
@@ -389,7 +395,10 @@ fn check_package_whose_sources_the_global_gitignore_excludes_fails() {
     let config = git.path().join("config");
     std::fs::write(
         &config,
-        format!("[core]\n\texcludesfile = {}\n", excludes.display()),
+        format!(
+            "[core]\n\texcludesfile = {}\n",
+            excludes.display().to_string().replace('\\', "/")
+        ),
     )
     .expect("git configuration should be written");
 
@@ -647,8 +656,8 @@ fn check_with_diagnostics_and_errors_splits_report_and_errors() {
         .stdout(predicate::str::contains(
             "warning[fixture.wildcard-match-arm]",
         ))
-        .stdout(predicate::str::contains("error: src/not_utf8.rs").not())
-        .stderr(predicate::str::contains("error: src/not_utf8.rs"))
+        .stdout(predicate::str::contains(not_utf8_error()).not())
+        .stderr(predicate::str::contains(not_utf8_error()))
         .stderr(predicate::str::contains("wildcard-match-arm").not());
 }
 
@@ -909,7 +918,7 @@ fn check_without_keep_going_keeps_diagnostics_from_earlier_files() {
         .args(["check", "src"])
         .assert()
         .code(1)
-        .stderr(predicate::str::contains("error: src/not_utf8.rs"))
+        .stderr(predicate::str::contains(not_utf8_error()))
         .stdout(predicate::str::contains(
             "warning[fixture.wildcard-match-arm]",
         ));
