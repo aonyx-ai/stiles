@@ -12,8 +12,8 @@ mod tests {
     use std::path::PathBuf;
 
     use stiles_types::{
-        DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic, RuleId, RuleOptions,
-        Severity,
+        Collector, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic, RuleId,
+        RuleOptions, Severity,
     };
 
     use super::*;
@@ -62,9 +62,14 @@ mod tests {
         let function = tree.root_node().named_child(0).unwrap();
         let mut adapter = TypeScriptLintPassAdapter::new(WarnOnFunction);
 
-        let checked: Result<_, Panic> = adapter.check_node(&function).into();
+        let collector = Collector::new();
 
-        let diagnostics = checked.expect("the rule should not panic");
+        let checked: Result<(), Panic> = collector
+            .lend(|sink| adapter.check_node(&function, sink))
+            .into();
+
+        checked.expect("the rule should not panic");
+        let diagnostics = collector.finish().expect("the report should be whole");
         let rules: Vec<RuleId> = diagnostics.iter().map(|found| found.rule_id()).collect();
         assert_eq!(rules, [RuleId::new("test.function")]);
     }
@@ -91,7 +96,9 @@ mod tests {
         let function = tree.root_node().named_child(0).unwrap();
         let mut adapter = TypeScriptLintPassAdapter::new(Exploding);
 
-        let checked: Result<_, Panic> = adapter.check_node(&function).into();
+        let checked: Result<(), Panic> = Collector::new()
+            .lend(|sink| adapter.check_node(&function, sink))
+            .into();
 
         let panic = checked.expect_err("the rule should panic");
         assert_eq!(panic.message(), "cannot check function_declaration");

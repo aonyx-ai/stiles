@@ -108,8 +108,8 @@ mod tests {
     use stabby::closure::Call0Dyn;
     use stiles_rust::{RuleId, RustLintPass};
     use stiles_types::{
-        BoxedLintPass, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic,
-        Severity,
+        BoxedLintPass, Collector, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass,
+        Panic, Severity,
     };
     use stiles_typescript::TypeScriptLintPass;
 
@@ -245,9 +245,14 @@ mod tests {
         let function = tree.root_node().named_child(0).expect("should parse a fn");
         let mut pass = built(0);
 
-        let checked: Result<_, Panic> = LintPass::check_node(&mut pass, &function).into();
+        let collector = Collector::new();
 
-        let diagnostics = checked.expect("the pass should not panic");
+        let checked: Result<(), Panic> = collector
+            .lend(|sink| LintPass::check_node(&mut pass, &function, sink))
+            .into();
+
+        checked.expect("the pass should not panic");
+        let diagnostics = collector.finish().expect("the report should be whole");
         let rules: Vec<RuleId> = diagnostics.iter().map(|found| found.rule_id()).collect();
         assert_eq!(rules, [RuleId::new("test.flag-every-function")]);
     }
@@ -265,9 +270,14 @@ mod tests {
             .expect("should parse a comment");
         let mut pass = built(2);
 
-        let checked: Result<_, Panic> = LintPass::check_node(&mut pass, &comment).into();
+        let collector = Collector::new();
 
-        let diagnostics = checked.expect("the pass should not panic");
+        let checked: Result<(), Panic> = collector
+            .lend(|sink| LintPass::check_node(&mut pass, &comment, sink))
+            .into();
+
+        checked.expect("the pass should not panic");
+        let diagnostics = collector.finish().expect("the report should be whole");
         let rules: Vec<RuleId> = diagnostics.iter().map(|found| found.rule_id()).collect();
         assert_eq!(rules, [RuleId::new("test.flag-every-comment")]);
     }

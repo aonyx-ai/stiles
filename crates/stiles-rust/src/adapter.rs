@@ -7,8 +7,8 @@ mod tests {
     use std::path::PathBuf;
 
     use stiles_types::{
-        DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic, RuleId, RuleOptions,
-        Severity,
+        Collector, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic, RuleId,
+        RuleOptions, Severity,
     };
 
     use super::*;
@@ -68,9 +68,14 @@ mod tests {
         let fn_node = tree.root_node().named_child(0).unwrap();
         let mut adapter = RustLintPassAdapter::new(FnFinder);
 
-        let checked: Result<_, Panic> = adapter.check_node(&fn_node).into();
+        let collector = Collector::new();
 
-        let diagnostics = checked.expect("the rule should not panic");
+        let checked: Result<(), Panic> = collector
+            .lend(|sink| adapter.check_node(&fn_node, sink))
+            .into();
+
+        checked.expect("the rule should not panic");
+        let diagnostics = collector.finish().expect("the report should be whole");
         let rules: Vec<RuleId> = diagnostics.iter().map(|found| found.rule_id()).collect();
         assert_eq!(rules, [RuleId::new("test.fn")]);
     }
@@ -104,7 +109,9 @@ mod tests {
         let fn_node = tree.root_node().named_child(0).unwrap();
         let mut adapter = RustLintPassAdapter::new(Exploding);
 
-        let checked: Result<_, Panic> = adapter.check_node(&fn_node).into();
+        let checked: Result<(), Panic> = Collector::new()
+            .lend(|sink| adapter.check_node(&fn_node, sink))
+            .into();
 
         let panic = checked.expect_err("the rule should panic");
         assert_eq!(panic.message(), "cannot check function_item");

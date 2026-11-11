@@ -34,11 +34,10 @@ const MAX_ROUNDS: usize = 10;
 /// # Examples
 ///
 /// ```
-/// use stabby::vec;
 /// use stiles_testing::{assert_fix, parse};
 /// use stiles_types::{
 ///     Checked, Configured, DecoratedNode, Diagnostic, Edit, Fix, Language, LintPass,
-///     RuleId, RuleOptions, Severity, Span,
+///     RuleId, RuleOptions, Severity, Sink, Span,
 /// };
 ///
 /// /// Removes the period at the end of a line comment
@@ -53,10 +52,10 @@ const MAX_ROUNDS: usize = 10;
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+///     extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked {
 ///         let span = node.span();
 ///         if node.kind() != "line_comment" || !node.text().trim_end().ends_with('.') {
-///             return Checked::Ok(vec::Vec::new());
+///             return Checked::Ok(());
 ///         }
 ///         let end = span.start() + node.text().trim_end().len();
 ///         let period = Span::builder().file(span.file()).start(end - 1).end(end).build();
@@ -73,7 +72,8 @@ const MAX_ROUNDS: usize = 10;
 ///             .build()
 ///             .with_fix(fix)
 ///             .expect("the fix should attach");
-///         Checked::Ok([diagnostic].into_iter().collect())
+///         sink.report(&diagnostic);
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -124,10 +124,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use stabby::vec;
     use stiles_types::{
         Checked, Configured, DecoratedNode, Diagnostic, Edit, Fix, Language, RuleId, RuleOptions,
-        Severity, Span,
+        Severity, Sink, Span,
     };
 
     use super::*;
@@ -155,11 +154,11 @@ mod tests {
             Configured::Ok(())
         }
 
-        extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+        extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked {
             let span = node.span();
             let text = node.text().trim_end();
             if node.kind() != "line_comment" || !text.ends_with('.') {
-                return Checked::Ok(vec::Vec::new());
+                return Checked::Ok(());
             }
             let end = span.start() + text.len();
             let diagnostic = Diagnostic::builder()
@@ -174,7 +173,8 @@ mod tests {
                 Answer::Report => None,
             };
             let Some((start, replacement)) = edit else {
-                return Checked::Ok([diagnostic].into_iter().collect());
+                sink.report(&diagnostic);
+                return Checked::Ok(());
             };
             let edit = Edit::builder()
                 .span(
@@ -192,7 +192,8 @@ mod tests {
                 .build()
                 .expect("the fix should build");
             let diagnostic = diagnostic.with_fix(fix).expect("the fix should attach");
-            Checked::Ok([diagnostic].into_iter().collect())
+            sink.report(&diagnostic);
+            Checked::Ok(())
         }
     }
 

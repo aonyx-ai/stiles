@@ -289,11 +289,10 @@ mod tests {
     use std::path::PathBuf;
 
     use stabby::str::Str;
-    use stabby::vec;
     use stiles_types::{
         Checked, Configured, CoverageGap, DecorateTreeError, DecoratedNode, Decoration,
         DecorationKey, DecorationMap, Diagnostic, Language, LintPass, Panic, ProviderName, RuleId,
-        RuleOptions, Severity,
+        RuleOptions, Severity, Sink,
     };
 
     use super::*;
@@ -376,23 +375,22 @@ mod tests {
             Configured::Ok(())
         }
 
-        extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+        extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked {
             if node.kind() != "source_file" {
-                return Checked::Ok(vec::Vec::new());
+                return Checked::Ok(());
             }
             let Some(marker) = node.decoration::<Marker>() else {
-                return Checked::Ok(vec::Vec::new());
+                return Checked::Ok(());
             };
-            Checked::Ok(
-                [Diagnostic::builder()
+            sink.report(
+                &Diagnostic::builder()
                     .rule_id(RuleId::new("test.marker"))
                     .severity(Severity::Warn)
                     .message(marker.0.as_str())
                     .span(node.span())
-                    .build()]
-                .into_iter()
-                .collect(),
-            )
+                    .build(),
+            );
+            Checked::Ok(())
         }
     }
 
@@ -430,15 +428,17 @@ mod tests {
                 Configured::Ok(())
             }
 
-            extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
+            extern "C" fn check_node(
+                &mut self,
+                node: &DecoratedNode<'_>,
+                _sink: &Sink<'_>,
+            ) -> Checked {
                 let kind = node.kind();
-                Panic::catch(move || -> Vec<Diagnostic> {
-                    match kind == "function_item" {
-                        true => panic!("no functions allowed"),
-                        false => Vec::new(),
+                Panic::catch(move || {
+                    if kind == "function_item" {
+                        panic!("no functions allowed");
                     }
                 })
-                .map(|found| found.into_iter().collect())
                 .into()
             }
         }
@@ -571,19 +571,22 @@ mod tests {
                 Configured::Ok(())
             }
 
-            extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-                let found = match node.kind() == "function_item" {
-                    true => vec![
-                        Diagnostic::builder()
+            extern "C" fn check_node(
+                &mut self,
+                node: &DecoratedNode<'_>,
+                sink: &Sink<'_>,
+            ) -> Checked {
+                if node.kind() == "function_item" {
+                    sink.report(
+                        &Diagnostic::builder()
                             .rule_id(RuleId::new("test.always"))
                             .severity(Severity::Warn)
                             .message("found function")
                             .span(node.span())
                             .build(),
-                    ],
-                    false => Vec::new(),
-                };
-                Checked::Ok(found.into_iter().collect())
+                    );
+                }
+                Checked::Ok(())
             }
         }
 
@@ -663,12 +666,13 @@ mod tests {
                 Configured::Ok(())
             }
 
-            extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-                Panic::catch(|| -> Vec<Diagnostic> {
-                    panic!("lint passes must not run on an uncovered file")
-                })
-                .map(|found| found.into_iter().collect())
-                .into()
+            extern "C" fn check_node(
+                &mut self,
+                _node: &DecoratedNode<'_>,
+                _sink: &Sink<'_>,
+            ) -> Checked {
+                Panic::catch(|| -> () { panic!("lint passes must not run on an uncovered file") })
+                    .into()
             }
         }
 

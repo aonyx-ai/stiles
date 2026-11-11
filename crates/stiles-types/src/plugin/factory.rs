@@ -19,7 +19,8 @@ use crate::{BoxedLintPass, Language, Panic, RuleId};
 /// use stabby::vec;
 /// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
 /// use stiles_types::{
-///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, Sink,
+///     boxed_lint_pass,
 /// };
 ///
 /// /// Reports nothing
@@ -34,8 +35,12 @@ use crate::{BoxedLintPass, Language, Panic, RuleId};
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-///         Checked::Ok(vec::Vec::new())
+///     extern "C" fn check_node(
+///         &mut self,
+///         _node: &DecoratedNode<'_>,
+///         _sink: &Sink<'_>,
+///     ) -> Checked {
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -56,7 +61,8 @@ pub type LintPassFactory =
 /// use stabby::vec;
 /// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
 /// use stiles_types::{
-///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, Sink,
+///     boxed_lint_pass,
 /// };
 ///
 /// /// Reports nothing
@@ -71,8 +77,12 @@ pub type LintPassFactory =
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-///         Checked::Ok(vec::Vec::new())
+///     extern "C" fn check_node(
+///         &mut self,
+///         _node: &DecoratedNode<'_>,
+///         _sink: &Sink<'_>,
+///     ) -> Checked {
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -97,7 +107,8 @@ pub type Constructed = result::Result<BoxedLintPass, Panic>;
 /// use stabby::vec;
 /// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
 /// use stiles_types::{
-///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, Sink,
+///     boxed_lint_pass,
 /// };
 ///
 /// /// Reports nothing
@@ -112,8 +123,12 @@ pub type Constructed = result::Result<BoxedLintPass, Panic>;
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-///         Checked::Ok(vec::Vec::new())
+///     extern "C" fn check_node(
+///         &mut self,
+///         _node: &DecoratedNode<'_>,
+///         _sink: &Sink<'_>,
+///     ) -> Checked {
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -139,7 +154,8 @@ pub fn factory(build: impl Fn() -> Constructed + Send + Sync + 'static) -> LintP
 /// use stabby::vec;
 /// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
 /// use stiles_types::{
-///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, Sink,
+///     boxed_lint_pass,
 /// };
 ///
 /// /// Reports nothing
@@ -154,8 +170,12 @@ pub fn factory(build: impl Fn() -> Constructed + Send + Sync + 'static) -> LintP
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-///         Checked::Ok(vec::Vec::new())
+///     extern "C" fn check_node(
+///         &mut self,
+///         _node: &DecoratedNode<'_>,
+///         _sink: &Sink<'_>,
+///     ) -> Checked {
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -184,7 +204,8 @@ pub fn construct(factory: &LintPassFactory) -> Constructed {
 /// use stabby::vec;
 /// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
 /// use stiles_types::{
-///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, Sink,
+///     boxed_lint_pass,
 /// };
 ///
 /// /// Reports nothing
@@ -199,8 +220,12 @@ pub fn construct(factory: &LintPassFactory) -> Constructed {
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-///         Checked::Ok(vec::Vec::new())
+///     extern "C" fn check_node(
+///         &mut self,
+///         _node: &DecoratedNode<'_>,
+///         _sink: &Sink<'_>,
+///     ) -> Checked {
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -244,7 +269,8 @@ pub struct ExportedLint {
 /// use stabby::vec;
 /// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
 /// use stiles_types::{
-///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, Sink,
+///     boxed_lint_pass,
 /// };
 ///
 /// /// Reports nothing
@@ -259,8 +285,12 @@ pub struct ExportedLint {
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-///         Checked::Ok(vec::Vec::new())
+///     extern "C" fn check_node(
+///         &mut self,
+///         _node: &DecoratedNode<'_>,
+///         _sink: &Sink<'_>,
+///     ) -> Checked {
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -294,7 +324,8 @@ pub struct Plugin {
 /// use stabby::vec;
 /// use stiles_types::plugin::{Constructed, ExportedLint, Loaded, Plugin, construct, factory};
 /// use stiles_types::{
-///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, boxed_lint_pass,
+///     Checked, Configured, DecoratedNode, Language, LintPass, RuleId, RuleOptions, Sink,
+///     boxed_lint_pass,
 /// };
 ///
 /// /// Reports nothing
@@ -309,8 +340,12 @@ pub struct Plugin {
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-///         Checked::Ok(vec::Vec::new())
+///     extern "C" fn check_node(
+///         &mut self,
+///         _node: &DecoratedNode<'_>,
+///         _sink: &Sink<'_>,
+///     ) -> Checked {
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -335,10 +370,9 @@ pub type Loaded = result::Result<Plugin, Panic>;
 #[cfg(test)]
 mod tests {
     use stabby::closure::Call0Dyn;
-    use stabby::vec;
 
     use super::*;
-    use crate::{Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions};
+    use crate::{Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions, Sink};
 
     struct Quiet;
 
@@ -351,8 +385,12 @@ mod tests {
             Configured::Ok(())
         }
 
-        extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-            Checked::Ok(vec::Vec::new())
+        extern "C" fn check_node(
+            &mut self,
+            _node: &DecoratedNode<'_>,
+            _sink: &Sink<'_>,
+        ) -> Checked {
+            Checked::Ok(())
         }
     }
 

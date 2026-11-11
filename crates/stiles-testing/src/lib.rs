@@ -84,11 +84,8 @@ pub fn decorate(tree: &mut DecoratedTree, decorations: DecorationMap) {
 /// # Examples
 ///
 /// ```
-/// use stabby::vec;
 /// use stiles_testing::{execute, parse};
-/// use stiles_types::{
-///     Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions,
-/// };
+/// use stiles_types::{Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions, Sink};
 ///
 /// /// Reports nothing
 /// struct Quiet;
@@ -102,8 +99,12 @@ pub fn decorate(tree: &mut DecoratedTree, decorations: DecorationMap) {
 ///         Configured::Ok(())
 ///     }
 ///
-///     extern "C" fn check_node(&mut self, _node: &DecoratedNode<'_>) -> Checked {
-///         Checked::Ok(vec::Vec::new())
+///     extern "C" fn check_node(
+///         &mut self,
+///         _node: &DecoratedNode<'_>,
+///         _sink: &Sink<'_>,
+///     ) -> Checked {
+///         Checked::Ok(())
 ///     }
 /// }
 ///
@@ -488,7 +489,7 @@ impl DiagnosticAssertion<'_> {
 mod tests {
     use stiles_types::{
         Checked, Configured, DecoratedNode, Decoration, DecorationKey, Diagnostic, RuleId,
-        RuleOptions, Severity,
+        RuleOptions, Severity, Sink,
     };
 
     use super::*;
@@ -552,19 +553,22 @@ mod tests {
                 Configured::Ok(())
             }
 
-            extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>) -> Checked {
-                let found = match node.kind() == "function_item" {
-                    true => vec![
-                        Diagnostic::builder()
+            extern "C" fn check_node(
+                &mut self,
+                node: &DecoratedNode<'_>,
+                sink: &Sink<'_>,
+            ) -> Checked {
+                if node.kind() == "function_item" {
+                    sink.report(
+                        &Diagnostic::builder()
                             .rule_id(RuleId::new("test.fn"))
                             .severity(Severity::Warn)
                             .message("found fn")
                             .span(node.span())
                             .build(),
-                    ],
-                    false => Vec::new(),
-                };
-                Checked::Ok(found.into_iter().collect())
+                    );
+                }
+                Checked::Ok(())
             }
         }
 

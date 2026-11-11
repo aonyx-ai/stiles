@@ -1,3 +1,4 @@
+use stiles_types::{CollectDiagnosticsError, Span};
 use thiserror::Error;
 
 use crate::{PassPanic, UndeclaredRule};
@@ -32,6 +33,19 @@ pub enum WalkLintsError {
         source: PassPanic,
     },
 
+    /// A pass reported what the host cannot build into diagnostics
+    #[error(
+        "failed to build what a lint pass reported at byte {} of {}",
+        span.start(),
+        span.file().display()
+    )]
+    Reported {
+        /// The node the pass was checking
+        span: Span,
+        /// What the host could not build, and why
+        source: CollectDiagnosticsError,
+    },
+
     /// A pass reported a rule that its plugin did not declare for it
     #[error(transparent)]
     Undeclared {
@@ -42,7 +56,26 @@ pub enum WalkLintsError {
 
 #[cfg(test)]
 mod tests {
+    use stiles_types::RuleId;
+
     use super::*;
+
+    #[test]
+    fn reported_names_the_node() {
+        let error = WalkLintsError::Reported {
+            span: Span::builder().file("src/lib.rs").start(3).end(9).build(),
+            source: CollectDiagnosticsError::UnnamedFix {
+                rule: RuleId::new("lint.bar"),
+            },
+        };
+
+        let message = error.to_string();
+
+        assert_eq!(
+            message,
+            "failed to build what a lint pass reported at byte 3 of src/lib.rs"
+        );
+    }
 
     #[test]
     fn trait_send() {

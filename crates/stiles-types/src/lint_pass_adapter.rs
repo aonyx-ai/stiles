@@ -18,13 +18,16 @@
 /// The adapter is also the plugin's edge. A rule may panic, and a panic must
 /// not unwind into the host. Each call therefore runs under
 /// [`Panic::catch`] and comes back as a value. A rule keeps writing plain
-/// Rust and returning std's `Vec`, and the copy into the list that crosses
-/// the boundary happens in the adapter.
+/// Rust and returning std's `Vec` of diagnostics. The adapter reports each
+/// one through the [`Sink`] that the host lent the check, so no diagnostic
+/// crosses the boundary as a laid-out value. A rule that panics reports
+/// nothing for that node.
 ///
 /// [`Language`]: crate::Language
 /// [`LintPass`]: crate::LintPass
 /// [`LintPass::language`]: crate::LintPass::language
 /// [`Panic::catch`]: crate::Panic::catch
+/// [`Sink`]: crate::Sink
 #[macro_export]
 macro_rules! lint_pass_adapter {
     ($adapter:ident, $pass:ident, $dispatch:path, $language:ident) => {
@@ -97,9 +100,13 @@ macro_rules! lint_pass_adapter {
                 $crate::Panic::catch(|| self.inner.configure(options)).into()
             }
 
-            extern "C" fn check_node(&mut self, node: &$crate::DecoratedNode<'_>) -> $crate::Checked {
+            extern "C" fn check_node(
+                &mut self,
+                node: &$crate::DecoratedNode<'_>,
+                sink: &$crate::Sink<'_>,
+            ) -> $crate::Checked {
                 $crate::Panic::catch(|| $dispatch(&mut self.inner, node))
-                    .map(|found| found.into_iter().collect())
+                    .map(|found| found.iter().for_each(|diagnostic| sink.report(diagnostic)))
                     .into()
             }
         }
