@@ -47,6 +47,8 @@ stiles-types = { path = "../stiles-types", version = "=0.6.0" }
 [dev-dependencies]
 assert_cmd = "2"
 predicates = "3"
+# The loader's tests define decorations of their own, which stabby lays out.
+stabby.workspace = true
 tempfile.workspace = true
 tiny_http.workspace = true
 toml.workspace = true

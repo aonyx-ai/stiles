@@ -8,10 +8,12 @@ use bon::bon;
 use getset::{CopyGetters, Getters};
 use libloading::Library;
 use stiles_core::Lint;
+use stiles_rust::{RuleId, RustDecorationProvider};
 use stiles_types::plugin::{
     AbiVersion, PluginDeclaration, Registered, RegisteredLint, Registrar, Registrations,
 };
-use stiles_types::{Language, LintPass, Panic, RuleId, RuleOptions};
+use stiles_types::{DecorationIdentity, Language, LintPass, Panic, RuleOptions};
+use stiles_typescript::TypeScriptDecorationProvider;
 
 use self::handshake::AbiIdentity;
 use crate::config::{GitLintSource, LintSource, StilesConfig};
@@ -61,7 +63,8 @@ impl CustomLints {
     /// not export a plugin declaration, fails the ABI handshake, or exports
     /// no lints. It also
     /// returns one if a lint declares no rule, or if two lints declare one
-    /// rule for one language.
+    /// rule for one language. It returns one too if a plugin needs a longer
+    /// host table than this stiles has, or an unoffered decoration.
     #[builder]
     pub(crate) fn load(
         config: &StilesConfig,
@@ -182,6 +185,19 @@ impl CustomLints {
     }
 }
 
+/// Returns the decorations that this stiles's provider of `language` offers
+///
+/// A lint declares the decorations it reads, and the loader refuses one
+/// that is not here at the same layout. A provider computes only what the
+/// loaded lints read, so a decoration it does not offer is one the lint
+/// would never find.
+pub(crate) fn offered(language: Language) -> &'static [DecorationIdentity] {
+    match language {
+        Language::Rust => &RustDecorationProvider::DECORATIONS,
+        Language::TypeScript => &TypeScriptDecorationProvider::DECORATIONS,
+    }
+}
+
 /// A rule a loaded plugin declares, and the languages it runs on
 #[derive(Clone, Eq, PartialEq, Hash, Debug, CopyGetters, Getters)]
 pub(crate) struct DeclaredRule {
@@ -238,6 +254,58 @@ fn refuse_shared_rules(lints: &[LoadedLint]) -> anyhow::Result<()> {
                 library.display(),
                 other_library.display(),
             );
+        }
+    }
+
+    Ok(())
+}
+
+/// Refuses a lint that reads a decoration no provider of its language offers
+///
+/// A provider computes only the decorations the loaded lints declare, and
+/// it can compute only the ones it offers. A lint that reads any other
+/// would load and never find it. Its rule fails open, so it would report
+/// nothing, which reads like a rule that found no fault.
+///
+/// A decoration whose definition changed has a new key. A plugin built
+/// against an older or a newer one therefore names a key that is not
+/// offered. A change to a type that a decoration holds keeps the key and
+/// moves the layout. The fingerprint of each read has to match as well.
+///
+/// # Errors
+///
+/// Returns an error that names the rules of the lint and the key it reads.
+/// It says whether no provider offers the key or offers it at another
+/// layout.
+fn refuse_unoffered_reads(lints: &[LoadedLint]) -> anyhow::Result<()> {
+    for LoadedLint { lint, .. } in lints {
+        let Some(identities) = lint.reads().declared() else {
+            continue;
+        };
+        let offered = offered(lint.language());
+        let Some(identity) = identities
+            .iter()
+            .find(|identity| !offered.contains(identity))
+        else {
+            continue;
+        };
+        let rules = lint
+            .rules()
+            .iter()
+            .map(|rule| format!("`{rule}`"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let key = identity.key().as_str();
+        match offered.iter().any(|known| known.key() == identity.key()) {
+            true => anyhow::bail!(
+                "the lint of {rules} reads the decoration `{key}` at a layout that differs from \
+                 the one this stiles offers; build the plugin against this stiles"
+            ),
+            false => anyhow::bail!(
+                "the lint of {rules} reads the decoration `{key}`, which no {} provider of this \
+                 stiles offers; a stiles that offers it may run the plugin",
+                lint.language(),
+            ),
         }
     }
 
@@ -690,7 +758,9 @@ fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loade
 ///
 /// Returns an error if `register` panics, or if it registers a lint for a
 /// language this stiles does not know. Returns an error too if it
-/// registers no lint, or a lint that declares no rules.
+/// registers no lint, or a lint that declares no rules. It also returns
+/// one if the plugin needs a longer host table than this stiles has. It
+/// returns one too if a lint reads a decoration that no provider offers.
 fn register_lints(
     register: extern "C" fn(&Registrar) -> Registered,
     library: &Path,
@@ -721,6 +791,8 @@ fn register_lints(
         "the plugin exported a lint that declares no rules; stiles refuses every diagnostic \
          such a lint reports, so give it a `DeclaresRules` implementation that names them"
     );
+    refuse_unoffered_reads(&lints)
+        .context("failed to check the decorations that the lints read")?;
 
     Ok(lints)
 }
@@ -754,7 +826,9 @@ mod tests {
     use std::path::PathBuf;
 
     use kawauso_project::project::ProjectRoot;
-    use stiles_types::plugin::{Built, PassInstance};
+    use stiles_rust::decorations::FnSignature;
+    use stiles_types::plugin::{Built, HostTable, PassInstance, Reads};
+    use stiles_types::{DecoratedNode, Decoration, DecorationKey};
 
     use super::*;
     use crate::config::LintPath;
@@ -920,12 +994,46 @@ mod tests {
         Panic::catch(|| unreachable!("never built")).into()
     }
 
+    /// A decoration that no provider of this stiles offers
+    #[stabby::stabby]
+    struct Absent(u8);
+
+    impl Decoration for Absent {
+        const KEY: DecorationKey = DecorationKey::new("absent::Decoration#00");
+
+        type Ref<'a> = Option<&'a Self>;
+
+        fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+            node.decoration::<Self>()
+        }
+    }
+
+    /// A decoration under the key of [`FnSignature`], at another layout
+    ///
+    /// It stands in for a plugin built against a stiles whose signature
+    /// held a type that has changed since, so the key stayed the same.
+    #[stabby::stabby]
+    struct MisshapenSignature(u8);
+
+    impl Decoration for MisshapenSignature {
+        const KEY: DecorationKey = FnSignature::KEY;
+
+        type Ref<'a> = Option<&'a Self>;
+
+        fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+            node.decoration::<Self>()
+        }
+    }
+
     /// Describes a lint whose factory is never called
     fn loaded_lint(language: Language, rules: &[&'static str], library: &str) -> LoadedLint {
         let rules: Vec<RuleId> = rules.iter().map(|rule| RuleId::new(rule)).collect();
         let registrations = Registrations::new();
-        // SAFETY: `never` never returns `Ok`.
-        registrations.lend(|registrar| unsafe { registrar.lint(language, never, &rules) });
+        registrations.lend(|registrar| {
+            registrar.require_host_tables();
+            // SAFETY: `never` never returns `Ok`.
+            unsafe { registrar.lint(language, never, &rules) };
+        });
 
         let mut lints = registrations
             .finish()
@@ -937,12 +1045,47 @@ mod tests {
         }
     }
 
+    /// Registers one Rust lint, with every table named, that reads `reads`
+    fn register_reading(registrar: &Registrar, reads: &Reads) -> Registered {
+        registrar.require_host_tables();
+        // SAFETY: `never` never returns `Ok`.
+        let lint = unsafe { registrar.lint(Language::Rust, never, &[RuleId::new("lint.a")]) };
+        registrar.reads(lint, reads);
+
+        Registered::Ok(())
+    }
+
+    /// Registers one Rust lint that reads an offered key at another layout
+    extern "C" fn register_a_lint_reading_a_key_at_another_layout(
+        registrar: &Registrar,
+    ) -> Registered {
+        register_reading(registrar, &Reads::of::<MisshapenSignature>())
+    }
+
+    /// Registers one Rust lint that reads a decoration this stiles offers
+    extern "C" fn register_a_lint_reading_an_offered_key(registrar: &Registrar) -> Registered {
+        register_reading(registrar, &Reads::of::<FnSignature>())
+    }
+
+    /// Registers one Rust lint that reads a decoration no provider offers
+    extern "C" fn register_a_lint_reading_an_unoffered_key(registrar: &Registrar) -> Registered {
+        register_reading(registrar, &Reads::of::<Absent>())
+    }
+
     /// Registers one Rust lint that declares no rules
     extern "C" fn register_a_lint_without_rules(registrar: &Registrar) -> Registered {
+        registrar.require_host_tables();
         // SAFETY: `never` never returns `Ok`.
         unsafe { registrar.lint(Language::Rust, never, &[]) };
 
         Registered::Ok(())
+    }
+
+    /// Registers one lint, built against a node table longer than any
+    extern "C" fn register_needing_a_longer_table(registrar: &Registrar) -> Registered {
+        registrar.requires(HostTable::Context, usize::MAX);
+
+        register_one_lint(registrar)
     }
 
     /// Registers nothing
@@ -957,6 +1100,12 @@ mod tests {
 
     /// Registers one Rust lint with one rule
     extern "C" fn register_one_lint(registrar: &Registrar) -> Registered {
+        registrar.require_host_tables();
+        register_one_lint_naming_no_table(registrar)
+    }
+
+    /// Registers one Rust lint with one rule, and names no host table
+    extern "C" fn register_one_lint_naming_no_table(registrar: &Registrar) -> Registered {
         // SAFETY: `never` never returns `Ok`.
         unsafe { registrar.lint(Language::Rust, never, &[RuleId::new("lint.a")]) };
 
@@ -1003,6 +1152,51 @@ mod tests {
     }
 
     #[test]
+    fn register_lints_with_a_lint_reading_a_key_at_another_layout_says_so() {
+        let error = register_lints(
+            register_a_lint_reading_a_key_at_another_layout,
+            Path::new("misshapen.so"),
+        )
+        .err()
+        .expect("should refuse");
+
+        assert_eq!(
+            format!("{error:#}"),
+            format!(
+                "failed to check the decorations that the lints read: the lint of `lint.a` reads \
+                 the decoration `{}` at a layout that differs from the one this stiles offers; \
+                 build the plugin against this stiles",
+                FnSignature::KEY.as_str()
+            )
+        );
+    }
+
+    #[test]
+    fn register_lints_with_a_lint_reading_an_offered_key_keeps_it() {
+        let lints = register_lints(register_a_lint_reading_an_offered_key, Path::new("one.so"))
+            .expect("should register");
+
+        assert_eq!(lints[0].lint.reads(), &Reads::of::<FnSignature>());
+    }
+
+    #[test]
+    fn register_lints_with_a_lint_reading_an_unoffered_key_names_the_key() {
+        let error = register_lints(
+            register_a_lint_reading_an_unoffered_key,
+            Path::new("absent.so"),
+        )
+        .err()
+        .expect("should refuse");
+
+        assert_eq!(
+            format!("{error:#}"),
+            "failed to check the decorations that the lints read: the lint of `lint.a` reads the \
+             decoration `absent::Decoration#00`, which no Rust provider of this stiles offers; a \
+             stiles that offers it may run the plugin"
+        );
+    }
+
+    #[test]
     fn register_lints_with_a_lint_without_rules_fails() {
         let error = register_lints(register_a_lint_without_rules, Path::new("bare.so"))
             .err()
@@ -1010,6 +1204,18 @@ mod tests {
 
         assert!(
             format!("{error:#}").contains("declares no rules"),
+            "unexpected: {error:#}"
+        );
+    }
+
+    #[test]
+    fn register_lints_with_a_longer_table_names_the_table() {
+        let error = register_lints(register_needing_a_longer_table, Path::new("newer.so"))
+            .err()
+            .expect("should refuse");
+
+        assert!(
+            format!("{error:#}").contains("built against a node table of"),
             "unexpected: {error:#}"
         );
     }
@@ -1034,6 +1240,18 @@ mod tests {
 
         assert!(
             format!("{error:#}").contains("exported no lints"),
+            "unexpected: {error:#}"
+        );
+    }
+
+    #[test]
+    fn register_lints_without_naming_the_tables_names_the_first() {
+        let error = register_lints(register_one_lint_naming_no_table, Path::new("bare.so"))
+            .err()
+            .expect("should refuse");
+
+        assert!(
+            format!("{error:#}").contains("without naming the registrar it was built against"),
             "unexpected: {error:#}"
         );
     }

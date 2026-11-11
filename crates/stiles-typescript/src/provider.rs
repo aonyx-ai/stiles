@@ -13,7 +13,7 @@ use stiles_tsrs::tsrs_vfs::{FS, bundled, osvfs};
 use stiles_tsrs::{tsrs_ast, tsrs_astnav, tsrs_tsoptions};
 use stiles_types::{
     Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, Decoration as _,
-    DecorationKey, DecorationMap, DecorationProvider, DecorationSet, ProviderName,
+    DecorationIdentity, DecorationMap, DecorationProvider, DecorationSet, ProviderName,
 };
 
 use crate::decorations::{FnSignature, ImportSource, ResolvedType, StringUnion, TypeText};
@@ -117,7 +117,10 @@ impl TypeScriptDecorationProvider {
     /// The decoration types that this provider attaches to nodes
     ///
     /// A provider computes all of them unless [`wanting`] narrows the set.
-    /// The other decoration types of this crate are fields of these.
+    /// The other decoration types of this crate are fields of these. The
+    /// list is what this stiles offers a lint, each type by its key and its
+    /// layout. The loader refuses a plugin whose lint declares a decoration
+    /// that the list leaves out, or holds at another layout.
     ///
     /// # Examples
     ///
@@ -125,18 +128,21 @@ impl TypeScriptDecorationProvider {
     /// use stiles_types::DecorationSet;
     /// use stiles_typescript::TypeScriptDecorationProvider;
     ///
-    /// let every = DecorationSet::from_iter(TypeScriptDecorationProvider::DECORATIONS);
+    /// let every: DecorationSet = TypeScriptDecorationProvider::DECORATIONS
+    ///     .iter()
+    ///     .map(|identity| identity.key())
+    ///     .collect();
     ///
     /// assert!(!every.is_empty());
     /// ```
     ///
     /// [`wanting`]: TypeScriptDecorationProvider::wanting
-    pub const DECORATIONS: [DecorationKey; 5] = [
-        TypeText::KEY,
-        ResolvedType::KEY,
-        StringUnion::KEY,
-        FnSignature::KEY,
-        ImportSource::KEY,
+    pub const DECORATIONS: [DecorationIdentity; 5] = [
+        DecorationIdentity::of::<TypeText>(),
+        DecorationIdentity::of::<ResolvedType>(),
+        DecorationIdentity::of::<StringUnion>(),
+        DecorationIdentity::of::<FnSignature>(),
+        DecorationIdentity::of::<ImportSource>(),
     ];
 
     /// Returns the provider, computing only the decoration types of `wanted`
@@ -241,7 +247,10 @@ impl TypeScriptDecorationProvider {
             root,
             fs,
             texts: HashMap::new(),
-            wanted: Self::DECORATIONS.into_iter().collect(),
+            wanted: Self::DECORATIONS
+                .iter()
+                .map(DecorationIdentity::key)
+                .collect(),
         })
     }
 

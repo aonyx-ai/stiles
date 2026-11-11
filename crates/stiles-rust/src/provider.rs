@@ -21,7 +21,7 @@ use ra_ap_syntax::{
 use ra_ap_vfs::{AbsPathBuf, FileExcluded, Vfs};
 use stiles_types::{
     Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, Decoration as _,
-    DecorationKey, DecorationMap, DecorationProvider, DecorationSet, ProviderName,
+    DecorationIdentity, DecorationMap, DecorationProvider, DecorationSet, ProviderName,
 };
 
 use crate::decorations::{
@@ -66,7 +66,10 @@ impl RustDecorationProvider {
     /// The decoration types that this provider attaches to nodes
     ///
     /// A provider computes all of them unless [`wanting`] narrows the set.
-    /// The other decoration types of this crate are fields of these.
+    /// The other decoration types of this crate are fields of these. The
+    /// list is what this stiles offers a lint, each type by its key and its
+    /// layout. The loader refuses a plugin whose lint declares a decoration
+    /// that the list leaves out, or holds at another layout.
     ///
     /// # Examples
     ///
@@ -74,20 +77,23 @@ impl RustDecorationProvider {
     /// use stiles_types::DecorationSet;
     /// use stiles_rust::RustDecorationProvider;
     ///
-    /// let every = DecorationSet::from_iter(RustDecorationProvider::DECORATIONS);
+    /// let every: DecorationSet = RustDecorationProvider::DECORATIONS
+    ///     .iter()
+    ///     .map(|identity| identity.key())
+    ///     .collect();
     ///
     /// assert!(!every.is_empty());
     /// ```
     ///
     /// [`wanting`]: RustDecorationProvider::wanting
-    pub const DECORATIONS: [DecorationKey; 7] = [
-        FnSignature::KEY,
-        ResolvedType::KEY,
-        AdtFlags::KEY,
-        EnumVariants::KEY,
-        ImportSource::KEY,
-        Reexports::KEY,
-        ItemExposure::KEY,
+    pub const DECORATIONS: [DecorationIdentity; 7] = [
+        DecorationIdentity::of::<FnSignature>(),
+        DecorationIdentity::of::<ResolvedType>(),
+        DecorationIdentity::of::<AdtFlags>(),
+        DecorationIdentity::of::<EnumVariants>(),
+        DecorationIdentity::of::<ImportSource>(),
+        DecorationIdentity::of::<Reexports>(),
+        DecorationIdentity::of::<ItemExposure>(),
     ];
 
     /// Returns the provider, computing only the decoration types of `wanted`
@@ -208,7 +214,10 @@ impl RustDecorationProvider {
             db: Mutex::new(db),
             vfs,
             root,
-            wanted: Self::DECORATIONS.into_iter().collect(),
+            wanted: Self::DECORATIONS
+                .iter()
+                .map(DecorationIdentity::key)
+                .collect(),
         })
     }
 
@@ -293,7 +302,10 @@ impl RustDecorationProvider {
             db: Mutex::new(RootDatabase::default()),
             vfs: Vfs::default(),
             root: Arc::from(Path::new(".")),
-            wanted: Self::DECORATIONS.into_iter().collect(),
+            wanted: Self::DECORATIONS
+                .iter()
+                .map(DecorationIdentity::key)
+                .collect(),
         }
     }
 
@@ -1677,7 +1689,10 @@ mod tests {
             db: Mutex::new(RootDatabase::default()),
             vfs,
             root: Arc::from(Path::new("/")),
-            wanted: RustDecorationProvider::DECORATIONS.into_iter().collect(),
+            wanted: RustDecorationProvider::DECORATIONS
+                .iter()
+                .map(DecorationIdentity::key)
+                .collect(),
         };
         let tree = parse_rust("fn main() {}\n", file_path);
 

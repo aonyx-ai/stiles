@@ -5,8 +5,8 @@ use anyhow::Context as _;
 use bon::bon;
 use stiles_rust::RustDecorationProvider;
 use stiles_types::{
-    Coverage, CoverageGap, DecorateTreeError, DecoratedTree, DecorationKey, DecorationProvider,
-    DecorationSet, Language, ProviderName,
+    Coverage, CoverageGap, DecorateTreeError, DecoratedTree, DecorationIdentity, DecorationKey,
+    DecorationProvider, DecorationSet, Language, ProviderName,
 };
 use stiles_typescript::TypeScriptDecorationProvider;
 
@@ -73,7 +73,9 @@ impl Providers {
                     let wanted = wanted(
                         inspected,
                         Language::TypeScript,
-                        TypeScriptDecorationProvider::DECORATIONS,
+                        TypeScriptDecorationProvider::DECORATIONS
+                            .iter()
+                            .map(DecorationIdentity::key),
                     );
                     load_typescript_project(file, &wanted, &mut typescript)
                         .context("failed to load the TypeScript project for analysis")?;
@@ -88,7 +90,9 @@ impl Providers {
                     .wanting(wanted(
                         inspected,
                         Language::Rust,
-                        RustDecorationProvider::DECORATIONS,
+                        RustDecorationProvider::DECORATIONS
+                            .iter()
+                            .map(DecorationIdentity::key),
                     )),
             ),
             false => None,
@@ -472,7 +476,9 @@ mod tests {
         let wanted = wanted(
             &inspected,
             Language::TypeScript,
-            TypeScriptDecorationProvider::DECORATIONS,
+            TypeScriptDecorationProvider::DECORATIONS
+                .iter()
+                .map(DecorationIdentity::key),
         );
 
         assert!(wanted.is_empty());
@@ -485,12 +491,17 @@ mod tests {
         let wanted = wanted(
             &inspected,
             Language::Rust,
-            RustDecorationProvider::DECORATIONS,
+            RustDecorationProvider::DECORATIONS
+                .iter()
+                .map(DecorationIdentity::key),
         );
 
         assert_eq!(
             wanted,
-            DecorationSet::from_iter(RustDecorationProvider::DECORATIONS)
+            RustDecorationProvider::DECORATIONS
+                .iter()
+                .map(DecorationIdentity::key)
+                .collect::<DecorationSet>()
         );
     }
 }

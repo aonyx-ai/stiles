@@ -3,17 +3,21 @@ use std::mem::MaybeUninit;
 use bon::Builder;
 
 use crate::plugin::LoadedPass;
+use crate::plugin::Reads;
 use crate::plugin::registrar::BuildFn;
-use crate::{Language, Panic, RuleId};
+use crate::{DecorationIdentity, Language, Panic, RuleId};
 
 /// One lint a plugin registered, as the host keeps it
 ///
-/// Stiles reads the language and the rules without running the factory.
+/// Stiles reads the language, the rules, and the decoration keys the pass
+/// reads without running the factory.
 /// It knows every rule of every loaded plugin before the first file. It can
 /// therefore refuse a configured rule name that nothing reports, and list
 /// the rules. It can also refuse two lints that report one rule on one
 /// language. The walk also holds each pass to its own rules: a diagnostic
-/// under any other id ends the run.
+/// under any other id ends the run. A provider computes only the keys that
+/// the loaded passes read, and stiles refuses a key that no provider of
+/// the lint's language offers.
 ///
 /// Passes are stateful, so the host builds a fresh one for every file
 /// through [`RegisteredLint::build`]. The factory and the rule ids point
@@ -38,9 +42,10 @@ use crate::{Language, Panic, RuleId};
 /// }
 ///
 /// let registrations = Registrations::new();
-/// // SAFETY: `build` never returns `Ok`.
-/// registrations.lend(|registrar| unsafe {
-///     registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")])
+/// registrations.lend(|registrar| {
+///     registrar.require_host_tables();
+///     // SAFETY: `build` never returns `Ok`.
+///     unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
 /// });
 ///
 /// let lints = registrations.finish().expect("the registration should be whole");
@@ -53,6 +58,8 @@ pub struct RegisteredLint {
     language: Language,
     factory: BuildFn,
     rules: Vec<RuleId>,
+    #[builder(default)]
+    reads: Reads,
 }
 
 impl RegisteredLint {
@@ -69,9 +76,10 @@ impl RegisteredLint {
     /// }
     ///
     /// let registrations = Registrations::new();
-    /// // SAFETY: `build` never returns `Ok`.
-    /// registrations.lend(|registrar| unsafe {
-    ///     registrar.lint(Language::TypeScript, build, &[RuleId::new("lint.quiet")])
+    /// registrations.lend(|registrar| {
+    ///     registrar.require_host_tables();
+    ///     // SAFETY: `build` never returns `Ok`.
+    ///     unsafe { registrar.lint(Language::TypeScript, build, &[RuleId::new("lint.quiet")]) };
     /// });
     ///
     /// let lints = registrations.finish().expect("the registration should be whole");
@@ -100,9 +108,10 @@ impl RegisteredLint {
     /// }
     ///
     /// let registrations = Registrations::new();
-    /// // SAFETY: `build` never returns `Ok`.
-    /// registrations.lend(|registrar| unsafe {
-    ///     registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")])
+    /// registrations.lend(|registrar| {
+    ///     registrar.require_host_tables();
+    ///     // SAFETY: `build` never returns `Ok`.
+    ///     unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
     /// });
     ///
     /// let lints = registrations.finish().expect("the registration should be whole");
@@ -111,6 +120,45 @@ impl RegisteredLint {
     /// ```
     pub fn rules(&self) -> &[RuleId] {
         &self.rules
+    }
+
+    /// Returns the decorations the lint's pass declared that it reads
+    ///
+    /// A provider computes only the decorations that the loaded passes of
+    /// its language declare. A pass whose reads are [`Reads::undeclared`]
+    /// gets every decoration of its language. That fallback is staged, and
+    /// [stiles#651] removes it.
+    ///
+    /// [stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::plugin::{Built, PassInstance, Reads, Registrations};
+    /// use stiles_types::{Language, Panic, RuleId};
+    ///
+    /// extern "C" fn build(_out: &mut std::mem::MaybeUninit<PassInstance>) -> Built {
+    ///     Panic::catch(|| unreachable!("never built")).into()
+    /// }
+    ///
+    /// let registrations = Registrations::new();
+    /// registrations.lend(|registrar| {
+    ///     registrar.require_host_tables();
+    ///     // SAFETY: `build` never returns `Ok`.
+    ///     unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+    /// });
+    ///
+    /// let lints = registrations.finish().expect("the registration should be whole");
+    ///
+    /// assert_eq!(lints[0].reads(), &Reads::undeclared());
+    /// ```
+    pub fn reads(&self) -> &Reads {
+        &self.reads
+    }
+
+    /// Records that the lint's pass reads `identities`, each once
+    pub(crate) fn read(&mut self, identities: &[DecorationIdentity]) {
+        self.reads = std::mem::take(&mut self.reads).extend(identities);
     }
 
     /// Runs the plugin's factory, and returns the fresh pass it built
@@ -133,9 +181,10 @@ impl RegisteredLint {
     /// }
     ///
     /// let registrations = Registrations::new();
-    /// // SAFETY: `build` never returns `Ok`.
-    /// registrations.lend(|registrar| unsafe {
-    ///     registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")])
+    /// registrations.lend(|registrar| {
+    ///     registrar.require_host_tables();
+    ///     // SAFETY: `build` never returns `Ok`.
+    ///     unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
     /// });
     /// let lints = registrations.finish().expect("the registration should be whole");
     ///
@@ -213,10 +262,11 @@ mod tests {
     /// Returns the one lint that `factory` builds, in TypeScript
     fn registered(factory: BuildFn) -> RegisteredLint {
         let registrations = Registrations::new();
-        // SAFETY: every factory of this module writes a pass whenever
-        // it returns `Ok`.
-        registrations.lend(|registrar| unsafe {
-            registrar.lint(Language::TypeScript, factory, &[RuleId::new("test.rule")])
+        registrations.lend(|registrar| {
+            registrar.require_host_tables();
+            // SAFETY: every factory of this module writes a pass whenever
+            // it returns `Ok`.
+            unsafe { registrar.lint(Language::TypeScript, factory, &[RuleId::new("test.rule")]) };
         });
 
         let mut lints = registrations

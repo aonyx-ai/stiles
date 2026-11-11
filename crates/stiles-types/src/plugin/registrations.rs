@@ -1,7 +1,7 @@
 use std::ptr;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use crate::plugin::{RegisteredLint, Registrar};
+use crate::plugin::{HostTable, RegisteredLint, Registrar};
 
 mod register_lints_error;
 mod table;
@@ -47,10 +47,11 @@ const _: () = {
     assert_send_sync::<Registrations>();
 };
 
-/// Everything a record holds: the registered lints and the first fault
+/// Everything a record holds: the lints, the named tables, and the first fault
 #[derive(Debug, Default)]
 struct State {
     lints: Vec<RegisteredLint>,
+    required: Vec<HostTable>,
     fault: Option<RegisterLintsError>,
 }
 
@@ -91,9 +92,10 @@ impl Registrations {
     ///
     /// let registrations = Registrations::new();
     ///
-    /// // SAFETY: `build` never returns `Ok`.
-    /// registrations.lend(|registrar| unsafe {
-    ///     registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")])
+    /// registrations.lend(|registrar| {
+    ///     registrar.require_host_tables();
+    ///     // SAFETY: `build` never returns `Ok`.
+    ///     unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
     /// });
     ///
     /// let lints = registrations.finish().expect("the registration should be whole");
@@ -124,20 +126,43 @@ impl Registrations {
     /// assert!(lints.is_empty());
     /// ```
     pub fn finish(self) -> Result<Vec<RegisteredLint>, RegisterLintsError> {
-        let State { lints, fault } = self
+        let State {
+            lints,
+            required,
+            fault,
+        } = self
             .state
             .into_inner()
             .unwrap_or_else(PoisonError::into_inner);
 
-        match fault {
-            Some(fault) => Err(fault),
-            None => Ok(lints),
+        if let Some(fault) = fault {
+            return Err(fault);
         }
+        if let Some(table) = unrequired(&lints, &required) {
+            return Err(RegisterLintsError::UnrequiredTable { table });
+        }
+
+        Ok(lints)
     }
 
     /// Returns the lints this record holds, through any poison
     fn state(&self) -> MutexGuard<'_, State> {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+/// Returns the first table a plugin left unnamed, if it registered lints
+///
+/// `export_lints!` names every table before it registers a lint. A plugin
+/// that registers lints without naming one was written by hand, or built
+/// against a stiles that did not know the table. Either way the host
+/// cannot tell whether that plugin calls an entry the table lacks.
+fn unrequired(lints: &[RegisteredLint], required: &[HostTable]) -> Option<HostTable> {
+    match lints {
+        [] => None,
+        [_, ..] => HostTable::ALL
+            .into_iter()
+            .find(|table| !required.contains(table)),
     }
 }
 
@@ -152,7 +177,60 @@ impl State {
 
 #[cfg(test)]
 mod tests {
+    use std::mem::MaybeUninit;
+
     use super::*;
+    use crate::plugin::{Built, PassInstance};
+    use crate::{Language, Panic, RuleId};
+
+    /// Builds nothing, because no test here calls it
+    extern "C" fn never(_out: &mut MaybeUninit<PassInstance>) -> Built {
+        Panic::catch(|| unreachable!("never built")).into()
+    }
+
+    /// Registers one lint after naming the length of every table but `skipped`
+    fn register_skipping(
+        skipped: Option<HostTable>,
+    ) -> Result<Vec<RegisteredLint>, RegisterLintsError> {
+        let registrations = Registrations::new();
+        registrations.lend(|registrar| {
+            for table in HostTable::ALL {
+                if Some(table) != skipped {
+                    registrar.requires(table, table.length());
+                }
+            }
+            // SAFETY: `never` never returns `Ok`.
+            unsafe { registrar.lint(Language::Rust, never, &[RuleId::new("test.rule")]) };
+        });
+
+        registrations.finish()
+    }
+
+    #[test]
+    fn finish_with_lints_and_an_unnamed_table_names_it() {
+        let error = register_skipping(Some(HostTable::Sink)).expect_err("the sink is unnamed");
+
+        assert_eq!(
+            error,
+            RegisterLintsError::UnrequiredTable {
+                table: HostTable::Sink
+            }
+        );
+    }
+
+    #[test]
+    fn finish_with_lints_and_every_table_named_returns_them() {
+        let lints = register_skipping(None).expect("every table is named");
+
+        assert_eq!(lints.len(), 1);
+    }
+
+    #[test]
+    fn finish_with_no_lints_needs_no_table_named() {
+        let registered = Registrations::new().finish();
+
+        assert!(registered.is_ok());
+    }
 
     #[test]
     fn trait_send_registrations() {

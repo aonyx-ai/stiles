@@ -5,7 +5,7 @@
 //! [`RustLintPass`], and this crate hands them to stiles. [`export_lints!`]
 //! writes the declaration stiles looks up, and the function that registers
 //! each lint through the host's [`Registrar`]. [`DeclaresRules`] says which
-//! rule names a pass reports.
+//! rule names a pass reports, and which decorations it reads.
 //!
 //! The crate also owns [`LANGUAGE_FINGERPRINT`], which joins the
 //! fingerprints of every language crate. One plugin may export passes of
@@ -21,8 +21,8 @@ mod export_lints;
 
 use stiles_types::plugin::stable_fingerprint;
 pub use stiles_types::plugin::{
-    ABI_VERSION, AbiVersion, Built, PassInstance, PluginDeclaration, Provenance, Registered,
-    Registrar, TYPES_FINGERPRINT,
+    ABI_VERSION, AbiVersion, Built, HostTable, PassInstance, PluginDeclaration, Provenance, Reads,
+    Registered, Registrar, TYPES_FINGERPRINT,
 };
 pub use stiles_types::{Language, Panic};
 

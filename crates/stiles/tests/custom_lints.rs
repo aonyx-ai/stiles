@@ -12,10 +12,13 @@ mod configurable_plugin;
 mod git_pin;
 #[path = "support/other_protocol_plugin.rs"]
 mod other_protocol_plugin;
+#[path = "support/unoffered_read_plugin.rs"]
+mod unoffered_read_plugin;
 
 use self::configurable_plugin::write_configurable_lint_package;
 use self::git_pin::GitPin;
 use self::other_protocol_plugin::write_other_protocol_lint_package;
+use self::unoffered_read_plugin::{Declared, UNOFFERED, write_unoffered_read_lint_package};
 
 /// Source that trips the example lint and none of the built-ins
 const TODO_SOURCE: &str = "pub fn later() {\n    todo!()\n}\n";
@@ -236,6 +239,52 @@ fn check_with_a_git_lint_that_cannot_be_fetched_names_the_source() {
         .stderr(predicate::str::contains(
             "0123456789abcdef0123456789abcdef01234567",
         ));
+}
+
+/// Pins that a lint reading a decoration at another layout is refused
+///
+/// A change to a type that a decoration holds keeps the decoration's key.
+/// A plugin built before the change would load, and its lookups would find
+/// nothing. The refusal names the decoration and says the layouts differ.
+#[test]
+fn check_with_a_lint_reading_a_decoration_at_another_layout_refuses_it() {
+    let target = package(TODO_SOURCE);
+    let lints = tempfile::tempdir().expect("temporary directory should be created");
+    write_unoffered_read_lint_package(lints.path(), "misshapen_lint", Declared::AtAnotherLayout);
+    configure_lint(target.path(), lints.path());
+
+    stiles()
+        .env("CARGO_TARGET_DIR", shared_build_directory())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(
+            "at a layout that differs from the one this stiles offers",
+        ));
+}
+
+/// Pins that a lint reading a decoration this stiles lacks is refused
+///
+/// A plugin built against a newer stiles may read a decoration that this
+/// one does not compute. Its rule would load and find nothing. The refusal
+/// names the decoration, so the reader knows what the plugin needs.
+#[test]
+fn check_with_a_lint_reading_a_decoration_stiles_lacks_refuses_it() {
+    let target = package(TODO_SOURCE);
+    let lints = tempfile::tempdir().expect("temporary directory should be created");
+    write_unoffered_read_lint_package(lints.path(), "future_lint", Declared::Unoffered);
+    configure_lint(target.path(), lints.path());
+
+    stiles()
+        .env("CARGO_TARGET_DIR", shared_build_directory())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(format!(
+            "reads the decoration `{UNOFFERED}`, which no Rust provider of this stiles offers"
+        )));
 }
 
 /// Pins that a plugin from a protocol stiles does not read is refused

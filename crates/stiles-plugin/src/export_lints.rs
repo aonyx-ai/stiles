@@ -18,17 +18,21 @@
 /// group: a rule that reads only comments can implement several language
 /// traits and run on each.
 ///
-/// Each lint carries the language of its group and the rule names its
-/// [`DeclaresRules`] implementation returns. Stiles refuses two lints that
-/// declare one rule for one language. It also ends a run in which a pass
-/// reports a rule it did not declare.
+/// Each lint carries the language of its group, and the rule names and
+/// decoration reads its [`DeclaresRules`] implementation returns. Stiles
+/// refuses two lints that declare one rule for one language, and a read
+/// that no provider of the lint's language offers at its layout. It also ends a run in
+/// which a pass reports a rule it did not declare.
 ///
 /// The macro writes the `stiles_plugin_declaration` static that stiles's
 /// loader looks up, filling in the handshake constants of the stiles
 /// crates this plugin was compiled against. It also writes the `register`
-/// function the declaration names. That function registers each lint
-/// through the host's [`Registrar`], with its language, its rules, and a
-/// factory. Passes are stateful, and the check command constructs a fresh
+/// function the declaration names. That function first names the length
+/// of each [`HostTable`] that this build of the plugin calls into. A stiles
+/// with a shorter table refuses the plugin. The function then registers
+/// each lint through the host's [`Registrar`], with its language, its
+/// rules, and a factory, and declares the decorations the lint reads.
+/// Passes are stateful, and the check command constructs a fresh
 /// set for every file. Each factory is a plain `extern "C"` function, so
 /// each expression must construct its lint from nothing; an expression
 /// that captures its surroundings does not compile.
@@ -44,6 +48,7 @@
 /// as a value rather than unwinding across the boundary.
 ///
 /// [`DeclaresRules`]: crate::DeclaresRules
+/// [`HostTable`]: crate::HostTable
 /// [`LintPass`]: stiles_types::LintPass
 /// [`Panic::catch`]: crate::Panic::catch
 /// [`PassInstance`]: crate::PassInstance
@@ -67,6 +72,7 @@ macro_rules! export_lints {
         #[doc(hidden)]
         extern "C" fn __stiles_register(registrar: &$crate::Registrar) -> $crate::Registered {
             $crate::Panic::catch(|| {
+                registrar.require_host_tables();
                 $($({
                     extern "C" fn build(
                         out: &mut ::core::mem::MaybeUninit<$crate::PassInstance>,
@@ -78,10 +84,12 @@ macro_rules! export_lints {
                     }
 
                     let rules = $crate::DeclaresRules::rules(&$lint);
+                    let language = $crate::__language!($language);
                     // SAFETY: `build` writes the instance before it returns
                     // `Ok`, and returns the panic instead when construction
                     // panics.
-                    unsafe { registrar.lint($crate::__language!($language), build, &rules) };
+                    let handle = unsafe { registrar.lint(language, build, &rules) };
+                    registrar.reads(handle, &$crate::DeclaresRules::reads(&$lint));
                 })+)+
             })
             .into()
@@ -117,8 +125,9 @@ macro_rules! __adapter {
 mod tests {
     use std::path::PathBuf;
 
+    use stiles_rust::decorations::{FnSignature, ResolvedType};
     use stiles_rust::{RuleId, RustLintPass};
-    use stiles_types::plugin::{LoadedPass, RegisteredLint, Registrations};
+    use stiles_types::plugin::{LoadedPass, Reads, RegisteredLint, Registrations};
     use stiles_types::{
         Collector, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, Panic, Severity,
     };
@@ -131,6 +140,10 @@ mod tests {
     impl DeclaresRules for FlagEveryFunction {
         fn rules(&self) -> Vec<RuleId> {
             vec![RuleId::new("test.flag-every-function")]
+        }
+
+        fn reads(&self) -> Reads {
+            Reads::of::<FnSignature>().and::<ResolvedType>()
         }
     }
 
@@ -185,6 +198,10 @@ mod tests {
     impl DeclaresRules for QuietLint {
         fn rules(&self) -> Vec<RuleId> {
             vec![RuleId::new("test.quiet")]
+        }
+
+        fn reads(&self) -> Reads {
+            Reads::none()
         }
     }
 
@@ -297,6 +314,23 @@ mod tests {
         let diagnostics = collector.finish().expect("the report should be whole");
         let rules: Vec<RuleId> = diagnostics.iter().map(|found| found.rule_id()).collect();
         assert_eq!(rules, [RuleId::new("test.flag-every-comment")]);
+    }
+
+    #[test]
+    fn register_carries_the_reads_of_each_lint() {
+        let lints = registered();
+
+        let reads: Vec<&Reads> = lints.iter().map(RegisteredLint::reads).collect();
+
+        assert_eq!(
+            reads,
+            [
+                &Reads::of::<FnSignature>().and::<ResolvedType>(),
+                &Reads::undeclared(),
+                &Reads::undeclared(),
+                &Reads::none(),
+            ]
+        );
     }
 
     #[test]
