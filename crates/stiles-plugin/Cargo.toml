@@ -10,7 +10,6 @@ repository.workspace = true
 # constants. The language crates come without their decoration providers,
 # whose analysis stacks a plugin never runs.
 [dependencies]
-stabby.workspace = true
 stiles-rust = { path = "../stiles-rust", version = "=0.6.0", default-features = false }
 stiles-types.workspace = true
 stiles-typescript = { path = "../stiles-typescript", version = "=0.6.0", default-features = false }

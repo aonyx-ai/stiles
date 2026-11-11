@@ -3,8 +3,9 @@
 //! A plugin is a `cdylib` that stiles loads into its own process. Its
 //! rules implement a language crate's lint pass trait, such as
 //! [`RustLintPass`], and this crate hands them to stiles. [`export_lints!`]
-//! writes the declaration stiles looks up, and [`DeclaresRules`] says
-//! which rule names a pass reports.
+//! writes the declaration stiles looks up, and the function that registers
+//! each lint through the host's [`Registrar`]. [`DeclaresRules`] says which
+//! rule names a pass reports.
 //!
 //! The crate also owns [`LANGUAGE_FINGERPRINT`], which joins the
 //! fingerprints of every language crate. One plugin may export passes of
@@ -20,8 +21,8 @@ mod export_lints;
 
 use stiles_types::plugin::stable_fingerprint;
 pub use stiles_types::plugin::{
-    ABI_VERSION, AbiVersion, Constructed, ExportedLint, LintPassFactory, Loaded, Plugin,
-    PluginDeclaration, Provenance, TYPES_FINGERPRINT, factory,
+    ABI_VERSION, AbiVersion, Built, PassInstance, PluginDeclaration, Provenance, Registered,
+    Registrar, TYPES_FINGERPRINT,
 };
 pub use stiles_types::{Language, Panic};
 

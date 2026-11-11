@@ -5,9 +5,11 @@
 /// kind names such as `identifier` and `comment`. A pass that ran on every
 /// tree would therefore act on nodes it was never written for.
 ///
-/// The discriminant is a byte. A language crosses the plugin boundary as
-/// the answer to [`LintPass::language`]. An undeclared representation has
-/// no layout that holds from one compiler to the next.
+/// A language crosses the plugin boundary as a byte that this type pins
+/// for each variant, never as a laid-out enum. A plugin names the language
+/// of each lint it registers by that byte. A rule names the language of a
+/// snippet it asks the host to parse the same way. A reader that meets a
+/// byte it does not know treats the language as unknown.
 ///
 /// # Examples
 ///
@@ -16,9 +18,6 @@
 ///
 /// assert_eq!(Language::from_extension("ts"), Some(Language::TypeScript));
 /// ```
-///
-/// [`LintPass::language`]: crate::LintPass::language
-#[stabby::stabby]
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum Language {

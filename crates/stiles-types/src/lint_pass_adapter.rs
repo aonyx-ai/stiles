@@ -17,7 +17,9 @@
 ///
 /// The adapter is also the plugin's edge. A rule may panic, and a panic must
 /// not unwind into the host. Each call therefore runs under
-/// [`Panic::catch`] and comes back as a value. A rule keeps writing plain
+/// [`Panic::catch`] and comes back as a value. `instance` pairs an adapter
+/// with the table of `extern "C"` entries that run it, which is what
+/// crosses the boundary. A rule keeps writing plain
 /// Rust and returning std's `Vec` of diagnostics. The adapter reports each
 /// one through the [`Sink`] that the host lent the check, so no diagnostic
 /// crosses the boundary as a laid-out value. A rule that panics reports
@@ -72,22 +74,23 @@ macro_rules! lint_pass_adapter {
                 Self { inner: pass }
             }
 
-            /// Wraps a rule and boxes it for the plugin boundary
+            /// Wraps a rule as a pass instance for the plugin boundary
             ///
             /// A factory that stiles-plugin's `export_lints!` writes hands this
-            /// back to stiles. It is a pass behind a stabby box and a stabby
-            /// vtable, which the host calls without knowing the rule's type.
+            /// to stiles. The instance holds the adapter and the table of
+            /// `extern "C"` entries that run it, both in the plugin's image.
+            /// The host therefore calls the rule without knowing its type.
             ///
             /// # Examples
             ///
             /// ```ignore
-            #[doc = concat!("let pass = ", stringify!($adapter), "::boxed(Quiet);")]
+            #[doc = concat!("let instance = ", stringify!($adapter), "::instance(Quiet);")]
             /// ```
-            pub fn boxed(pass: P) -> $crate::BoxedLintPass
+            pub fn instance(pass: P) -> $crate::plugin::PassInstance
             where
                 P: 'static,
             {
-                $crate::boxed_lint_pass(Self::new(pass))
+                $crate::plugin::PassInstance::new(Self::new(pass))
             }
         }
 

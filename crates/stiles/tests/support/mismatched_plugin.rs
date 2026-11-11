@@ -31,13 +31,11 @@ pub(crate) fn write_mismatched_lint_package(directory: &Path, name: &str) {
     .expect("the manifest should be written");
     std::fs::write(
         directory.join("src").join("lib.rs"),
-        r#"use stiles_types::plugin::{AbiVersion, Loaded, Plugin, PluginDeclaration, Provenance};
+        r#"use stiles_types::plugin::{AbiVersion, PluginDeclaration, Provenance, Registered, Registrar};
 
-/// Exports nothing, because the handshake refuses this library first
-extern "C" fn load() -> Loaded {
-    Loaded::Ok(Plugin {
-        lints: std::iter::empty().collect(),
-    })
+/// Registers nothing, because the handshake refuses this library first
+extern "C" fn register(_registrar: &Registrar) -> Registered {
+    Registered::Ok(())
 }
 
 /// A protocol no stiles at this one reads
@@ -49,7 +47,7 @@ pub static stiles_plugin_declaration: PluginDeclaration = PluginDeclaration {
     abi_version: REFUSED,
     types_fingerprint: stiles_types::plugin::TYPES_FINGERPRINT,
     language_fingerprint: 0,
-    load,
+    register,
     provenance: Provenance::UNPUBLISHED,
 };
 "#,

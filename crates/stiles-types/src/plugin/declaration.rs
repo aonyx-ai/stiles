@@ -1,4 +1,4 @@
-use crate::plugin::{AbiVersion, Loaded, Provenance};
+use crate::plugin::{AbiVersion, Provenance, Registered, Registrar};
 
 /// The entry point a custom lint plugin exports
 ///
@@ -15,10 +15,9 @@ use crate::plugin::{AbiVersion, Loaded, Provenance};
 /// - [`provenance`] says whether the plugin was built from published
 ///   crates. When it and the host both were, the version alone vouches
 ///   for the layout, and the fingerprints are not compared.
-/// - [`load`] is an `extern "C"` function pointer that hands back values
-///   stabby lays out. Calling it is sound once the version or the
-///   fingerprints prove that both images lay those values out the same
-///   way.
+/// - [`register`] is an `extern "C"` function pointer that takes the
+///   host's [`Registrar`]. Calling it is sound once the version or the
+///   fingerprints prove that both images lay out the boundary alike.
 ///
 /// The fields are public rather than accessed through getters, because
 /// this struct is a wire format. The exporting macro constructs it in a
@@ -28,21 +27,19 @@ use crate::plugin::{AbiVersion, Loaded, Provenance};
 ///
 /// ```
 /// use stiles_types::plugin::{
-///     ABI_VERSION, Loaded, PROVENANCE, Plugin, PluginDeclaration, TYPES_FINGERPRINT,
+///     ABI_VERSION, PROVENANCE, PluginDeclaration, Registered, Registrar, TYPES_FINGERPRINT,
 /// };
 ///
-/// /// Exports no lints
-/// extern "C" fn load() -> Loaded {
-///     Loaded::Ok(Plugin {
-///         lints: std::iter::empty().collect(),
-///     })
+/// /// Registers no lints
+/// extern "C" fn register(_registrar: &Registrar) -> Registered {
+///     Registered::Ok(())
 /// }
 ///
 /// static DECLARATION: PluginDeclaration = PluginDeclaration {
 ///     abi_version: ABI_VERSION,
 ///     types_fingerprint: TYPES_FINGERPRINT,
 ///     language_fingerprint: 0,
-///     load,
+///     register,
 ///     provenance: PROVENANCE,
 /// };
 ///
@@ -51,8 +48,9 @@ use crate::plugin::{AbiVersion, Loaded, Provenance};
 ///
 /// [`abi_version`]: PluginDeclaration::abi_version
 /// [`language_fingerprint`]: PluginDeclaration::language_fingerprint
-/// [`load`]: PluginDeclaration::load
+/// [`Registrar`]: crate::plugin::Registrar
 /// [`provenance`]: PluginDeclaration::provenance
+/// [`register`]: PluginDeclaration::register
 /// [`types_fingerprint`]: PluginDeclaration::types_fingerprint
 #[repr(C)]
 pub struct PluginDeclaration {
@@ -75,33 +73,36 @@ pub struct PluginDeclaration {
     /// turns that into a refusal.
     pub language_fingerprint: u64,
 
-    /// Hands over everything the plugin exports
+    /// Registers everything the plugin exports through the host's registrar
     ///
-    /// The host calls this once, after the handshake, and keeps what it
-    /// gets for the life of the process. One call carries the factories
-    /// and the rule list together.
+    /// The host calls this once, after the handshake, and keeps what the
+    /// plugin registers for the life of the process. The plugin calls an
+    /// entry of the [`Registrar`] for each lint, with its language, its
+    /// factory, and its rules.
     ///
-    /// This is the only function the boundary needs. After `dlopen` the
-    /// host holds an address and a name, and no stabby value. The first
-    /// hand-over must therefore be a call whose convention both images agree
-    /// on with no prior agreement. Everything the call returns is stabby's.
+    /// This is the only function the declaration needs. After `dlopen` the
+    /// host holds an address and a name, and no table. The first call must
+    /// therefore be one whose convention both images agree on with no
+    /// prior agreement. It hands over the host's table, and everything
+    /// after it goes through tables.
     ///
-    /// Anything added later goes inside [`Plugin`] rather than beside it.
-    /// A `#[repr(C)]` struct has offsets stiles can reason about per
-    /// protocol, and a vtable does not.
+    /// Anything a plugin declares later is a new entry of the registrar,
+    /// not a new field here or a new field of a laid-out list. A
+    /// `#[repr(C)]` table has offsets stiles can reason about per protocol,
+    /// and a reader reaches only the entries its own length names.
     ///
-    /// [`Plugin`]: crate::plugin::Plugin
-    pub load: extern "C" fn() -> Loaded,
+    /// [`Registrar`]: crate::plugin::Registrar
+    pub register: extern "C" fn(&Registrar) -> Registered,
 
     /// Whether every boundary crate of the plugin was published
     ///
     /// stiles-plugin joins the [`PROVENANCE`] of every crate it builds
     /// on, so a plugin that patched one of them is unpublished. The field
-    /// follows [`load`], because the version that precedes it says which
-    /// fields a declaration has.
+    /// follows [`register`], because the version that precedes it says
+    /// which fields a declaration has.
     ///
     /// [`PROVENANCE`]: crate::plugin::PROVENANCE
-    /// [`load`]: PluginDeclaration::load
+    /// [`register`]: PluginDeclaration::register
     pub provenance: Provenance,
 }
 
@@ -116,6 +117,23 @@ mod tests {
         assert_eq!(offset_of!(PluginDeclaration, abi_version), 0);
     }
 
+    /// A field appended later goes after this one, for the reason
+    /// [`register_sits_after_every_field_before_it`] gives
+    #[test]
+    fn provenance_sits_last() {
+        let provenance = offset_of!(PluginDeclaration, provenance);
+
+        let before = [
+            offset_of!(PluginDeclaration, abi_version),
+            offset_of!(PluginDeclaration, types_fingerprint),
+            offset_of!(PluginDeclaration, language_fingerprint),
+            offset_of!(PluginDeclaration, register),
+        ]
+        .map(|offset| offset < provenance);
+
+        assert_eq!(before, [true; 4]);
+    }
+
     /// Pins that the fields keep the order the protocol was written in
     ///
     /// Stiles reads each field at the offset this struct gives. A field
@@ -125,34 +143,17 @@ mod tests {
     /// a crash. A new field goes last, and a test pins each field behind
     /// the ones before it.
     #[test]
-    fn load_sits_after_every_field_before_it() {
-        let load = offset_of!(PluginDeclaration, load);
+    fn register_sits_after_every_field_before_it() {
+        let register = offset_of!(PluginDeclaration, register);
 
         let before = [
             offset_of!(PluginDeclaration, abi_version),
             offset_of!(PluginDeclaration, types_fingerprint),
             offset_of!(PluginDeclaration, language_fingerprint),
         ]
-        .map(|offset| offset < load);
+        .map(|offset| offset < register);
 
         assert_eq!(before, [true; 3]);
-    }
-
-    /// A field appended later goes after this one, for the reason
-    /// [`load_sits_after_every_field_before_it`] gives
-    #[test]
-    fn provenance_sits_last() {
-        let provenance = offset_of!(PluginDeclaration, provenance);
-
-        let before = [
-            offset_of!(PluginDeclaration, abi_version),
-            offset_of!(PluginDeclaration, types_fingerprint),
-            offset_of!(PluginDeclaration, language_fingerprint),
-            offset_of!(PluginDeclaration, load),
-        ]
-        .map(|offset| offset < provenance);
-
-        assert_eq!(before, [true; 4]);
     }
 
     /// Ties the fields of the declaration to the version that names them
@@ -169,7 +170,7 @@ mod tests {
                 abi_version: _,
                 types_fingerprint: _,
                 language_fingerprint: _,
-                load: _,
+                register: _,
                 provenance: _,
             } = declaration;
         }
