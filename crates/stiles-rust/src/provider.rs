@@ -20,7 +20,7 @@ use ra_ap_syntax::{
 };
 use ra_ap_vfs::{AbsPathBuf, FileExcluded, Vfs};
 use stiles_types::{
-    Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, Decoration as _,
+    Coverage, CoverageGap, DecorateTreeError, DecoratedNode, DecoratedTree, Decoration,
     DecorationIdentity, DecorationMap, DecorationProvider, DecorationSet, ProviderName,
 };
 
@@ -99,9 +99,10 @@ impl RustDecorationProvider {
     /// Returns the provider, computing only the decoration types of `wanted`
     ///
     /// Each kind of target yields some of [`DECORATIONS`], and the provider
-    /// skips a target whose types `wanted` leaves out. With an empty set,
-    /// the provider still decides whether it covers a file, and attaches
-    /// nothing to it.
+    /// skips a target whose types `wanted` leaves out. A target that yields
+    /// several types builds only the ones `wanted` holds, so a type no pass
+    /// reads is never attached. With an empty set, the provider still
+    /// decides whether it covers a file, and attaches nothing to it.
     ///
     /// # Examples
     ///
@@ -473,7 +474,13 @@ impl DecorationProvider for RustDecorationProvider {
 
             match targets.is_empty() {
                 true => Coverage::Covered(DecorationMap::new()),
-                false => Coverage::Covered(resolve_targets(&sema, file_id, module, &targets)),
+                false => Coverage::Covered(resolve_targets(
+                    &sema,
+                    file_id,
+                    module,
+                    &targets,
+                    &self.wanted,
+                )),
             }
         });
 
@@ -490,11 +497,15 @@ impl DecorationProvider for RustDecorationProvider {
 /// `module` identifies the crate. The crate supplies the edition for
 /// display and the `core` definitions of `Result` and `Option`. These
 /// resolve once per file, not once per target.
+///
+/// A target may yield several types. Each is built only when `wanted`
+/// holds it, so the result holds no type that no pass reads.
 fn resolve_targets(
     sema: &Semantics<'_, RootDatabase>,
     file_id: FileId,
     module: Module,
     targets: &[Target],
+    wanted: &DecorationSet,
 ) -> DecorationMap {
     let source_file = sema.parse_guess_edition(file_id);
     let syntax = source_file.syntax().clone();
@@ -511,40 +522,37 @@ fn resolve_targets(
     };
 
     let mut module_paths = ModulePaths::default();
-    let mut decorations = DecorationMap::new();
+    let mut decorations = WantedDecorations {
+        decorations: DecorationMap::new(),
+        wanted,
+    };
     for target in targets {
         match target {
             Target::Function { node_id, range } => {
-                if let Some(sig) = resolve_function(&ctx, *range) {
-                    decorations.insert(*node_id, sig);
-                }
+                decorations.insert(*node_id, || resolve_function(&ctx, *range));
             }
             Target::MatchScrutinee {
                 scrutinee_range,
                 scrutinee_node_id,
             } => {
-                if let Some((ty, flags)) = resolve_match_scrutinee(&ctx, *scrutinee_range) {
-                    decorations.insert(*scrutinee_node_id, ty);
-                    if let Some(flags) = flags {
-                        decorations.insert(*scrutinee_node_id, flags);
-                    }
-                }
+                decorate_match_scrutinee(
+                    &ctx,
+                    &mut decorations,
+                    *scrutinee_node_id,
+                    *scrutinee_range,
+                );
             }
             Target::IfElse {
                 branch_range,
                 else_node_id,
             } => {
-                if let Some(ty) = resolve_expr_type(&ctx, *branch_range) {
-                    decorations.insert(*else_node_id, ty);
-                }
+                decorations.insert(*else_node_id, || resolve_expr_type(&ctx, *branch_range));
             }
             Target::TryExpr {
                 operand_range,
                 operand_node_id,
             } => {
-                if let Some(ty) = resolve_expr_type(&ctx, *operand_range) {
-                    decorations.insert(*operand_node_id, ty);
-                }
+                decorations.insert(*operand_node_id, || resolve_expr_type(&ctx, *operand_range));
             }
             Target::BranchValue { range, node_id } => {
                 if let Some(expr) = find_expr_covering(&ctx, *range)
@@ -562,23 +570,45 @@ fn resolve_targets(
                 }
             }
             Target::Import { node_id, range } => {
-                if let Some(source) = resolve_import(&ctx, *range) {
-                    decorations.insert(*node_id, source);
-                }
+                decorations.insert(*node_id, || resolve_import(&ctx, *range));
             }
             Target::ImportPath { node_id, range } => {
-                if let Some(reexports) = resolve_reexports(&ctx, &mut module_paths, *range) {
-                    decorations.insert(*node_id, reexports);
-                }
+                decorations.insert(*node_id, || {
+                    resolve_reexports(&ctx, &mut module_paths, *range)
+                });
             }
             Target::ModuleItem { node_id, range } => {
-                if let Some(exposure) = resolve_item_exposure(&ctx, *range) {
-                    decorations.insert(*node_id, exposure);
-                }
+                decorations.insert(*node_id, || resolve_item_exposure(&ctx, *range));
             }
         }
     }
-    decorations
+    decorations.decorations
+}
+
+/// The decorations of one file, which hold only the types a pass reads
+///
+/// A target such as a match scrutinee yields more than one type. Each
+/// insert names its type and builds the value in a closure, which runs
+/// only when `wanted` holds the type. A type no pass reads is therefore
+/// neither built nor attached.
+struct WantedDecorations<'w> {
+    decorations: DecorationMap,
+    wanted: &'w DecorationSet,
+}
+
+impl WantedDecorations<'_> {
+    /// Attaches what `build` returns to `node_id`, when a pass reads `D`
+    ///
+    /// `build` runs only when `wanted` holds `D`, and a [`None`] from it
+    /// attaches nothing.
+    fn insert<D: Decoration>(&mut self, node_id: usize, build: impl FnOnce() -> Option<D>) {
+        if !self.wanted.contains_any(&[D::KEY]) {
+            return;
+        }
+        if let Some(value) = build() {
+            self.decorations.insert(node_id, value);
+        }
+    }
 }
 
 /// A node the provider asks rust-analyzer to resolve
@@ -719,7 +749,7 @@ fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &m
         }
         "let_condition" | "let_declaration" | "call_expression" | "binary_expression"
         | "macro_invocation"
-            if wanted.contains_any(&[EnumVariants::KEY]) =>
+            if wanted.contains_any(&[ResolvedType::KEY, AdtFlags::KEY, EnumVariants::KEY]) =>
         {
             collect_branch_values(node, targets);
         }
@@ -1104,33 +1134,42 @@ fn resolve_function(ctx: &DecorateCtx<'_, '_>, range: TextRange) -> Option<FnSig
     )
 }
 
-fn resolve_match_scrutinee(
+/// Attaches the type of a match scrutinee and, for an enum, its flags
+///
+/// The scrutinee is typed once. Each of the two decorations is built only
+/// when a pass reads it.
+fn decorate_match_scrutinee(
     ctx: &DecorateCtx<'_, '_>,
+    decorations: &mut WantedDecorations<'_>,
+    node_id: usize,
     scrutinee_range: TextRange,
-) -> Option<(ResolvedType, Option<AdtFlags>)> {
-    let expr_node = find_expr_covering(ctx, scrutinee_range)?;
-    let ty_info = ctx.sema.type_of_expr(&expr_node)?;
+) {
+    let Some(expr_node) = find_expr_covering(ctx, scrutinee_range) else {
+        return;
+    };
+    let Some(ty_info) = ctx.sema.type_of_expr(&expr_node) else {
+        return;
+    };
 
     let ty = ty_info.original;
-    let adt_kind = match ty.as_adt() {
-        Some(Adt::Enum(_)) => AdtKind::Enum,
-        Some(Adt::Struct(_) | Adt::Union(_)) | None => AdtKind::Other,
-    };
-
     let func = find_enclosing_fn(ctx, scrutinee_range);
-    let display = match &func {
-        Some(f) => ctx.display_type(&ty, f),
-        None => format!("{ty:?}"),
-    };
 
-    let resolved = ResolvedType::new(display).with_adt_kind(adt_kind);
+    decorations.insert(node_id, || {
+        let adt_kind = match ty.as_adt() {
+            Some(Adt::Enum(_)) => AdtKind::Enum,
+            Some(Adt::Struct(_) | Adt::Union(_)) | None => AdtKind::Other,
+        };
+        let display = match &func {
+            Some(f) => ctx.display_type(&ty, f),
+            None => format!("{ty:?}"),
+        };
 
-    let flags = match ty.as_adt() {
+        Some(ResolvedType::new(display).with_adt_kind(adt_kind))
+    });
+    decorations.insert(node_id, || match ty.as_adt() {
         Some(Adt::Enum(e)) => Some(adt_flags(ctx, e, func)),
         Some(Adt::Struct(_) | Adt::Union(_)) | None => None,
-    };
-
-    Some((resolved, flags))
+    });
 }
 
 /// Returns the flags of an enum as seen from the function that names it
@@ -1150,43 +1189,49 @@ fn adt_flags(ctx: &DecorateCtx<'_, '_>, e: Enum, func: Option<Function>) -> AdtF
 /// Attaches what a rule needs to judge a value that decides a branch
 ///
 /// The provider looks through references, because `self` in a method that
-/// takes `&self` tests the same variants as an owned value.
+/// takes `&self` tests the same variants as an owned value. Each of the
+/// three decorations is built only when a pass reads it.
 fn decorate_branch_value(
     ctx: &DecorateCtx<'_, '_>,
-    decorations: &mut DecorationMap,
+    decorations: &mut WantedDecorations<'_>,
     node_id: usize,
     ty: &Type<'_>,
     range: TextRange,
 ) {
     let ty = ty.strip_references();
     let func = find_enclosing_fn(ctx, range);
-    let display = match &func {
-        Some(f) => ctx.display_type(&ty, f),
-        None => format!("{ty:?}"),
-    };
-    let adt_kind = match ty.as_adt() {
-        Some(Adt::Enum(_)) => AdtKind::Enum,
-        Some(Adt::Struct(_) | Adt::Union(_)) | None => AdtKind::Other,
-    };
 
-    decorations.insert(
-        node_id,
-        ResolvedType::new(display)
-            .with_adt_kind(adt_kind)
-            .with_result_kind(result_kind(ctx, &ty))
-            .with_option_kind(option_kind(ctx, &ty)),
-    );
+    decorations.insert(node_id, || {
+        let display = match &func {
+            Some(f) => ctx.display_type(&ty, f),
+            None => format!("{ty:?}"),
+        };
+        let adt_kind = match ty.as_adt() {
+            Some(Adt::Enum(_)) => AdtKind::Enum,
+            Some(Adt::Struct(_) | Adt::Union(_)) | None => AdtKind::Other,
+        };
 
-    if let Some(Adt::Enum(e)) = ty.as_adt() {
+        Some(
+            ResolvedType::new(display)
+                .with_adt_kind(adt_kind)
+                .with_result_kind(result_kind(ctx, &ty))
+                .with_option_kind(option_kind(ctx, &ty)),
+        )
+    });
+
+    let Some(Adt::Enum(e)) = ty.as_adt() else {
+        return;
+    };
+    decorations.insert(node_id, || Some(adt_flags(ctx, e, func)));
+    decorations.insert(node_id, || {
         let db = ctx.sema.db;
         let names = e
             .variants(db)
             .into_iter()
             .map(|variant| variant.name(db).display(db, ctx.edition).to_string());
 
-        decorations.insert(node_id, adt_flags(ctx, e, func));
-        decorations.insert(node_id, EnumVariants::new(names));
-    }
+        Some(EnumVariants::new(names))
+    });
 }
 
 /// Returns the type of the value that a `matches!` call tests
@@ -1840,6 +1885,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_send_wanted_decorations() {
+        fn assert_send<T: Send>() {}
+        assert_send::<WantedDecorations<'static>>();
+    }
+
+    #[test]
     fn trait_sync_module_paths() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<ModulePaths>();
@@ -1855,6 +1906,12 @@ mod tests {
     fn trait_sync_target() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<Target>();
+    }
+
+    #[test]
+    fn trait_sync_wanted_decorations() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<WantedDecorations<'static>>();
     }
 
     #[test]
@@ -1879,5 +1936,11 @@ mod tests {
     fn trait_unpin_target() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Target>();
+    }
+
+    #[test]
+    fn trait_unpin_wanted_decorations() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<WantedDecorations<'static>>();
     }
 }

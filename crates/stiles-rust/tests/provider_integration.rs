@@ -1764,6 +1764,15 @@ fn match_on_enum_scrutinee<'a>(root: &DecoratedNode<'a>) -> DecoratedNode<'a> {
         .expect("match should have value field")
 }
 
+/// Returns the value that the first `if let` in `if_let_on_enum` tests
+fn if_let_on_enum_value<'a>(root: &DecoratedNode<'a>) -> DecoratedNode<'a> {
+    let func = find_function_by_name(root, "if_let_on_enum").expect("should find the function");
+    let condition = find_first_node_of_kind(&func, "let_condition").expect("should find let");
+    condition
+        .child_by_field_name("value")
+        .expect("let should have value field")
+}
+
 #[test]
 fn wanting_item_exposure_decorates_an_item() {
     let provider = load_provider_wanting(DecorationSet::from_iter([ItemExposure::KEY]));
@@ -1784,6 +1793,62 @@ fn wanting_no_decorations_attaches_no_signature() {
     let func = find_function_by_name(&root, "match_on_enum").expect("should find the function");
 
     assert!(func.decoration::<FnSignature>().is_none());
+}
+
+#[test]
+fn wanting_only_adt_flags_flags_a_scrutinee() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([AdtFlags::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let scrutinee = match_on_enum_scrutinee(&root);
+
+    assert!(scrutinee.decoration::<AdtFlags>().is_some());
+}
+
+/// A scrutinee yields two types, and a provider builds only the wanted one
+#[test]
+fn wanting_only_adt_flags_leaves_a_scrutinee_untyped() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([AdtFlags::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let scrutinee = match_on_enum_scrutinee(&root);
+
+    assert!(scrutinee.decoration::<ResolvedType>().is_none());
+}
+
+#[test]
+fn wanting_only_enum_variants_leaves_a_branch_value_untyped() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([EnumVariants::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let value = if_let_on_enum_value(&root);
+
+    assert!(value.decoration::<ResolvedType>().is_none());
+}
+
+#[test]
+fn wanting_only_enum_variants_names_the_variants_of_a_branch_value() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([EnumVariants::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+
+    let variants = branch_node(&tree, "if_let_on_enum", BranchSite::LetCondition);
+
+    assert_eq!(variants, COLORS);
+}
+
+/// A branch value is typed for a pass that reads types and no variants
+#[test]
+fn wanting_only_resolved_types_types_a_branch_value() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([ResolvedType::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let value = if_let_on_enum_value(&root);
+
+    assert!(value.decoration::<ResolvedType>().is_some());
 }
 
 #[test]

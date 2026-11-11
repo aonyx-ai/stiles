@@ -8,8 +8,8 @@
 use std::path::{Path, PathBuf};
 
 use stiles_types::{
-    Coverage, CoverageGap, DecoratedNode, DecoratedTree, DecorationProvider, Diagnostic, Language,
-    LintPass, RuleId, Severity,
+    Coverage, CoverageGap, DecoratedNode, DecoratedTree, Decoration as _, DecorationProvider,
+    DecorationSet, Diagnostic, Language, LintPass, RuleId, Severity,
 };
 use stiles_typescript::decorations::{
     FnSignature, ImportSource, Primitive, ResolvedType, StringUnion, TypeText,
@@ -75,11 +75,28 @@ fn parse(path: &Path, source: &str) -> DecoratedTree {
 /// Returns the tree with the provider's decorations merged in, or the gap
 /// the provider declined the file with.
 fn decorate(project: &Project, relative: &str) -> Result<DecoratedTree, CoverageGap> {
+    decorate_with(&project.provider(), project, relative)
+}
+
+/// Decorates the file at `relative` with a provider that computes only `wanted`
+fn decorate_wanting(
+    project: &Project,
+    relative: &str,
+    wanted: DecorationSet,
+) -> Result<DecoratedTree, CoverageGap> {
+    decorate_with(&project.provider().wanting(wanted), project, relative)
+}
+
+/// Decorates the file at `relative` of `project` through `provider`
+fn decorate_with(
+    provider: &TypeScriptDecorationProvider,
+    project: &Project,
+    relative: &str,
+) -> Result<DecoratedTree, CoverageGap> {
     let path = project.path(relative);
     let source = std::fs::read_to_string(&path).expect("the file should exist");
     let mut tree = parse(&path, &source);
-    let coverage = project
-        .provider()
+    let coverage = provider
         .decorate(&tree)
         .expect("decoration should not fail");
     match coverage {
@@ -569,6 +586,59 @@ fn decorate_types_the_identifiers_of_a_tsx_file() {
         types_of(&tree, "label"),
         vec![Some("\"hi\"".to_owned()), Some("\"hi\"".to_owned())]
     );
+}
+
+/// Returns the `total` identifier of a project that declares one number
+fn total_wanting(wanted: DecorationSet) -> (Project, DecoratedTree) {
+    let project = Project::new(STRICT, &[("src/main.ts", "export const total = 1 + 2;\n")]);
+    let tree = decorate_wanting(&project, "src/main.ts", wanted).expect("should cover the file");
+
+    (project, tree)
+}
+
+#[test]
+fn decorate_wanting_only_resolved_types_leaves_no_type_text() {
+    let (_project, tree) = total_wanting(DecorationSet::from_iter([ResolvedType::KEY]));
+
+    let total = find(
+        &tree,
+        Wanted {
+            kind: "identifier",
+            text: "total",
+        },
+    );
+
+    assert!(total.decoration::<TypeText>().is_none());
+}
+
+#[test]
+fn decorate_wanting_only_type_text_leaves_no_resolved_type() {
+    let (_project, tree) = total_wanting(DecorationSet::from_iter([TypeText::KEY]));
+
+    let total = find(
+        &tree,
+        Wanted {
+            kind: "identifier",
+            text: "total",
+        },
+    );
+
+    assert!(total.decoration::<ResolvedType>().is_none());
+}
+
+#[test]
+fn decorate_wanting_only_type_text_types_an_identifier() {
+    let (_project, tree) = total_wanting(DecorationSet::from_iter([TypeText::KEY]));
+
+    let total = find(
+        &tree,
+        Wanted {
+            kind: "identifier",
+            text: "total",
+        },
+    );
+
+    assert!(total.decoration::<TypeText>().is_some());
 }
 
 #[test]

@@ -136,13 +136,13 @@ impl CustomLints {
             .collect()
     }
 
-    /// Returns the languages that at least one loaded pass inspects
+    /// Returns every loaded lint, in load order
     ///
-    /// A provider computes decorations only for these languages.
-    pub(crate) fn languages(&self) -> HashSet<Language> {
+    /// A provider computes only the decorations that these lints read.
+    pub(crate) fn registered(&self) -> Vec<&RegisteredLint> {
         self.lints
             .iter()
-            .map(|LoadedLint { lint, .. }| lint.language())
+            .map(|LoadedLint { lint, .. }| lint)
             .collect()
     }
 

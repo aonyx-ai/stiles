@@ -1,5 +1,6 @@
 use stiles_rust::decorations::ImportSource;
 use stiles_rust::{RustLintPass, RustLintPassAdapter};
+use stiles_types::plugin::Reads;
 use stiles_types::{DecoratedNode, Diagnostic, LintPass, RuleId, Severity};
 
 /// The rule id this probe reports under
@@ -30,6 +31,10 @@ impl FunctionScopedImport {
 impl stiles_plugin::DeclaresRules for FunctionScopedImport {
     fn rules(&self) -> Vec<RuleId> {
         vec![RuleId::new("fixture.function-scoped-import")]
+    }
+
+    fn reads(&self) -> Reads {
+        Reads::of::<ImportSource>()
     }
 }
 

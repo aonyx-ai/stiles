@@ -148,9 +148,10 @@ impl TypeScriptDecorationProvider {
     /// Returns the provider, computing only the decoration types of `wanted`
     ///
     /// Each kind of target yields some of [`DECORATIONS`], and the provider
-    /// skips a target whose types `wanted` leaves out. With an empty set,
-    /// the provider still decides whether it covers a file, and asks the
-    /// checker nothing about it.
+    /// skips a target whose types `wanted` leaves out. An identifier yields
+    /// three types, and the provider builds only the ones `wanted` holds.
+    /// With an empty set, the provider still decides whether it covers a
+    /// file, and asks the checker nothing about it.
     ///
     /// # Examples
     ///
@@ -409,17 +410,22 @@ impl DecorationProvider for TypeScriptDecorationProvider {
             }
 
             let ty = checker.get_type_at_location(token);
-            let text = checker.type_to_string_exported(ty);
-            decorations.insert(node_id, TypeText::new(&text));
-
-            let declaration = checker
-                .get_symbol_at_location_exported(token)
-                .and_then(|symbol| symbol.value_declaration());
-            decorations.insert(
-                node_id,
-                queries::resolved_type(&mut checker, ty, declaration),
-            );
-            if let Some(union) = queries::string_union(ty) {
+            if self.wanted.contains_any(&[TypeText::KEY]) {
+                let text = checker.type_to_string_exported(ty);
+                decorations.insert(node_id, TypeText::new(&text));
+            }
+            if self.wanted.contains_any(&[ResolvedType::KEY]) {
+                let declaration = checker
+                    .get_symbol_at_location_exported(token)
+                    .and_then(|symbol| symbol.value_declaration());
+                decorations.insert(
+                    node_id,
+                    queries::resolved_type(&mut checker, ty, declaration),
+                );
+            }
+            if self.wanted.contains_any(&[StringUnion::KEY])
+                && let Some(union) = queries::string_union(ty)
+            {
                 decorations.insert(node_id, union);
             }
         }
