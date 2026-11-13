@@ -12,7 +12,8 @@ pub use self::walk_lints_error::WalkLintsError;
 /// Walks a decorated syntax tree and collects diagnostics from lint passes
 ///
 /// This is [`walk_lints`] for passes that no plugin declared, such as a
-/// rule's own tests run. It accepts any rule a pass reports.
+/// rule's own tests run. It accepts any rule a pass reports, and serves
+/// any decoration a pass reads.
 ///
 /// # Errors
 ///
@@ -99,16 +100,18 @@ pub fn walk(
 /// names the node it was checking. Returns [`WalkLintsError::Reported`]
 /// when a pass reports what the host cannot build into diagnostics.
 /// Returns [`WalkLintsError::Undeclared`] when a pass reports a rule its
-/// plugin did not declare for it. The walk stops at the first of these,
-/// for the reasons [`PassPanic`] and [`UndeclaredRule`] give.
+/// plugin did not declare for it. Returns [`WalkLintsError::UndeclaredRead`]
+/// when a pass reads a decoration its plugin did not declare for it. The
+/// walk stops at the first of these, for the reasons [`PassPanic`],
+/// [`UndeclaredRule`], and [`UndeclaredRead`] give.
 ///
 /// # Examples
 ///
 /// ```
 /// use stiles_core::Lint;
 /// use stiles_types::{
-///     Checked, Configured, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, RuleId,
-///     RuleOptions, Severity, Sink,
+///     Checked, Configured, DecoratedNode, DecoratedTree, Diagnostic, Language, LintPass, ReadKeys,
+///     RuleId, RuleOptions, Severity, Sink,
 /// };
 ///
 /// /// Reports every function
@@ -151,6 +154,7 @@ pub fn walk(
 ///     Lint::builder()
 ///         .pass(Box::new(Functions))
 ///         .rules(vec![RuleId::new("lint.functions")])
+///         .reads(ReadKeys::from_iter([]))
 ///         .build(),
 /// ];
 ///
@@ -161,6 +165,7 @@ pub fn walk(
 /// ```
 ///
 /// [`PassPanic`]: crate::PassPanic
+/// [`UndeclaredRead`]: crate::UndeclaredRead
 /// [`UndeclaredRule`]: crate::UndeclaredRule
 pub fn walk_lints(
     tree: &DecoratedTree,
@@ -171,7 +176,7 @@ pub fn walk_lints(
         .filter(|lint| lint.language() == tree.language())
         .collect();
     let mut diagnostics = Vec::new();
-    visit_node(&tree.root_node(), &mut lints, &mut diagnostics)?;
+    visit_node(tree, &tree.root_node(), &mut lints, &mut diagnostics)?;
     Ok(diagnostics)
 }
 
@@ -196,18 +201,19 @@ impl LintPass for BorrowedPass<'_> {
 }
 
 fn visit_node(
+    tree: &DecoratedTree,
     node: &DecoratedNode<'_>,
     lints: &mut [&mut Lint<'_>],
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Result<(), WalkLintsError> {
     if node.is_named() {
         for lint in lints.iter_mut() {
-            diagnostics.extend(lint.check_node(node)?);
+            diagnostics.extend(lint.check_node(tree, node)?);
         }
     }
 
     for child in node.named_children() {
-        visit_node(&child, lints, diagnostics)?;
+        visit_node(tree, &child, lints, diagnostics)?;
     }
 
     Ok(())
@@ -219,7 +225,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use stiles_types::{Panic, RuleId};
+    use stiles_types::{Decoration, DecorationKey, Panic, ReadKeys, RuleId, Severity};
 
     use super::*;
 
@@ -228,6 +234,7 @@ mod tests {
         Lint::builder()
             .pass(Box::new(pass))
             .rules(rules.iter().map(|rule| RuleId::new(rule)).collect())
+            .reads(ReadKeys::from_iter([]))
             .build()
     }
 
@@ -315,8 +322,6 @@ mod tests {
 
     #[test]
     fn walk_collects_diagnostics_from_multiple_passes() {
-        use stiles_types::{RuleId, Severity};
-
         struct WarnOnFn(&'static str);
         impl LintPass for WarnOnFn {
             extern "C" fn language(&self) -> Language {
@@ -616,6 +621,74 @@ mod tests {
         assert!(count > 1, "should visit multiple nested nodes, got {count}");
     }
 
+    /// Marks a node for [`ReadsTag`] to find
+    #[stabby::stabby]
+    struct Tag(u32);
+
+    impl Decoration for Tag {
+        const KEY: DecorationKey = DecorationKey::new("tests::Tag");
+
+        type Ref<'a> = Option<&'a Self>;
+
+        fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+            node.decoration::<Self>()
+        }
+    }
+
+    /// Reports every node that holds a [`Tag`]
+    struct ReadsTag;
+
+    impl LintPass for ReadsTag {
+        extern "C" fn language(&self) -> Language {
+            Language::Rust
+        }
+
+        extern "C" fn configure(&mut self, _options: &RuleOptions) -> Configured {
+            Configured::Ok(())
+        }
+
+        extern "C" fn check_node(&mut self, node: &DecoratedNode<'_>, sink: &Sink<'_>) -> Checked {
+            if node.get::<Tag>().is_some() {
+                sink.report(
+                    &Diagnostic::builder()
+                        .rule_id(RuleId::new("pass.tag"))
+                        .severity(Severity::Warn)
+                        .message("a tag")
+                        .span(node.span())
+                        .build(),
+                );
+            }
+            Checked::Ok(())
+        }
+    }
+
+    /// Returns a Rust tree whose root holds a [`Tag`]
+    fn tagged_rust() -> DecoratedTree {
+        let mut tree = parse_rust("fn main() {}");
+        let root = tree.root_node().id();
+        tree.decorations_mut().insert(root, Tag(1));
+        tree
+    }
+
+    /// Pairs [`ReadsTag`] with its rule, and declares that it reads `reads`
+    fn reading(reads: &[DecorationKey]) -> Lint<'static> {
+        Lint::builder()
+            .pass(Box::new(ReadsTag))
+            .rules(vec![RuleId::new("pass.tag")])
+            .reads(reads.iter().copied().collect())
+            .build()
+    }
+
+    #[test]
+    fn walk_with_a_declared_read_serves_the_decoration() {
+        let tree = tagged_rust();
+        let mut lints = vec![reading(&[Tag::KEY])];
+
+        let diagnostics = walk_lints(&tree, &mut lints).expect("the read is declared");
+
+        assert_eq!(diagnostics.len(), 1);
+    }
+
     /// A panic stops the walk where it happened and says where that was
     #[test]
     fn walk_with_a_panicking_pass_names_the_node() {
@@ -669,14 +742,43 @@ mod tests {
         assert_eq!(visited.load(Ordering::Relaxed), 1);
     }
 
+    /// A pass that no plugin declared reads what it likes, as a rule's own
+    /// tests run it
+    #[test]
+    fn walk_with_an_undeclared_read_in_an_unchecked_pass_serves_it() {
+        let tree = tagged_rust();
+        let mut passes: Vec<Box<dyn LintPass>> = vec![Box::new(ReadsTag)];
+
+        let diagnostics = walk(&tree, &mut passes).expect("nothing is declared");
+
+        assert_eq!(diagnostics.len(), 1);
+    }
+
+    /// A read outside the pass's declaration stops the walk and names the key
+    ///
+    /// The lookup would otherwise find nothing in a real run, where the
+    /// provider computes only the declared keys, and the rule would report
+    /// nothing.
+    #[test]
+    fn walk_with_an_undeclared_read_stops_and_names_it() {
+        let tree = tagged_rust();
+        let mut lints = vec![reading(&[])];
+
+        let error = walk_lints(&tree, &mut lints).expect_err("the read should end the walk");
+
+        assert_eq!(
+            error.to_string(),
+            "the lint of `pass.tag` reads the decoration `tests::Tag` at byte 0 of test.rs, which \
+             its plugin does not declare for it; add it to the lint's `DeclaresRules::reads`"
+        );
+    }
+
     /// A rule outside the pass's declaration stops the walk and names itself
     ///
     /// The diagnostic would otherwise slip past every switch and option a
     /// project sets by rule id.
     #[test]
     fn walk_with_an_undeclared_rule_stops_and_names_it() {
-        use stiles_types::Severity;
-
         struct Mislabeled;
         impl LintPass for Mislabeled {
             extern "C" fn language(&self) -> Language {

@@ -120,6 +120,7 @@ emits a `dispatches` call for every kind of the grammar.
 The host refuses a plugin when:
 
 - the plugin requires a table longer than the host's,
+- a lint declares no reads,
 - a declared key has no provider in this stiles,
 - a declared kind is not in the host's grammar, or
 - a declared option conflicts with the configuration.
@@ -189,6 +190,12 @@ to be added.
 declared. A run whose rules read no types infers no function body. That is the
 laziness that matters, because rust-analyzer infers a whole body to type one
 expression in it. [#607][issue-607] is this point.
+
+A pass reads only what it declares, and a pass that declares nothing reads
+nothing. A lookup of any other key would find nothing, and its rule would report
+nothing. The host therefore fails the run at such a lookup, and names the rule
+and the key. The host also refuses a plugin that registers a lint without a
+`reads` call for it.
 
 **Keys stay versioned.** A key already joins the name with a hash of the
 definition. A changed decoration is a new key, and the provider may offer both

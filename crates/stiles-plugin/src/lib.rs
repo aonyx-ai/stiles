@@ -44,10 +44,7 @@ pub mod __private {
 /// The decorations are not part of it. A lint declares each decoration it
 /// reads by its key and the fingerprint of its layout. Stiles refuses a
 /// read that no provider offers at both, and names the decoration a plugin
-/// needs. A lint whose reads are undeclared escapes it until
-/// [stiles#651].
-///
-/// [stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
+/// needs.
 ///
 /// # Examples
 ///

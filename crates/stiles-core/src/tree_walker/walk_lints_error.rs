@@ -1,7 +1,7 @@
 use stiles_types::{CollectDiagnosticsError, Span};
 use thiserror::Error;
 
-use crate::{PassPanic, UndeclaredRule};
+use crate::{PassPanic, UndeclaredRead, UndeclaredRule};
 
 /// The reason a walk of the lint passes stopped
 ///
@@ -51,6 +51,13 @@ pub enum WalkLintsError {
     Undeclared {
         /// The rule the pass reported, with the rules it declared
         source: UndeclaredRule,
+    },
+
+    /// A pass read a decoration that its plugin did not declare for it
+    #[error(transparent)]
+    UndeclaredRead {
+        /// The decoration the pass read, with the rules of its lint
+        source: UndeclaredRead,
     },
 }
 

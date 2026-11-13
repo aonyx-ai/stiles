@@ -12,7 +12,6 @@ use stiles_types::{
 use stiles_typescript::TypeScriptDecorationProvider;
 
 use super::grammar::Grammar;
-use crate::custom_lints::offered;
 
 /// The decoration providers a run loaded, for the languages it found
 ///
@@ -218,31 +217,17 @@ fn load_typescript_project(
 /// Returns the decoration types that a provider of `language` computes
 ///
 /// The set is the union of the keys that the loaded lints of `language`
-/// declare. A language that no lint inspects gets none.
-///
-/// A lint that declares [`Reads::none`] adds nothing. A lint whose reads
-/// are [`Reads::undeclared`] gets every type of its provider. One such
-/// lint therefore makes the provider compute all of them for its language. That
-/// fallback is staged, and [stiles#651] removes it.
+/// declare. A language that no lint inspects gets none, and a lint that
+/// declares [`Reads::none`] adds nothing.
 ///
 /// [`Reads::none`]: stiles_types::plugin::Reads::none
-/// [`Reads::undeclared`]: stiles_types::plugin::Reads::undeclared
-///
-/// [stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
 fn wanted(lints: &[&RegisteredLint], language: Language) -> DecorationSet {
-    let mut keys = Vec::new();
-
-    for lint in lints.iter().filter(|lint| lint.language() == language) {
-        let Some(identities) = lint.reads().declared() else {
-            return offered(language)
-                .iter()
-                .map(DecorationIdentity::key)
-                .collect();
-        };
-        keys.extend(identities.iter().map(DecorationIdentity::key));
-    }
-
-    keys.into_iter().collect()
+    lints
+        .iter()
+        .filter(|lint| lint.language() == language)
+        .flat_map(|lint| lint.reads().declared())
+        .map(DecorationIdentity::key)
+        .collect()
 }
 
 #[cfg(test)]
@@ -504,17 +489,9 @@ mod tests {
         assert_unpin::<Providers>();
     }
 
-    /// Returns every key the Rust provider offers
-    fn every_rust_key() -> DecorationSet {
-        RustDecorationProvider::DECORATIONS
-            .iter()
-            .map(DecorationIdentity::key)
-            .collect()
-    }
-
     #[test]
     fn wanted_for_a_language_no_lint_inspects_is_empty() {
-        let lint = registered(Language::Rust, Reads::undeclared());
+        let lint = registered(Language::Rust, Reads::of::<FnSignature>());
 
         let wanted = wanted(&[&lint], Language::TypeScript);
 
@@ -542,15 +519,6 @@ mod tests {
     }
 
     #[test]
-    fn wanted_with_an_undeclared_lint_wants_every_type() {
-        let lint = registered(Language::Rust, Reads::undeclared());
-
-        let wanted = wanted(&[&lint], Language::Rust);
-
-        assert_eq!(wanted, every_rust_key());
-    }
-
-    #[test]
     fn wanted_with_declared_reads_wants_their_union() {
         let signatures = registered(Language::Rust, Reads::of::<FnSignature>());
         let types = registered(
@@ -564,16 +532,6 @@ mod tests {
             wanted,
             DecorationSet::from_iter([FnSignature::KEY, ResolvedType::KEY])
         );
-    }
-
-    #[test]
-    fn wanted_with_one_undeclared_lint_wants_every_type() {
-        let signatures = registered(Language::Rust, Reads::of::<FnSignature>());
-        let undeclared = registered(Language::Rust, Reads::undeclared());
-
-        let wanted = wanted(&[&signatures, &undeclared], Language::Rust);
-
-        assert_eq!(wanted, every_rust_key());
     }
 
     #[test]

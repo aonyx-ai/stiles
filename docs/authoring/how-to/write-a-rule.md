@@ -78,10 +78,16 @@ impl stiles_plugin::DeclaresRules for DocSummaryBreak {
     fn rules(&self) -> Vec<RuleId> {
         vec![RULE_ID]
     }
+
+    fn reads(&self) -> stiles_plugin::Reads {
+        stiles_plugin::Reads::none()
+    }
 }
 
 stiles_plugin::export_lints![rust: [DocSummaryBreak]];
 ```
+
+`reads` names the decorations the rule reads, and this rule reads none.
 
 ## Read a decoration
 
@@ -106,14 +112,10 @@ impl stiles_plugin::DeclaresRules for WildcardMatchArm {
 ```
 
 A rule that reads no decoration returns `Reads::none()`. Stiles computes only
-the decorations that a loaded rule declares, so a lookup of an undeclared one
-may find nothing. It refuses to load your rule when it offers no decoration
-with a declared name and layout, which happens when your rule was built against
-another Stiles release.
-
-A rule that leaves out `reads` is undeclared, and still receives every
-decoration of its language. That stops with [stiles#651], so declare your reads
-now.
+the decorations that a loaded rule declares. A lookup of an undeclared one
+therefore ends the run with the name of the rule and the decoration. Stiles also
+refuses to load your rule when it offers no decoration with a declared name and
+layout. That happens when your rule was built against another Stiles release.
 
 Read a decoration from the node it describes:
 
@@ -124,7 +126,8 @@ let Some(resolved) = scrutinee.decoration::<ResolvedType>() else {
 ```
 
 A test attaches the decorations it needs with `stiles_testing::decorate`, so
-declared reads do not apply there.
+declared reads do not apply there. A test therefore passes even when `reads`
+leaves out a decoration that the rule reads, and only a real run catches it.
 
 ## Test the rule
 
@@ -240,5 +243,4 @@ where now. api, configuration, shared-rules, prebuilt archives.
   use your rules download them compiled.
 
 [api]: /authoring/reference/api
-[stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
 [supported-languages]: /docs/reference/supported-languages

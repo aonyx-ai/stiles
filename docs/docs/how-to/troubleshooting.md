@@ -93,6 +93,26 @@ anything.
 Report this to the rule author. If the lint is yours, implement `DeclaresRules`
 for it and return the IDs it reports.
 
+## `the plugin registered the lint of RULES without declaring the decorations`
+
+Every lint must say which decorations it reads, even when it reads none. The
+plugin was built against a Stiles release that did not ask for that, or it was
+written without `stiles_plugin::export_lints!`.
+
+Pin the plugin to a release built for your Stiles. If the plugin is yours,
+rebuild it against your Stiles. The compiler then asks each rule for its
+`DeclaresRules::reads`, and a rule that reads none returns `Reads::none()`.
+
+## ``the lint of RULES reads the decoration `KEY` at byte N of FILE``
+
+A rule looked up a decoration that it did not name in `DeclaresRules::reads`.
+Stiles computes only the decorations that the loaded rules declare, so the
+lookup would find nothing, and the rule would report nothing. Stiles stops
+instead.
+
+Report this to the rule author. If the rule is yours, add the decoration to its
+`DeclaresRules::reads`.
+
 ## ``the lint of RULES reads the decoration `KEY`, which no ... offers``
 
 A rule declares the decorations it reads, and this Stiles computes none under

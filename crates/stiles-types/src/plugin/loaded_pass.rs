@@ -23,7 +23,7 @@ use crate::{Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions,
 /// # Examples
 ///
 /// ```
-/// use stiles_types::plugin::{Built, PassInstance, Registrations};
+/// use stiles_types::plugin::{Built, PassInstance, Reads, Registrations};
 /// use stiles_types::{
 ///     Checked, Configured, DecoratedNode, Language, LintPass, Panic, RuleId, RuleOptions, Sink,
 /// };
@@ -59,7 +59,8 @@ use crate::{Checked, Configured, DecoratedNode, Language, LintPass, RuleOptions,
 /// registrations.lend(|registrar| {
 ///     registrar.require_host_tables();
 ///     // SAFETY: `build` writes a pass whenever it returns `Ok`.
-///     unsafe { registrar.lint(Language::TypeScript, build, &[RuleId::new("lint.quiet")]) };
+///     let lint = unsafe { registrar.lint(Language::TypeScript, build, &[RuleId::new("lint.quiet")]) };
+///     registrar.reads(lint, &Reads::none());
 /// });
 /// let lints = registrations.finish().expect("the registration should be whole");
 ///

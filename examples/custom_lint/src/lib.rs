@@ -44,6 +44,10 @@ impl stiles_plugin::DeclaresRules for NoTodo {
     fn rules(&self) -> Vec<RuleId> {
         vec![RuleId::new("custom.no-todo")]
     }
+
+    fn reads(&self) -> stiles_plugin::Reads {
+        stiles_plugin::Reads::none()
+    }
 }
 
 stiles_plugin::export_lints![rust: [NoTodo]];

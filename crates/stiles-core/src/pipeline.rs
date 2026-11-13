@@ -291,17 +291,18 @@ mod tests {
     use stabby::str::Str;
     use stiles_types::{
         Checked, Configured, CoverageGap, DecorateTreeError, DecoratedNode, Decoration,
-        DecorationKey, DecorationMap, Diagnostic, Language, LintPass, Panic, ProviderName, RuleId,
-        RuleOptions, Severity, Sink,
+        DecorationKey, DecorationMap, Diagnostic, Language, LintPass, Panic, ProviderName,
+        ReadKeys, RuleId, RuleOptions, Severity, Sink,
     };
 
     use super::*;
 
-    /// Pairs `pass` with the rules it may report
+    /// Pairs `pass` with the rules it may report, and lets it read [`Marker`]
     fn lint(pass: impl LintPass + 'static, rules: &[&'static str]) -> Lint<'static> {
         Lint::builder()
             .pass(Box::new(pass))
             .rules(rules.iter().map(|rule| RuleId::new(rule)).collect())
+            .reads(ReadKeys::from_iter([Marker::KEY]))
             .build()
     }
 

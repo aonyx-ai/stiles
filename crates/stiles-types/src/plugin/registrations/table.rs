@@ -18,9 +18,9 @@ use std::ffi::c_void;
 use std::slice;
 use std::sync::MutexGuard;
 
-use super::{RegisterLintsError, Registrations, State};
+use super::{Pending, RegisterLintsError, Registrations, State};
 use crate::plugin::registrar::BuildFn;
-use crate::plugin::{HostTable, RegisteredLint, Registrar};
+use crate::plugin::{HostTable, Registrar};
 use crate::{DecorationIdentity, Language, RuleId};
 
 /// Returns the table whose functions register into the record at `data`
@@ -69,13 +69,12 @@ extern "C" fn lint(
         _ => unsafe { slice::from_raw_parts(rules, count) }.to_vec(),
     };
 
-    state.lints.push(
-        RegisteredLint::builder()
-            .language(language)
-            .factory(factory)
-            .rules(rules)
-            .build(),
-    );
+    state.lints.push(Pending {
+        language,
+        factory,
+        rules,
+        reads: None,
+    });
     state.lints.len() - 1
 }
 
@@ -83,7 +82,7 @@ extern "C" fn lint(
 ///
 /// The identities are copied out before the call returns, so the plugin's
 /// list may go when it does. A count of zero declares that the lint reads
-/// none, and reads no pointer. A handle that names no lint is kept as a
+/// none, and reads no pointer. Either way the lint counts as declared. A handle that names no lint is kept as a
 /// fault, and the record refuses the plugin when it finishes. That
 /// includes [`usize::MAX`], which a refused [`lint`] hands back, so the
 /// fault of that call stays the first. An identity the lint already
@@ -139,7 +138,7 @@ mod tests {
     use std::mem::MaybeUninit;
 
     use super::*;
-    use crate::plugin::{Built, PassInstance, Reads};
+    use crate::plugin::{Built, PassInstance, Reads, RegisteredLint};
     use crate::{DecoratedNode, Decoration, DecorationKey, Panic};
 
     const RULE: RuleId = RuleId::new("test.rule");
@@ -203,13 +202,14 @@ mod tests {
     fn lint_copies_the_rules() {
         let lints = register(|registrar| {
             let rules = [RULE, RuleId::new("test.other")];
-            lint(
+            let handle = lint(
                 registrar,
                 Language::Rust.to_byte(),
                 never,
                 rules.as_ptr(),
                 rules.len(),
             );
+            declare(registrar, handle, &[]);
         })
         .expect("the registration should be whole");
 
@@ -219,7 +219,8 @@ mod tests {
     #[test]
     fn lint_keeps_the_language() {
         let lints = register(|registrar| {
-            lint(registrar, Language::TypeScript.to_byte(), never, &RULE, 1);
+            let handle = lint(registrar, Language::TypeScript.to_byte(), never, &RULE, 1);
+            declare(registrar, handle, &[]);
         })
         .expect("the registration should be whole");
 
@@ -273,13 +274,14 @@ mod tests {
     #[test]
     fn lint_with_no_rules_reads_no_pointer() {
         let lints = register(|registrar| {
-            lint(
+            let handle = lint(
                 registrar,
                 Language::Rust.to_byte(),
                 never,
                 std::ptr::null(),
                 0,
             );
+            declare(registrar, handle, &[]);
         })
         .expect("the registration should be whole");
 
@@ -287,13 +289,16 @@ mod tests {
     }
 
     #[test]
-    fn lint_without_reads_is_undeclared() {
-        let lints = register(|registrar| {
+    fn lint_without_reads_refuses_the_plugin() {
+        let error = register(|registrar| {
             lint(registrar, Language::Rust.to_byte(), never, &RULE, 1);
         })
-        .expect("the registration should be whole");
+        .expect_err("the lint should be refused");
 
-        assert_eq!(lints[0].reads(), &Reads::undeclared());
+        assert_eq!(
+            error,
+            RegisterLintsError::UndeclaredReads { rules: vec![RULE] }
+        );
     }
 
     #[test]
@@ -392,23 +397,13 @@ mod tests {
     }
 
     #[test]
-    fn registrar_through_the_method_leaves_undeclared_reads_undeclared() {
-        let lints = register(|registrar| {
-            // SAFETY: `never` never returns `Ok`.
-            let handle = unsafe { registrar.lint(Language::Rust, never, &[RULE]) };
-            registrar.reads(handle, &Reads::undeclared());
-        })
-        .expect("the registration should be whole");
-
-        assert_eq!(lints[0].reads(), &Reads::undeclared());
-    }
-
-    #[test]
     fn registrar_through_the_method_registers_in_order() {
-        // SAFETY: `never` never returns `Ok`.
-        let lints = register(|registrar| unsafe {
-            registrar.lint(Language::Rust, never, &[RULE]);
-            registrar.lint(Language::TypeScript, never, &[RULE]);
+        let lints = register(|registrar| {
+            for language in [Language::Rust, Language::TypeScript] {
+                // SAFETY: `never` never returns `Ok`.
+                let handle = unsafe { registrar.lint(language, never, &[RULE]) };
+                registrar.reads(handle, &Reads::none());
+            }
         })
         .expect("the registration should be whole");
 

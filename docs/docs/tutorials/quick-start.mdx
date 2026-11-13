@@ -27,7 +27,8 @@ each lint can register multiple rules. Every rule has four important components:
 
 1. Rule struct and documentation.
 2. `LintPass` implementation: the actual logic of the lint.
-3. Rule ID: a string identifying the rule.
+3. Rule ID: a string identifying the rule, declared with the decorations the
+   rule reads.
 4. Lint registration.
 
 Here's a simple lint that checks if the first line of a Rust `///` docstring is

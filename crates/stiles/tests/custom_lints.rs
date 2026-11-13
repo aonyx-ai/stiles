@@ -3,7 +3,9 @@ use std::process::Command;
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use stiles_types::RuleId;
+use stiles_rust::RuleId;
+use stiles_rust::decorations::FnSignature;
+use stiles_types::Decoration;
 use tempfile::TempDir;
 
 #[path = "support/configurable_plugin.rs"]
@@ -12,12 +14,15 @@ mod configurable_plugin;
 mod git_pin;
 #[path = "support/other_protocol_plugin.rs"]
 mod other_protocol_plugin;
+#[path = "support/undeclared_read_plugin.rs"]
+mod undeclared_read_plugin;
 #[path = "support/unoffered_read_plugin.rs"]
 mod unoffered_read_plugin;
 
 use self::configurable_plugin::write_configurable_lint_package;
 use self::git_pin::GitPin;
 use self::other_protocol_plugin::write_other_protocol_lint_package;
+use self::undeclared_read_plugin::write_undeclared_read_lint_package;
 use self::unoffered_read_plugin::{Declared, UNOFFERED, write_unoffered_read_lint_package};
 
 /// Source that trips the example lint and none of the built-ins
@@ -171,6 +176,9 @@ fn workspace_of_lints(prefix: &str) -> TempDir {
                  impl stiles_plugin::DeclaresRules for Flag {{\n\
                  \x20   fn rules(&self) -> Vec<RuleId> {{\n\
                  \x20       vec![RuleId::new(\"{rule}\")]\n\
+                 \x20   }}\n\n\
+                 \x20   fn reads(&self) -> stiles_plugin::Reads {{\n\
+                 \x20       stiles_plugin::Reads::none()\n\
                  \x20   }}\n\
                  }}\n\n\
                  impl RustLintPass for Flag {{\n\
@@ -289,6 +297,31 @@ fn check_with_a_lint_reading_a_decoration_stiles_lacks_refuses_it() {
         .code(1)
         .stderr(predicate::str::contains(format!(
             "reads the decoration `{UNOFFERED}`, which no Rust provider of this stiles offers"
+        )));
+}
+
+/// Pins that a lookup of a decoration the lint did not declare ends the run
+///
+/// A provider computes only the declared decorations, so the lookup would
+/// find nothing, and the rule would report nothing. The error names the
+/// rule and the decoration, so the author knows what to declare.
+#[test]
+fn check_with_a_lint_reading_an_undeclared_decoration_fails() {
+    let target = package(TODO_SOURCE);
+    let lints = tempfile::tempdir().expect("temporary directory should be created");
+    write_undeclared_read_lint_package(lints.path(), "undeclared_read_lint");
+    configure_lint(target.path(), lints.path());
+
+    stiles()
+        .env("CARGO_TARGET_DIR", shared_build_directory())
+        .arg("check")
+        .arg(target.path())
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains(format!(
+            "the lint of `{}` reads the decoration `{}`",
+            undeclared_read_plugin::RULE,
+            <FnSignature as Decoration>::KEY.as_str(),
         )));
 }
 
