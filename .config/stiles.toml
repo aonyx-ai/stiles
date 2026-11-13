@@ -36,4 +36,7 @@ rev = "877030eda4ea7791f32be516219fbfd70a0f379c"
 # the TypeScript checker's `Kind` gains syntax kinds with each release of
 # TypeScript. A `match` that named every variant would gain nothing.
 [rules.options."lint.single-variant-branch"]
-non-exhaustive = ["tar::entry_type::EntryType", "stiles_tsrs::tsrs_ast::kind::Kind"]
+non-exhaustive = [
+  "tar::entry_type::EntryType",
+  "stiles_tsrs::tsrs_ast::kind::Kind",
+]
