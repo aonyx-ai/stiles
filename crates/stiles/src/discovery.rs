@@ -100,11 +100,12 @@ impl Discovery {
 
             let extension = extension.to_string_lossy();
 
-            let Some(_language) = Language::from_extension(&extension) else {
-                anyhow::bail!(
+            let _language = match Language::from_extension(&extension) {
+                Some(language) => language,
+                None => anyhow::bail!(
                     "stiles cannot check {}: there is no grammar for `.{extension}` files",
                     path.display()
-                );
+                ),
             };
 
             return Ok(Self {
@@ -166,8 +167,9 @@ impl Discovery {
             let Some(extension) = entry.path().extension() else {
                 continue;
             };
-            let Some(_language) = Language::from_extension(&extension.to_string_lossy()) else {
-                continue;
+            let _language = match Language::from_extension(&extension.to_string_lossy()) {
+                Some(language) => language,
+                None => continue,
             };
 
             files.push(rebase(path, &root, entry.path()));
