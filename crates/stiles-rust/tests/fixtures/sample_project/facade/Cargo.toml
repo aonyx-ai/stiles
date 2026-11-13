@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 facade_core = { path = "../facade_core" }
+tint-core = { path = "../tint-core" }

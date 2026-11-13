@@ -13,6 +13,7 @@ name = "facade"
 version = "0.1.0"
 dependencies = [
  "facade_core",
+ "tint-core",
 ]
 
 [[package]]
@@ -70,6 +71,10 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "tint-core"
+version = "0.1.0"
 
 [[package]]
 name = "unicode-ident"

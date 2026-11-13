@@ -5,8 +5,8 @@ use std::sync::OnceLock;
 
 use decoration_probes::{AnyhowBareTry, FunctionScopedImport, WildcardMatchArm};
 use stiles_rust::decorations::{
-    AdtFlags, EnumVariants, FnSignature, ImportSource, ItemExposure, PublicPath, Reexports,
-    ResolvedType, ReturnMode, TypePathRef,
+    AdtFlags, AdtPath, EnumVariants, FnSignature, ImportSource, ItemExposure, PublicPath,
+    Reexports, ResolvedType, ReturnMode, TypePathRef,
 };
 use stiles_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter};
 use stiles_types::{
@@ -294,6 +294,95 @@ fn flagged_in_file<'a>(tree: &'a DecoratedTree, diagnostics: &[Diagnostic]) -> V
         .map(Diagnostic::span)
         .map(|span| &tree.source()[span.start()..span.end()])
         .collect()
+}
+
+/// Returns the first `match` scrutinee inside `function`
+fn first_scrutinee<'a>(tree: &'a DecoratedTree, function: &str) -> DecoratedNode<'a> {
+    let root = tree.root_node();
+    let func =
+        find_function_by_name(&root, function).unwrap_or_else(|| panic!("should find {function}"));
+    let match_expr =
+        find_first_node_of_kind(&func, "match_expression").expect("should find match_expression");
+
+    match_expr
+        .child_by_field_name("value")
+        .expect("match should have value field")
+}
+
+/// Returns the rendered [`AdtPath`] on `node`, if it has one
+fn rendered_adt_path(node: &DecoratedNode<'_>) -> Option<String> {
+    node.decoration::<AdtPath>()
+        .map(|adt| adt.path().to_string())
+}
+
+#[test]
+fn adt_path_of_a_local_enum_scrutinee_is_its_definition() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    let path = rendered_adt_path(&first_scrutinee(&tree, "match_on_enum"));
+
+    assert_eq!(path.as_deref(), Some("sample_project::Color"));
+}
+
+/// An enum that a dependency re-exports gets the path of its definition
+///
+/// `facade` re-exports `tint_core::tint::Tint` as `facade::Tint`, and the
+/// fixture names it only through the facade. The crate segment also shows
+/// that the dash of `tint-core` becomes an underscore.
+#[test]
+fn adt_path_of_a_reexported_enum_is_its_definition() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    let value = branch_value(
+        &tree,
+        "if_let_on_a_reexported_enum",
+        BranchSite::LetCondition,
+    );
+
+    assert_eq!(
+        rendered_adt_path(&value).as_deref(),
+        Some("tint_core::tint::Tint")
+    );
+}
+
+/// `match self` in a `&self` method names the enum behind the reference
+#[test]
+fn adt_path_of_a_reference_scrutinee_names_the_enum() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    let path = rendered_adt_path(&first_scrutinee(&tree, "is_red"));
+
+    assert_eq!(path.as_deref(), Some("sample_project::Color"));
+}
+
+#[test]
+fn adt_path_of_a_reference_value_names_the_enum() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    let value = branch_value(&tree, "predicate_on_a_reference", BranchSite::Call);
+
+    assert_eq!(
+        rendered_adt_path(&value).as_deref(),
+        Some("sample_project::Color")
+    );
+}
+
+#[test]
+fn adt_path_of_a_struct_scrutinee_is_its_definition() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    let path = rendered_adt_path(&first_scrutinee(&tree, "match_on_struct"));
+
+    assert_eq!(path.as_deref(), Some("sample_project::Palette"));
+}
+
+#[test]
+fn adt_path_of_an_integer_scrutinee_is_absent() {
+    let tree = parse_and_decorate_fixture(load_provider());
+
+    let path = rendered_adt_path(&first_scrutinee(&tree, "match_on_integer"));
+
+    assert_eq!(path, None);
 }
 
 /// The bare-try probe fires on decorations the provider made
@@ -1067,13 +1156,17 @@ impl BranchSite {
     }
 }
 
-/// Returns the variants decorated on the first `site` inside `function`
-fn branch_node(tree: &DecoratedTree, function: &str, site: BranchSite) -> Vec<String> {
+/// Returns the value that decides the first `site` inside `function`
+fn branch_value<'a>(
+    tree: &'a DecoratedTree,
+    function: &str,
+    site: BranchSite,
+) -> DecoratedNode<'a> {
     let root = tree.root_node();
     let func =
         find_function_by_name(&root, function).unwrap_or_else(|| panic!("should find {function}"));
     let node = find_first_node_of_kind(&func, site.kind()).expect("should find the site");
-    let value = match site {
+    match site {
         BranchSite::Call => node
             .child_by_field_name("function")
             .and_then(|f| f.child_by_field_name("value"))
@@ -1083,9 +1176,12 @@ fn branch_node(tree: &DecoratedTree, function: &str, site: BranchSite) -> Vec<St
         BranchSite::LetCondition | BranchSite::LetDeclaration => {
             node.child_by_field_name("value").expect("value field")
         }
-    };
+    }
+}
 
-    value
+/// Returns the variants decorated on the first `site` inside `function`
+fn branch_node(tree: &DecoratedTree, function: &str, site: BranchSite) -> Vec<String> {
+    branch_value(tree, function, site)
         .decoration::<EnumVariants>()
         .map(|variants| variants.names().map(str::to_owned).collect())
         .unwrap_or_default()
@@ -1816,6 +1912,58 @@ fn wanting_only_adt_flags_leaves_a_scrutinee_untyped() {
     let scrutinee = match_on_enum_scrutinee(&root);
 
     assert!(scrutinee.decoration::<ResolvedType>().is_none());
+}
+
+/// A scrutinee yields three types, and the flags alone build no path
+#[test]
+fn wanting_only_adt_flags_leaves_a_scrutinee_without_a_path() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([AdtFlags::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let scrutinee = match_on_enum_scrutinee(&root);
+
+    assert!(scrutinee.decoration::<AdtPath>().is_none());
+}
+
+#[test]
+fn wanting_only_adt_path_leaves_a_scrutinee_without_flags() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([AdtPath::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let scrutinee = match_on_enum_scrutinee(&root);
+
+    assert!(scrutinee.decoration::<AdtFlags>().is_none());
+}
+
+/// A pass that reads only paths still gets the values that decide a branch
+#[test]
+fn wanting_only_adt_path_names_a_branch_value() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([AdtPath::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let value = if_let_on_enum_value(&root);
+
+    assert_eq!(
+        rendered_adt_path(&value).as_deref(),
+        Some("sample_project::Color")
+    );
+}
+
+#[test]
+fn wanting_only_adt_path_names_a_scrutinee() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([AdtPath::KEY]));
+    let tree = parse_and_decorate_fixture(&provider);
+    let root = tree.root_node();
+
+    let scrutinee = match_on_enum_scrutinee(&root);
+
+    assert_eq!(
+        rendered_adt_path(&scrutinee).as_deref(),
+        Some("sample_project::Color")
+    );
 }
 
 #[test]
