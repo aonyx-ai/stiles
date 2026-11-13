@@ -44,9 +44,9 @@ pub(crate) fn write_unoffered_read_lint_package(directory: &Path, name: &str, de
         format!(
             "[workspace]\n\n[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \
              \"2024\"\npublish = false\n\n[lib]\ncrate-type = [\"cdylib\"]\n\n[dependencies]\n\
-             stabby = \"72.1\"\nstiles-plugin = {{ path = \"{crates}/stiles-plugin\" }}\n\
-             stiles-rust = {{ path = \"{crates}/stiles-rust\", default-features = false }}\n\
-             stiles-types = {{ path = \"{crates}/stiles-types\" }}\n"
+             stabby = \"72.1\"\nstiles-plugin = {{ path = '{crates}/stiles-plugin' }}\n\
+             stiles-rust = {{ path = '{crates}/stiles-rust', default-features = false }}\n\
+             stiles-types = {{ path = '{crates}/stiles-types' }}\n"
         ),
     )
     .expect("the manifest should be written");
