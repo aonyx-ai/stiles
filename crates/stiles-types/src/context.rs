@@ -49,10 +49,8 @@ pub(crate) type ParseFn = for<'a, 'n> extern "C" fn(
 /// A [`DecoratedNode`] is the bytes of a tree-sitter node and a reference
 /// to this table. Every method of the node calls through the table. The
 /// host builds the table from functions in its own image, so the host's
-/// tree-sitter reads the host's tree. Only `DecoratedNode::raw` hands the
-/// node bytes to a plugin's own tree-sitter, until [stiles#643] removes it.
-///
-/// [stiles#643]: https://github.com/aonyx-ai/stiles/issues/643
+/// tree-sitter reads the host's tree. A plugin never reads the node bytes
+/// itself.
 ///
 /// The table is `#[repr(C)]`, and every entry is an `extern "C"` function
 /// that takes only C types: references, integers, flags, stabby's
