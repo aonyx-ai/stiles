@@ -1,14 +1,17 @@
 use std::path::Path;
 use std::ptr::{self, NonNull};
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use bon::bon;
 
 use crate::context::Context;
 use crate::ts_node::TsNode;
-use crate::{DecoratedNode, DecorationMap, FilePath, Language};
+use crate::{DecoratedNode, DecorationKey, DecorationMap, FilePath, Language, ReadKeys};
 
+mod confine_reads_error;
 mod table;
+
+pub use self::confine_reads_error::ConfineReadsError;
 
 /// A parsed syntax tree with an overlay of semantic decorations
 ///
@@ -60,6 +63,25 @@ struct Record {
     file: FilePath,
     decorations: DecorationMap,
     snippets: Mutex<Vec<DecoratedTree>>,
+    confinement: Mutex<Confinement>,
+}
+
+/// Which decorations a lookup through a record may read
+///
+/// The walk confines the record to the keys of one lint around each call
+/// of its pass. A lookup outside those keys finds nothing, and the record
+/// keeps the first such key for the walk to report. Outside a call, as
+/// while a provider or a test reads the tree, every lookup is open.
+#[derive(Debug, Default)]
+enum Confinement {
+    /// Every key may be read
+    #[default]
+    Open,
+    /// Only `keys` may be read, and `undeclared` holds the first other key
+    Declared {
+        keys: ReadKeys,
+        undeclared: Option<DecorationKey>,
+    },
 }
 
 const _: () = {
@@ -106,6 +128,7 @@ impl DecoratedTree {
             file: file.into(),
             decorations: DecorationMap::new(),
             snippets: Mutex::new(Vec::new()),
+            confinement: Mutex::new(Confinement::Open),
         }));
 
         // SAFETY: `Box::into_raw` returned a valid pointer that nothing else
@@ -298,6 +321,96 @@ impl DecoratedTree {
         self.record().file.as_path()
     }
 
+    /// Runs `work` while lookups through this tree read only `keys`
+    ///
+    /// The walk wraps each call of a lint's pass in this, with the keys
+    /// the lint declared. A lookup of another key finds nothing while
+    /// `work` runs, and the first such key comes back as the error. The
+    /// host serves lookups through `extern "C"` functions, which must not
+    /// panic, so the record keeps the key instead of failing on the spot.
+    ///
+    /// A call nests: the confinement in force before it holds again once
+    /// it returns, and so does it when `work` panics. A snippet that a node
+    /// parses has no decorations and no confinement of its own.
+    ///
+    /// The confinement belongs to the tree, not to the thread. Two threads
+    /// that confine one tree at once therefore read through each other's
+    /// keys. The walk visits the nodes of one file on one thread, so it
+    /// never does that.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConfineReadsError::Undeclared`] if `work` looked up a
+    /// decoration under a key outside `keys`. What `work` returned is then
+    /// dropped, because the pass ran on a lookup that found nothing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{
+    ///     ConfineReadsError, DecoratedNode, DecoratedTree, Decoration, DecorationKey, Language,
+    ///     ReadKeys,
+    /// };
+    ///
+    /// /// Marks the root of a file
+    /// #[stabby::stabby]
+    /// struct Root;
+    ///
+    /// impl Decoration for Root {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Root"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// # let source = "fn main() {}";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    ///
+    /// let error = tree
+    ///     .confine(&ReadKeys::from_iter([]), || tree.root_node().get::<Root>().is_some())
+    ///     .expect_err("the call reads a key it did not declare");
+    ///
+    /// assert_eq!(error, ConfineReadsError::Undeclared { key: Root::KEY });
+    /// ```
+    pub fn confine<R>(
+        &self,
+        keys: &ReadKeys,
+        work: impl FnOnce() -> R,
+    ) -> Result<R, ConfineReadsError> {
+        let record = self.record();
+        let previous = record.confine(Confinement::Declared {
+            keys: keys.clone(),
+            undeclared: None,
+        });
+        let restore = Restore {
+            record,
+            previous: Some(previous),
+        };
+
+        let found = work();
+
+        match restore.finish() {
+            Confinement::Declared {
+                undeclared: Some(key),
+                ..
+            } => Err(ConfineReadsError::Undeclared { key }),
+            Confinement::Declared {
+                undeclared: None, ..
+            } => Ok(found),
+            Confinement::Open => Ok(found),
+        }
+    }
+
     /// Returns the record this tree owns
     fn record(&self) -> &Record {
         // SAFETY: the record lives until `drop` frees it, and a shared borrow
@@ -315,6 +428,38 @@ impl DecoratedTree {
 }
 
 impl Record {
+    /// Returns whether a lookup may read `key`, and keeps it if not
+    ///
+    /// Every lookup a pass makes comes through here, so the check takes
+    /// one uncontended lock and a scan of a few keys.
+    fn admits(&self, key: DecorationKey) -> bool {
+        match &mut *self.confinement() {
+            Confinement::Open => true,
+            Confinement::Declared { keys, undeclared } => match keys.contains(key) {
+                true => true,
+                false => {
+                    undeclared.get_or_insert(key);
+                    false
+                }
+            },
+        }
+    }
+
+    /// Puts `confinement` in force, and returns the one it replaces
+    fn confine(&self, confinement: Confinement) -> Confinement {
+        std::mem::replace(&mut *self.confinement(), confinement)
+    }
+
+    /// Returns the confinement in force, through any poison
+    ///
+    /// Nothing panics while it holds the lock, so a poisoned lock still
+    /// holds a whole confinement.
+    fn confinement(&self) -> MutexGuard<'_, Confinement> {
+        self.confinement
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
     /// Returns the root of the tree as a node that reads through this record
     fn root_node(&self) -> DecoratedNode<'_> {
         DecoratedNode::builder()
@@ -359,6 +504,32 @@ impl Record {
         // SAFETY: the snippet's record stays at its address until the
         // snippet drops, and the snippet drops only with this record.
         Some(unsafe { record.as_ref() })
+    }
+}
+
+/// Puts a record's earlier confinement back in force when it drops
+///
+/// [`DecoratedTree::confine`] holds one around its work, so a panic in the
+/// work leaves the record as the call found it.
+struct Restore<'record> {
+    record: &'record Record,
+    previous: Option<Confinement>,
+}
+
+impl Restore<'_> {
+    /// Puts the earlier confinement back, and returns the one it replaced
+    fn finish(mut self) -> Confinement {
+        let previous = self.previous.take().unwrap_or_default();
+
+        self.record.confine(previous)
+    }
+}
+
+impl Drop for Restore<'_> {
+    fn drop(&mut self) {
+        if let Some(previous) = self.previous.take() {
+            self.record.confine(previous);
+        }
     }
 }
 
@@ -433,6 +604,95 @@ mod tests {
             .set_language(&tree_sitter_rust::LANGUAGE.into())
             .unwrap();
         parser.parse(source, None).unwrap()
+    }
+
+    /// Returns a tree whose root holds `Tag(7)`
+    fn tagged() -> DecoratedTree {
+        let source = "fn main() {}";
+        let mut decorated = DecoratedTree::builder()
+            .tree(parse_tree(source))
+            .language(Language::Rust)
+            .source(source.into())
+            .file(PathBuf::from("test.rs"))
+            .build();
+        let root_id = decorated.root_node().id();
+        decorated.decorations_mut().insert(root_id, Tag(7));
+
+        decorated
+    }
+
+    #[test]
+    fn confine_after_a_panic_opens_lookups_again() {
+        let decorated = tagged();
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            decorated.confine(&ReadKeys::from_iter([]), || panic!("the work fails"))
+        }));
+
+        let tag = decorated.root_node().decoration::<Tag>();
+
+        assert_eq!(tag, Some(&Tag(7)));
+    }
+
+    #[test]
+    fn confine_inside_another_keeps_the_outer_keys_afterwards() {
+        let decorated = tagged();
+
+        let error = decorated
+            .confine(&ReadKeys::from_iter([]), || {
+                let _ = decorated.confine(&ReadKeys::from_iter([Tag::KEY]), || ());
+                decorated.root_node().decoration::<Tag>()
+            })
+            .expect_err("the outer call declares no key");
+
+        assert_eq!(error, ConfineReadsError::Undeclared { key: Tag::KEY });
+    }
+
+    #[test]
+    fn confine_opens_lookups_again_afterwards() {
+        let decorated = tagged();
+        let _ = decorated.confine(&ReadKeys::from_iter([]), || ());
+
+        let tag = decorated.root_node().decoration::<Tag>();
+
+        assert_eq!(tag, Some(&Tag(7)));
+    }
+
+    #[test]
+    fn confine_with_a_declared_key_serves_it() {
+        let decorated = tagged();
+
+        let tag = decorated
+            .confine(&ReadKeys::from_iter([Tag::KEY]), || {
+                decorated.root_node().decoration::<Tag>()
+            })
+            .expect("the key is declared");
+
+        assert_eq!(tag, Some(&Tag(7)));
+    }
+
+    #[test]
+    fn confine_with_an_undeclared_key_finds_nothing() {
+        let decorated = tagged();
+        let mut found = Some(&Tag(0));
+
+        let _ = decorated.confine(&ReadKeys::from_iter([]), || {
+            found = decorated.root_node().decoration::<Tag>();
+        });
+
+        assert_eq!(found, None);
+    }
+
+    #[test]
+    fn confine_with_an_undeclared_key_names_it() {
+        let decorated = tagged();
+
+        let error = decorated
+            .confine(&ReadKeys::from_iter([]), || {
+                decorated.root_node().decoration::<Tag>()
+            })
+            .expect_err("the key is not declared");
+
+        assert_eq!(error, ConfineReadsError::Undeclared { key: Tag::KEY });
     }
 
     #[test]
@@ -538,6 +798,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_send_confinement() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Confinement>();
+    }
+
+    #[test]
     fn trait_send_decorated_tree() {
         fn assert_send<T: Send>() {}
         assert_send::<DecoratedTree>();
@@ -547,6 +813,18 @@ mod tests {
     fn trait_send_record() {
         fn assert_send<T: Send>() {}
         assert_send::<Record>();
+    }
+
+    #[test]
+    fn trait_send_restore() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Restore<'static>>();
+    }
+
+    #[test]
+    fn trait_sync_confinement() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Confinement>();
     }
 
     #[test]
@@ -562,6 +840,18 @@ mod tests {
     }
 
     #[test]
+    fn trait_sync_restore() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Restore<'static>>();
+    }
+
+    #[test]
+    fn trait_unpin_confinement() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Confinement>();
+    }
+
+    #[test]
     fn trait_unpin_decorated_tree() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<DecoratedTree>();
@@ -571,6 +861,12 @@ mod tests {
     fn trait_unpin_record() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<Record>();
+    }
+
+    #[test]
+    fn trait_unpin_restore() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Restore<'static>>();
     }
 
     mod prop {

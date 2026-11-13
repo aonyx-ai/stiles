@@ -105,9 +105,10 @@ impl Context {
 }
 
 // SAFETY: `data` points to the host's record of a tree, which owns the
-// tree, the source, the decorations, and a mutex around the snippets it
-// parsed. That record is `Send` and `Sync`, as `DecoratedTree` asserts,
-// and the functions of the table only read it or lock that mutex.
+// tree, the source, the decorations, a mutex around the snippets it
+// parsed, and a mutex around the keys a lookup may read. That record is
+// `Send` and `Sync`, as `DecoratedTree` asserts, and the functions of the
+// table only read it or lock those mutexes.
 unsafe impl Send for Context {}
 // SAFETY: as for `Send` above. Nothing writes the tree, the source, or the
 // decorations while a node borrows the table.
