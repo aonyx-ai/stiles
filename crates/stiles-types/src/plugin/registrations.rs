@@ -1,7 +1,9 @@
 use std::ptr;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use crate::plugin::{HostTable, RegisteredLint, Registrar};
+use crate::plugin::registrar::BuildFn;
+use crate::plugin::{HostTable, Reads, RegisteredLint, Registrar};
+use crate::{DecorationIdentity, Language, RuleId};
 
 mod register_lints_error;
 mod table;
@@ -50,9 +52,21 @@ const _: () = {
 /// Everything a record holds: the lints, the named tables, and the first fault
 #[derive(Debug, Default)]
 struct State {
-    lints: Vec<RegisteredLint>,
+    lints: Vec<Pending>,
     required: Vec<HostTable>,
     fault: Option<RegisterLintsError>,
+}
+
+/// One lint as the record holds it while the plugin registers
+///
+/// The reads stay [`None`] until the plugin's first `reads` call for the
+/// lint. [`Registrations::finish`] refuses a lint that never had one.
+#[derive(Debug)]
+struct Pending {
+    language: Language,
+    factory: BuildFn,
+    rules: Vec<RuleId>,
+    reads: Option<Reads>,
 }
 
 impl Registrations {
@@ -82,7 +96,7 @@ impl Registrations {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::plugin::{Built, PassInstance, Registrations};
+    /// use stiles_types::plugin::{Built, PassInstance, Reads, Registrations};
     /// use stiles_types::{Language, Panic, RuleId};
     ///
     /// /// Builds nothing, because nothing calls it
@@ -95,7 +109,8 @@ impl Registrations {
     /// registrations.lend(|registrar| {
     ///     registrar.require_host_tables();
     ///     // SAFETY: `build` never returns `Ok`.
-    ///     unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+    ///     let lint = unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+    ///     registrar.reads(lint, &Reads::none());
     /// });
     ///
     /// let lints = registrations.finish().expect("the registration should be whole");
@@ -111,8 +126,12 @@ impl Registrations {
     ///
     /// # Errors
     ///
-    /// Returns [`RegisterLintsError::UnknownLanguage`] if the plugin
-    /// registered a lint for a language this stiles does not know.
+    /// Returns the fault of the first call the record could not accept. One
+    /// is [`RegisterLintsError::UnknownLanguage`], for a lint in a language
+    /// this stiles does not know. Returns [`RegisterLintsError::UnrequiredTable`]
+    /// if the plugin registered lints without naming every host table.
+    /// Returns [`RegisterLintsError::UndeclaredReads`] if it registered a
+    /// lint without declaring what the lint reads.
     ///
     /// # Examples
     ///
@@ -142,7 +161,7 @@ impl Registrations {
             return Err(RegisterLintsError::UnrequiredTable { table });
         }
 
-        Ok(lints)
+        lints.into_iter().map(Pending::finish).collect()
     }
 
     /// Returns the lints this record holds, through any poison
@@ -157,12 +176,48 @@ impl Registrations {
 /// that registers lints without naming one was written by hand, or built
 /// against a stiles that did not know the table. Either way the host
 /// cannot tell whether that plugin calls an entry the table lacks.
-fn unrequired(lints: &[RegisteredLint], required: &[HostTable]) -> Option<HostTable> {
+fn unrequired(lints: &[Pending], required: &[HostTable]) -> Option<HostTable> {
     match lints {
         [] => None,
         [_, ..] => HostTable::ALL
             .into_iter()
             .find(|table| !required.contains(table)),
+    }
+}
+
+impl Pending {
+    /// Returns the registered lint, once the plugin declared what it reads
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RegisterLintsError::UndeclaredReads`] if the plugin never
+    /// called `reads` for the lint.
+    fn finish(self) -> Result<RegisteredLint, RegisterLintsError> {
+        let Self {
+            language,
+            factory,
+            rules,
+            reads,
+        } = self;
+        let Some(reads) = reads else {
+            return Err(RegisterLintsError::UndeclaredReads { rules });
+        };
+
+        Ok(RegisteredLint::builder()
+            .language(language)
+            .factory(factory)
+            .rules(rules)
+            .reads(reads)
+            .build())
+    }
+
+    /// Records that the lint reads `identities`, each once
+    ///
+    /// The first call marks the lint as declared, even with no identities.
+    fn read(&mut self, identities: &[DecorationIdentity]) {
+        let reads = self.reads.take().unwrap_or_else(Reads::none);
+
+        self.reads = Some(reads.extend(identities));
     }
 }
 
@@ -180,8 +235,8 @@ mod tests {
     use std::mem::MaybeUninit;
 
     use super::*;
+    use crate::Panic;
     use crate::plugin::{Built, PassInstance};
-    use crate::{Language, Panic, RuleId};
 
     /// Builds nothing, because no test here calls it
     extern "C" fn never(_out: &mut MaybeUninit<PassInstance>) -> Built {
@@ -200,10 +255,33 @@ mod tests {
                 }
             }
             // SAFETY: `never` never returns `Ok`.
-            unsafe { registrar.lint(Language::Rust, never, &[RuleId::new("test.rule")]) };
+            let lint =
+                unsafe { registrar.lint(Language::Rust, never, &[RuleId::new("test.rule")]) };
+            registrar.reads(lint, &Reads::none());
         });
 
         registrations.finish()
+    }
+
+    #[test]
+    fn finish_with_a_lint_that_declares_no_reads_names_its_rules() {
+        let registrations = Registrations::new();
+        registrations.lend(|registrar| {
+            registrar.require_host_tables();
+            // SAFETY: `never` never returns `Ok`.
+            unsafe { registrar.lint(Language::Rust, never, &[RuleId::new("test.rule")]) };
+        });
+
+        let error = registrations
+            .finish()
+            .expect_err("the lint declares no reads");
+
+        assert_eq!(
+            error,
+            RegisterLintsError::UndeclaredReads {
+                rules: vec![RuleId::new("test.rule")]
+            }
+        );
     }
 
     #[test]
@@ -233,6 +311,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_send_pending() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Pending>();
+    }
+
+    #[test]
     fn trait_send_registrations() {
         fn assert_send<T: Send>() {}
         assert_send::<Registrations>();
@@ -245,6 +329,12 @@ mod tests {
     }
 
     #[test]
+    fn trait_sync_pending() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Pending>();
+    }
+
+    #[test]
     fn trait_sync_registrations() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<Registrations>();
@@ -254,6 +344,12 @@ mod tests {
     fn trait_sync_state() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<State>();
+    }
+
+    #[test]
+    fn trait_unpin_pending() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Pending>();
     }
 
     #[test]

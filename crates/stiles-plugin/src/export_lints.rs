@@ -31,7 +31,9 @@
 /// of each [`HostTable`] that this build of the plugin calls into. A stiles
 /// with a shorter table refuses the plugin. The function then registers
 /// each lint through the host's [`Registrar`], with its language, its
-/// rules, and a factory, and declares the decorations the lint reads.
+/// rules, and a factory, and declares the decorations the lint reads. It
+/// declares them for every lint, so an empty [`Reads`] still tells stiles
+/// that the lint reads none.
 /// Passes are stateful, and the check command constructs a fresh
 /// set for every file. Each factory is a plain `extern "C"` function, so
 /// each expression must construct its lint from nothing; an expression
@@ -52,6 +54,7 @@
 /// [`LintPass`]: stiles_types::LintPass
 /// [`Panic::catch`]: crate::Panic::catch
 /// [`PassInstance`]: crate::PassInstance
+/// [`Reads`]: crate::Reads
 /// [`Registrar`]: crate::Registrar
 /// [`RustLintPass`]: stiles_rust::RustLintPass
 /// [`TypeScriptLintPass`]: stiles_typescript::TypeScriptLintPass
@@ -178,6 +181,10 @@ mod tests {
     impl DeclaresRules for FlagEveryComment {
         fn rules(&self) -> Vec<RuleId> {
             vec![RuleId::new("test.flag-every-comment")]
+        }
+
+        fn reads(&self) -> Reads {
+            Reads::of::<FnSignature>()
         }
     }
 
@@ -326,8 +333,8 @@ mod tests {
             reads,
             [
                 &Reads::of::<FnSignature>().and::<ResolvedType>(),
-                &Reads::undeclared(),
-                &Reads::undeclared(),
+                &Reads::of::<FnSignature>(),
+                &Reads::of::<FnSignature>(),
                 &Reads::none(),
             ]
         );

@@ -205,15 +205,23 @@ extern "C" fn prev_named_sibling(
 }
 
 /// Returns the `n`th entry under `key` on `node`, counting from zero
+///
+/// A record that the walk confined to the keys of one lint serves no
+/// other key. It keeps the first such key for the walk to report, and the
+/// lookup finds nothing.
 extern "C" fn decoration<'a>(
     context: &'a Context,
     node: &TsNode,
     key: DecorationKey,
     n: usize,
 ) -> Option<&'a Entry> {
+    let record = record(context);
+    if !record.admits(key) {
+        return None;
+    }
     let id = node_of(context, node).id();
 
-    record(context).decorations.under(id, key).nth(n)
+    record.decorations.under(id, key).nth(n)
 }
 
 /// Parses `text` as the language whose discriminant is `language`

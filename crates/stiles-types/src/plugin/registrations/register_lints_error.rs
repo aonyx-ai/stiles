@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use crate::RuleId;
 use crate::plugin::HostTable;
 
 /// The reason [`Registrations`] could not accept what a plugin registered
@@ -25,7 +26,7 @@ use crate::plugin::HostTable;
 ///
 /// [`Registrar`]: crate::plugin::Registrar
 /// [`Registrations`]: crate::plugin::Registrations
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Error)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Error)]
 pub enum RegisterLintsError {
     /// The plugin named a language by a byte that no language of this stiles has
     #[error(
@@ -80,6 +81,29 @@ pub enum RegisterLintsError {
         /// The number of entries this stiles has
         offered: usize,
     },
+
+    /// The plugin registered a lint without declaring the decorations it reads
+    #[error(
+        "the plugin registered the lint of {} without declaring the decorations it reads; \
+         declare them in its `DeclaresRules::reads`, or `Reads::none()` for none",
+        named(.rules)
+    )]
+    UndeclaredReads {
+        /// The rules of the lint
+        rules: Vec<RuleId>,
+    },
+}
+
+/// Returns `rules` as a list of code spans, or says that there are none
+fn named(rules: &[RuleId]) -> String {
+    match rules {
+        [] => "no rules".to_owned(),
+        [_, ..] => rules
+            .iter()
+            .map(|rule| format!("`{rule}`"))
+            .collect::<Vec<_>>()
+            .join(", "),
+    }
 }
 
 #[cfg(test)]
@@ -132,6 +156,27 @@ mod tests {
             error.to_string(),
             "the plugin registered lints without naming the node table it was built against; \
              export its lints with stiles_plugin::export_lints!"
+        );
+    }
+
+    #[test]
+    fn display_with_undeclared_reads_and_no_rules_says_so() {
+        let error = RegisterLintsError::UndeclaredReads { rules: Vec::new() };
+
+        assert!(error.to_string().contains("the lint of no rules"));
+    }
+
+    #[test]
+    fn display_with_undeclared_reads_names_the_rules() {
+        let error = RegisterLintsError::UndeclaredReads {
+            rules: vec![RuleId::new("lint.one"), RuleId::new("lint.two")],
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "the plugin registered the lint of `lint.one`, `lint.two` without declaring the \
+             decorations it reads; declare them in its `DeclaresRules::reads`, or \
+             `Reads::none()` for none"
         );
     }
 

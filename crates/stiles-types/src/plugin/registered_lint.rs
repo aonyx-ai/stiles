@@ -5,7 +5,7 @@ use bon::Builder;
 use crate::plugin::LoadedPass;
 use crate::plugin::Reads;
 use crate::plugin::registrar::BuildFn;
-use crate::{DecorationIdentity, Language, Panic, RuleId};
+use crate::{Language, Panic, RuleId};
 
 /// One lint a plugin registered, as the host keeps it
 ///
@@ -33,7 +33,7 @@ use crate::{DecorationIdentity, Language, Panic, RuleId};
 /// # Examples
 ///
 /// ```
-/// use stiles_types::plugin::{Built, PassInstance, Registrations};
+/// use stiles_types::plugin::{Built, PassInstance, Reads, Registrations};
 /// use stiles_types::{Language, Panic, RuleId};
 ///
 /// /// Builds nothing, because nothing calls it
@@ -45,7 +45,8 @@ use crate::{DecorationIdentity, Language, Panic, RuleId};
 /// registrations.lend(|registrar| {
 ///     registrar.require_host_tables();
 ///     // SAFETY: `build` never returns `Ok`.
-///     unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+///     let lint = unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+///     registrar.reads(lint, &Reads::none());
 /// });
 ///
 /// let lints = registrations.finish().expect("the registration should be whole");
@@ -58,7 +59,6 @@ pub struct RegisteredLint {
     language: Language,
     factory: BuildFn,
     rules: Vec<RuleId>,
-    #[builder(default)]
     reads: Reads,
 }
 
@@ -68,7 +68,7 @@ impl RegisteredLint {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::plugin::{Built, PassInstance, Registrations};
+    /// use stiles_types::plugin::{Built, PassInstance, Reads, Registrations};
     /// use stiles_types::{Language, Panic, RuleId};
     ///
     /// extern "C" fn build(_out: &mut std::mem::MaybeUninit<PassInstance>) -> Built {
@@ -79,7 +79,8 @@ impl RegisteredLint {
     /// registrations.lend(|registrar| {
     ///     registrar.require_host_tables();
     ///     // SAFETY: `build` never returns `Ok`.
-    ///     unsafe { registrar.lint(Language::TypeScript, build, &[RuleId::new("lint.quiet")]) };
+    ///     let lint = unsafe { registrar.lint(Language::TypeScript, build, &[RuleId::new("lint.quiet")]) };
+    ///     registrar.reads(lint, &Reads::none());
     /// });
     ///
     /// let lints = registrations.finish().expect("the registration should be whole");
@@ -100,7 +101,7 @@ impl RegisteredLint {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::plugin::{Built, PassInstance, Registrations};
+    /// use stiles_types::plugin::{Built, PassInstance, Reads, Registrations};
     /// use stiles_types::{Language, Panic, RuleId};
     ///
     /// extern "C" fn build(_out: &mut std::mem::MaybeUninit<PassInstance>) -> Built {
@@ -111,7 +112,8 @@ impl RegisteredLint {
     /// registrations.lend(|registrar| {
     ///     registrar.require_host_tables();
     ///     // SAFETY: `build` never returns `Ok`.
-    ///     unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+    ///     let lint = unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+    ///     registrar.reads(lint, &Reads::none());
     /// });
     ///
     /// let lints = registrations.finish().expect("the registration should be whole");
@@ -125,11 +127,8 @@ impl RegisteredLint {
     /// Returns the decorations the lint's pass declared that it reads
     ///
     /// A provider computes only the decorations that the loaded passes of
-    /// its language declare. A pass whose reads are [`Reads::undeclared`]
-    /// gets every decoration of its language. That fallback is staged, and
-    /// [stiles#651] removes it.
-    ///
-    /// [stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
+    /// its language declare. The walk holds the pass to them: a lookup of
+    /// any other decoration ends the run.
     ///
     /// # Examples
     ///
@@ -145,20 +144,16 @@ impl RegisteredLint {
     /// registrations.lend(|registrar| {
     ///     registrar.require_host_tables();
     ///     // SAFETY: `build` never returns `Ok`.
-    ///     unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+    ///     let lint = unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+    ///     registrar.reads(lint, &Reads::none());
     /// });
     ///
     /// let lints = registrations.finish().expect("the registration should be whole");
     ///
-    /// assert_eq!(lints[0].reads(), &Reads::undeclared());
+    /// assert_eq!(lints[0].reads(), &Reads::none());
     /// ```
     pub fn reads(&self) -> &Reads {
         &self.reads
-    }
-
-    /// Records that the lint's pass reads `identities`, each once
-    pub(crate) fn read(&mut self, identities: &[DecorationIdentity]) {
-        self.reads = std::mem::take(&mut self.reads).extend(identities);
     }
 
     /// Runs the plugin's factory, and returns the fresh pass it built
@@ -173,7 +168,7 @@ impl RegisteredLint {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::plugin::{Built, PassInstance, Registrations};
+    /// use stiles_types::plugin::{Built, PassInstance, Reads, Registrations};
     /// use stiles_types::{Language, Panic, RuleId};
     ///
     /// extern "C" fn build(_out: &mut std::mem::MaybeUninit<PassInstance>) -> Built {
@@ -184,7 +179,8 @@ impl RegisteredLint {
     /// registrations.lend(|registrar| {
     ///     registrar.require_host_tables();
     ///     // SAFETY: `build` never returns `Ok`.
-    ///     unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+    ///     let lint = unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+    ///     registrar.reads(lint, &Reads::none());
     /// });
     /// let lints = registrations.finish().expect("the registration should be whole");
     ///
@@ -266,7 +262,10 @@ mod tests {
             registrar.require_host_tables();
             // SAFETY: every factory of this module writes a pass whenever
             // it returns `Ok`.
-            unsafe { registrar.lint(Language::TypeScript, factory, &[RuleId::new("test.rule")]) };
+            let lint = unsafe {
+                registrar.lint(Language::TypeScript, factory, &[RuleId::new("test.rule")])
+            };
+            registrar.reads(lint, &Reads::none());
         });
 
         let mut lints = registrations

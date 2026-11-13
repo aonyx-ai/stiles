@@ -14,17 +14,14 @@ include!(concat!(env!("OUT_DIR"), "/visitor_fingerprint.rs"));
 /// plugin. A lint declares each decoration it reads by its key and its
 /// [`decoration_fingerprint`], which covers every type the decoration
 /// holds. Stiles refuses a read that no provider offers at that key and
-/// layout, so a changed decoration is refused by its name. A lint whose
-/// reads are undeclared reads every decoration, and it misses a changed one
-/// quietly until [stiles#651]. Stabby's checked downcast still compares
-/// every layout a plugin reads, so such a lookup finds nothing rather than
-/// reading the wrong bytes.
+/// layout, so a changed decoration is refused by its name. Stabby's
+/// checked downcast still compares every layout a plugin reads, so a
+/// lookup finds nothing rather than reading the wrong bytes.
 ///
 /// Everything else in this crate is absent too. Hashing the whole crate
 /// refuses every plugin in the tree whenever any source file here changes.
 ///
 /// [`decoration_fingerprint`]: stiles_types::plugin::decoration_fingerprint
-/// [stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
 ///
 /// # Examples
 ///

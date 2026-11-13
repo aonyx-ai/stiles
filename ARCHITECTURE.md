@@ -138,11 +138,9 @@ the gap that names its remedy.
 A provider lists the decoration types it offers, and it computes only the types
 that the loaded passes of its language read. Each pass declares the types it
 reads, and the run asks the provider for the union. A pass that declares it
-reads none adds nothing. A pass whose reads are undeclared still gets every type
-of its language. That fallback is staged, and [stiles#651] removes it. A target
-that yields several types, such as a match scrutinee, builds only the ones a
-pass reads. A run whose passes read no types therefore asks the toolchain
-nothing, and still decides coverage.
+reads none adds nothing. A target that yields several types, such as a match
+scrutinee, builds only the ones a pass reads. A run whose passes read no types
+therefore asks the toolchain nothing, and still decides coverage.
 
 A provider and the syntax tree keep separate parses of the same file, so
 byte offsets tie them together. Each provider compares the text it analyzed
@@ -238,11 +236,17 @@ path, its name, and a hash of its definition without its documentation.
 graphs, and a plugin is one.
 
 A pass names what it reads through `DeclaresRules::reads`, which returns
-`Reads`: none, exactly some decorations, or undeclared, the staged fallback that
-[stiles#651] removes. A provider computes only the types that some loaded pass
-names. A pass that reads a type it did not declare may therefore find nothing,
-and its rule fails open. A rule test decorates its tree by hand, so declared
-reads do not apply there.
+`Reads`: none, or exactly some decorations. The method has no default, so every
+pass declares. A provider computes only the types that some loaded pass names. A
+lookup of a type the pass did not declare would therefore find nothing, and its
+rule would fail open. The walk prevents that. Around each call of a pass, it
+confines the tree's record to the keys the pass's lint declared. The host's
+`decoration` entry serves only those keys, and it records the first other key
+instead of failing, because it must not panic. Once the pass returns, the walk
+turns that key into an error that names the rules of the lint and the key, and
+the run ends. A walk visits the nodes of one file on one thread, so the record
+holds the keys of one pass at a time. A rule test decorates its tree by hand
+and runs its pass with no declaration, so declared reads do not apply there.
 
 ## Lint rules
 
@@ -407,14 +411,16 @@ the declared rules as a pointer and a count. The entry returns a handle that
 names the lint, so a later entry can declare more about it. The `reads` entry
 takes that handle and the decorations the lint's pass reads, as a pointer and a
 count. Each is a `DecorationIdentity`: its key, and a fingerprint of its layout
-joined with the key. A count of zero declares that the pass reads none, and a
-lint that never calls `reads` stays undeclared. A plugin never
-assembles a laid-out list of its lints, so registration grows by new
+joined with the key. A count of zero declares that the pass reads none.
+`export_lints!` makes the call for every lint, even with an empty list. A plugin
+never assembles a laid-out list of its lints, so registration grows by new
 functions, not new fields. The host keeps a copy of each call. It refuses the
 plugin when a language byte names no language it knows, when the plugin
-registers no lint, or when a lint declares no rule. It also refuses a read that
-no provider of the lint's language offers, and a read that a provider offers
-under the same key at another layout. Each refusal names the key.
+registers no lint, or when a lint declares no rule. It refuses a lint that
+never had a `reads` call, and that refusal names the lint's rules. It also
+refuses a read that no provider of the lint's language offers, and a read that a
+provider offers under the same key at another layout. Each of these two
+refusals names the key.
 
 Before it registers anything, the plugin calls `requires` once for each host
 table it calls into: the registrar, the node's table, and the sink's table. Each
@@ -460,9 +466,7 @@ type, such as the `TypePath` inside a `FnSignature`, keeps the key. Each
 declared read therefore carries the decoration's fingerprint too, which stabby
 derives from every type it holds. The loader refuses a read that no provider
 offers at its key and fingerprint, so a plugin built against an old definition
-is refused by the decoration's name. A lint whose reads are undeclared escapes
-that check. It loads, and a lookup under a stale key or layout finds nothing,
-until [stiles#651] makes every lint declare its reads.
+is refused by the decoration's name.
 
 A rule that needs a snippet read as code, such as the body of a comment,
 asks the table to parse it. The host parses it with its own grammar, and
@@ -591,5 +595,4 @@ loaded lints together.
 [ra]: https://rust-analyzer.github.io/
 [tsrs]: https://github.com/oxc-project/tsrs
 [rules]: https://github.com/aonyx-ai/stiles-aonyx-rules
-[stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
 [ts]: https://tree-sitter.github.io/tree-sitter/

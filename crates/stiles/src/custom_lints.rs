@@ -109,7 +109,8 @@ impl CustomLints {
     ///
     /// Every pass is configured before it is returned. Each one reads only
     /// the options of the rules it declares, so a pass never sees an entry
-    /// meant for another rule. The walk holds each pass to those rules.
+    /// meant for another rule. The walk holds each pass to those rules, and
+    /// to the decorations its lint declares that it reads.
     ///
     /// # Errors
     ///
@@ -131,6 +132,13 @@ impl CustomLints {
                 Ok(Lint::builder()
                     .pass(pass)
                     .rules(lint.rules().to_vec())
+                    .reads(
+                        lint.reads()
+                            .declared()
+                            .iter()
+                            .map(DecorationIdentity::key)
+                            .collect(),
+                    )
                     .build())
             })
             .collect()
@@ -279,11 +287,10 @@ fn refuse_shared_rules(lints: &[LoadedLint]) -> anyhow::Result<()> {
 /// layout.
 fn refuse_unoffered_reads(lints: &[LoadedLint]) -> anyhow::Result<()> {
     for LoadedLint { lint, .. } in lints {
-        let Some(identities) = lint.reads().declared() else {
-            continue;
-        };
         let offered = offered(lint.language());
-        let Some(identity) = identities
+        let Some(identity) = lint
+            .reads()
+            .declared()
             .iter()
             .find(|identity| !offered.contains(identity))
         else {
@@ -819,8 +826,9 @@ fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loade
 /// # Errors
 ///
 /// Returns an error if `register` panics, or if it registers a lint for a
-/// language this stiles does not know. Returns an error too if it
-/// registers no lint, or a lint that declares no rules. It also returns
+/// language this stiles does not know. Returns one if a lint does not
+/// declare what it reads. Returns an error too if it registers no lint, or
+/// a lint that declares no rules. It also returns
 /// one if the plugin needs a longer host table than this stiles has. It
 /// returns one too if a lint reads a decoration that no provider offers.
 fn register_lints(
@@ -1116,7 +1124,8 @@ mod tests {
         registrations.lend(|registrar| {
             registrar.require_host_tables();
             // SAFETY: `never` never returns `Ok`.
-            unsafe { registrar.lint(language, never, &rules) };
+            let lint = unsafe { registrar.lint(language, never, &rules) };
+            registrar.reads(lint, &Reads::none());
         });
 
         let mut lints = registrations
@@ -1156,11 +1165,21 @@ mod tests {
         register_reading(registrar, &Reads::of::<Absent>())
     }
 
+    /// Registers one Rust lint that declares no reads
+    extern "C" fn register_a_lint_without_reads(registrar: &Registrar) -> Registered {
+        registrar.require_host_tables();
+        // SAFETY: `never` never returns `Ok`.
+        unsafe { registrar.lint(Language::Rust, never, &[RuleId::new("lint.a")]) };
+
+        Registered::Ok(())
+    }
+
     /// Registers one Rust lint that declares no rules
     extern "C" fn register_a_lint_without_rules(registrar: &Registrar) -> Registered {
         registrar.require_host_tables();
         // SAFETY: `never` never returns `Ok`.
-        unsafe { registrar.lint(Language::Rust, never, &[]) };
+        let lint = unsafe { registrar.lint(Language::Rust, never, &[]) };
+        registrar.reads(lint, &Reads::none());
 
         Registered::Ok(())
     }
@@ -1191,7 +1210,8 @@ mod tests {
     /// Registers one Rust lint with one rule, and names no host table
     extern "C" fn register_one_lint_naming_no_table(registrar: &Registrar) -> Registered {
         // SAFETY: `never` never returns `Ok`.
-        unsafe { registrar.lint(Language::Rust, never, &[RuleId::new("lint.a")]) };
+        let lint = unsafe { registrar.lint(Language::Rust, never, &[RuleId::new("lint.a")]) };
+        registrar.reads(lint, &Reads::none());
 
         Registered::Ok(())
     }
@@ -1277,6 +1297,20 @@ mod tests {
             "failed to check the decorations that the lints read: the lint of `lint.a` reads the \
              decoration `absent::Decoration#00`, which no Rust provider of this stiles offers; a \
              stiles that offers it may run the plugin"
+        );
+    }
+
+    #[test]
+    fn register_lints_with_a_lint_without_reads_names_its_rules() {
+        let error = register_lints(register_a_lint_without_reads, Path::new("bare.so"))
+            .err()
+            .expect("should refuse");
+
+        assert_eq!(
+            format!("{error:#}"),
+            "failed to read what the plugin exports: the plugin registered the lint of `lint.a` \
+             without declaring the decorations it reads; declare them in its \
+             `DeclaresRules::reads`, or `Reads::none()` for none"
         );
     }
 

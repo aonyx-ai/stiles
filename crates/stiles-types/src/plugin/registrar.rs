@@ -35,8 +35,8 @@ pub(crate) type RequiresFn = extern "C" fn(&Registrar, u8, usize);
 /// handle that `lint` returned. They follow as a pointer to
 /// [`DecorationIdentity`] values and a count, and a count of zero declares
 /// that the pass reads none. A provider computes only what the loaded
-/// passes declare. A lint that never calls `reads` gets every decoration
-/// of its language. That fallback is staged, and [stiles#651] removes it.
+/// passes declare. The host refuses a plugin that registers a lint without
+/// calling `reads` for it, because such a pass would read nothing.
 ///
 /// `requires` names a [`HostTable`] by its byte, and the number of entries
 /// the plugin was built against. The host refuses the plugin when its own
@@ -44,8 +44,6 @@ pub(crate) type RequiresFn = extern "C" fn(&Registrar, u8, usize);
 /// The check is coarse: it refuses the plugin even when the plugin never
 /// calls the entries this stiles lacks. The host also refuses a plugin
 /// that registers lints without naming every table it knows.
-///
-/// [stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
 ///
 /// The table is `#[repr(C)]`, and every entry is an `extern "C"` function
 /// that takes only C types: references, integers, pointers, and stabby's
@@ -65,7 +63,7 @@ pub(crate) type RequiresFn = extern "C" fn(&Registrar, u8, usize);
 /// # Examples
 ///
 /// ```
-/// use stiles_types::plugin::{Built, PassInstance, Registrations};
+/// use stiles_types::plugin::{Built, PassInstance, Reads, Registrations};
 /// use stiles_types::{Language, Panic, RuleId};
 ///
 /// /// Builds nothing, because nothing calls it
@@ -78,7 +76,8 @@ pub(crate) type RequiresFn = extern "C" fn(&Registrar, u8, usize);
 /// registrations.lend(|registrar| {
 ///     registrar.require_host_tables();
 ///     // SAFETY: `build` never returns `Ok`.
-///     unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+///     let lint = unsafe { registrar.lint(Language::Rust, build, &[RuleId::new("lint.quiet")]) };
+///     registrar.reads(lint, &Reads::none());
 /// });
 ///
 /// let lints = registrations.finish().expect("the registration should be whole");
@@ -157,20 +156,17 @@ impl Registrar {
     /// `export_lints!` calls this once for each lint, with what its
     /// `DeclaresRules::reads` returns and the handle that
     /// [`Registrar::lint`] returned for it. A provider computes only the
-    /// decorations that the loaded passes declare, so a pass that reads one
-    /// it never declared may find nothing.
+    /// decorations that the loaded passes declare. The walk ends the run
+    /// when a pass reads a decoration it did not declare.
     ///
-    /// [`Reads::undeclared`] calls nothing, and the lint gets every
-    /// decoration of its language. That fallback is staged, and
-    /// [stiles#651] removes it. [`Reads::none`] declares that the pass
-    /// reads no decoration.
+    /// Every lint needs this call, and [`Reads::none`] makes it with an
+    /// empty list. The host refuses the whole plugin, once its `register`
+    /// returns, when a lint never had it.
     ///
-    /// The host refuses the whole plugin, once its `register` returns, when
-    /// no provider of the lint's language offers a declared decoration at
-    /// its layout. It refuses it too when `lint` names no registered lint.
-    /// The host copies the identities before the call returns.
-    ///
-    /// [stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
+    /// The host refuses the plugin too when `lint` names no registered
+    /// lint. It refuses it when no provider of the lint's language offers a
+    /// declared decoration at its layout. The host copies the identities
+    /// before the call returns.
     ///
     /// # Examples
     ///
@@ -196,9 +192,7 @@ impl Registrar {
     /// assert_eq!(lints[0].reads(), &Reads::none());
     /// ```
     pub fn reads(&self, lint: usize, reads: &Reads) {
-        let Some(identities) = reads.declared() else {
-            return;
-        };
+        let identities = reads.declared();
 
         (self.reads)(self, lint, identities.as_ptr(), identities.len());
     }
