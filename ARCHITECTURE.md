@@ -439,19 +439,15 @@ can read. Doc comments and
 private helpers move nothing, so a plugin stays loadable across most of
 stiles's own churn.
 
-A node crosses as two fields: the bytes of a tree-sitter node, and a
-reference to a table of the host's functions for its tree. Every method of
-the node calls through that table, so the host's own tree-sitter reads the
-host's tree. The one exception is `DecoratedNode::raw`, which hands over the
-bare node for the plugin's own tree-sitter to read. It stays until
-stiles-aonyx-rules stops calling it, and [stiles#643] removes it. The table
-is `#[repr(C)]` and starts with the number of functions it holds, so a later
-version can append one.
-A function that may find no node writes it through an out-parameter and
-returns whether it did. Stabby cannot describe a function whose arguments
-borrow for a lifetime of their own, so no fingerprint covers the table.
-`ABI_VERSION` covers it instead, and a test in stiles-types fails when its
-entries move.
+A node crosses as two fields: the bytes of a tree-sitter node, and a reference
+to a table of the host's functions for its tree. Every method of the node calls
+through that table, so the host's own tree-sitter reads the host's tree. A
+plugin never reads the node bytes. The table is `#[repr(C)]` and starts with the
+number of functions it holds, so a later version can append one. A function that
+may find no node writes it through an out-parameter and returns whether it did.
+Stabby cannot describe a function whose arguments borrow for a lifetime of their
+own, so no fingerprint covers the table. `ABI_VERSION` covers it instead, and a
+test in stiles-types fails when its entries move.
 
 A node reaches the host's decorations through the same table, so no std
 collection crosses the boundary. The host compares the key and hands back
@@ -595,6 +591,5 @@ loaded lints together.
 [ra]: https://rust-analyzer.github.io/
 [tsrs]: https://github.com/oxc-project/tsrs
 [rules]: https://github.com/aonyx-ai/stiles-aonyx-rules
-[stiles#643]: https://github.com/aonyx-ai/stiles/issues/643
 [stiles#651]: https://github.com/aonyx-ai/stiles/issues/651
 [ts]: https://tree-sitter.github.io/tree-sitter/

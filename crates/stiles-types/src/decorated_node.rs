@@ -754,41 +754,6 @@ impl<'a> DecoratedNode<'a> {
         self.step(self.context().prev_named_sibling)
     }
 
-    /// Returns the bare tree-sitter node
-    ///
-    /// The plugin reads the node with its own copy of the tree-sitter C
-    /// library. A pass that calls this therefore depends on the host's
-    /// tree-sitter layout. The other methods of the node read through the host and do
-    /// not.
-    ///
-    /// The method stays only until stiles-aonyx-rules stops calling it.
-    /// [stiles#643] removes it.
-    ///
-    /// [stiles#643]: https://github.com/aonyx-ai/stiles/issues/643
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use stiles_types::{DecoratedTree, Language};
-    /// # let source = "fn main() {}";
-    /// # let mut parser = tree_sitter::Parser::new();
-    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
-    /// # let tree = DecoratedTree::builder()
-    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
-    /// #     .language(Language::Rust)
-    /// #     .source(source.to_string())
-    /// #     .file("src/main.rs")
-    /// #     .build();
-    /// let root = tree.root_node();
-    ///
-    /// assert_eq!(root.raw().kind(), "source_file");
-    /// ```
-    pub fn raw(&self) -> tree_sitter::Node<'a> {
-        // SAFETY: only the host writes node bytes, from a node of the tree
-        // that owns this node's table, and that tree outlives `'a`.
-        unsafe { self.node.into_node() }
-    }
-
     /// Parses `text` as `language` with the host's grammar, and returns its root
     ///
     /// A rule uses this to read a snippet as code, such as the body of a
