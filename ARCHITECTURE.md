@@ -588,8 +588,8 @@ and the language crates, without their providers. `stiles-testing` rests
 on `stiles-core`. The CLI ties the platform, the languages, and the
 loaded lints together.
 
-[discovery]: https://aonyx-ai.github.io/stiles/docs/reference/file-discovery
-[languages]: https://aonyx-ai.github.io/stiles/docs/reference/supported-languages
+[discovery]: https://stiles.aonyx.ai/docs/reference/file-discovery
+[languages]: https://stiles.aonyx.ai/docs/reference/supported-languages
 [ra]: https://rust-analyzer.github.io/
 [tsrs]: https://github.com/oxc-project/tsrs
 [rules]: https://github.com/aonyx-ai/stiles-aonyx-rules
