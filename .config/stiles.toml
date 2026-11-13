@@ -29,4 +29,11 @@ stiles-source = "."
 # check here runs exactly the rules it ran yesterday.
 [[lints]]
 git = "https://github.com/aonyx-ai/stiles-aonyx-rules"
-rev = "809c2d056eaa6a4cf0c5a002776d8dd0cb3775a8"
+rev = "877030eda4ea7791f32be516219fbfd70a0f379c"
+
+# These enums grow like a `#[non_exhaustive]` enum but lack the attribute.
+# tar's `EntryType` predates it and hides a `__Nonexhaustive` variant, and
+# the TypeScript checker's `Kind` gains syntax kinds with each release of
+# TypeScript. A `match` that named every variant would gain nothing.
+[rules.options."lint.single-variant-branch"]
+non-exhaustive = ["tar::entry_type::EntryType", "stiles_tsrs::tsrs_ast::kind::Kind"]
