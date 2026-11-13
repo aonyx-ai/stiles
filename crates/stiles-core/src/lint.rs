@@ -140,8 +140,9 @@ impl<'pass> Lint<'pass> {
                 source,
             })?;
 
-        let Declared::Rules(rules) = &self.declared else {
-            return Ok(found);
+        let rules = match &self.declared {
+            Declared::Rules(rules) => rules,
+            Declared::Unchecked => return Ok(found),
         };
         if let Some(stray) = found
             .iter()

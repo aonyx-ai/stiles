@@ -205,8 +205,11 @@ impl Rewriter {
     /// import, `pub use crate::free;`. A segment that a path continues past
     /// names a module, whatever its name.
     fn names_macro(&self, tokens: &[TokenTree], index: usize) -> bool {
-        let Some(TokenTree::Ident(ident)) = tokens.get(index) else {
-            return false;
+        let ident = match tokens.get(index) {
+            Some(TokenTree::Ident(ident)) => ident,
+            Some(TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_)) | None => {
+                return false;
+            }
         };
         self.exported.contains_key(&ident.to_string()) && !is_path_separator(tokens, index + 1)
     }
@@ -233,8 +236,11 @@ fn collect_macros(stream: TokenStream, exported: &mut BTreeMap<String, usize>) {
         if ident != "macro_rules" || !is_punct(&tokens, index + 1, '!') {
             continue;
         }
-        let Some(TokenTree::Ident(name)) = tokens.get(index + 2) else {
-            continue;
+        let name = match tokens.get(index + 2) {
+            Some(TokenTree::Ident(name)) => name,
+            Some(TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_)) | None => {
+                continue;
+            }
         };
         if has_macro_export(&tokens[..index]) {
             *exported.entry(name.to_string()).or_default() += 1;
@@ -255,10 +261,13 @@ fn has_macro_export(tokens: &[TokenTree]) -> bool {
             return false;
         }
         let first = group.stream().into_iter().next();
-        if let Some(TokenTree::Ident(ident)) = first
-            && ident == "macro_export"
-        {
-            return true;
+        match first {
+            Some(TokenTree::Ident(ident)) => {
+                if ident == "macro_export" {
+                    return true;
+                }
+            }
+            Some(TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_)) | None => {}
         }
         end -= 2;
     }
@@ -267,8 +276,11 @@ fn has_macro_export(tokens: &[TokenTree]) -> bool {
 
 /// Returns whether `tokens[index]` and the token after it form `::`
 fn is_path_separator(tokens: &[TokenTree], index: usize) -> bool {
-    let Some(TokenTree::Punct(first)) = tokens.get(index) else {
-        return false;
+    let first = match tokens.get(index) {
+        Some(TokenTree::Punct(first)) => first,
+        Some(TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Literal(_)) | None => {
+            return false;
+        }
     };
     first.as_char() == ':' && first.spacing() == Spacing::Joint && is_punct(tokens, index + 1, ':')
 }
@@ -288,8 +300,11 @@ fn follows_path_or_field(tokens: &[TokenTree], index: usize) -> bool {
 }
 
 fn is_punct(tokens: &[TokenTree], index: usize, character: char) -> bool {
-    let Some(TokenTree::Punct(punct)) = tokens.get(index) else {
-        return false;
+    let punct = match tokens.get(index) {
+        Some(TokenTree::Punct(punct)) => punct,
+        Some(TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Literal(_)) | None => {
+            return false;
+        }
     };
     punct.as_char() == character
 }
@@ -303,8 +318,11 @@ fn macro_literal(tokens: &[TokenTree], index: usize) -> Result<Option<(String, u
     if !is_punct(tokens, index + 1, '!') {
         return Ok(None);
     }
-    let Some(TokenTree::Group(group)) = tokens.get(index + 2) else {
-        return Ok(None);
+    let group = match tokens.get(index + 2) {
+        Some(TokenTree::Group(group)) => group,
+        Some(TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_)) | None => {
+            return Ok(None);
+        }
     };
     let arguments: Vec<TokenTree> = group.stream().into_iter().collect();
     let [TokenTree::Literal(literal)] = arguments.as_slice() else {

@@ -153,12 +153,12 @@ impl RustdocCrate {
     /// Returns the names of the crates that the crate root re-exports whole
     pub(super) fn reexported_crates(&self) -> Vec<String> {
         let Self { root, paths, .. } = self;
-        let Some(Inner {
-            module: Some(Module { items }),
-            ..
-        }) = self.item(*root).map(|item| &item.inner)
-        else {
-            return Vec::new();
+        let items = match self.item(*root).map(|item| &item.inner) {
+            Some(Inner {
+                module: Some(Module { items }),
+                ..
+            }) => items,
+            Some(Inner { module: None, .. }) | None => return Vec::new(),
         };
 
         items

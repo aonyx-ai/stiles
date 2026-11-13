@@ -1105,8 +1105,9 @@ fn classify_error(ctx: &DecorateCtx<'_, '_>, ty: &Type<'_>) -> ErrorType {
 fn result_error_type(ctx: &DecorateCtx<'_, '_>, ty: &Type<'_>) -> Option<ErrorType> {
     let core_result = ctx.core_result?;
     let (adt, args) = ty.as_adt_with_args()?;
-    let Adt::Enum(actual) = adt else {
-        return None;
+    let actual = match adt {
+        Adt::Enum(actual) => actual,
+        Adt::Struct(_) | Adt::Union(_) => return None,
     };
     if actual != core_result {
         return None;
@@ -1236,8 +1237,9 @@ fn decorate_branch_value(
     });
     decorations.insert(node_id, || adt_path(ctx, &ty));
 
-    let Some(Adt::Enum(e)) = ty.as_adt() else {
-        return;
+    let e = match ty.as_adt() {
+        Some(Adt::Enum(e)) => e,
+        Some(Adt::Struct(_) | Adt::Union(_)) | None => return,
     };
     decorations.insert(node_id, || Some(adt_flags(ctx, e, func)));
     decorations.insert(node_id, || {
@@ -1425,8 +1427,25 @@ fn public_module_paths(ctx: &DecorateCtx<'_, '_>, krate: Crate) -> HashMap<Modul
             continue;
         };
         for (name, def) in module.scope(db, Some(ctx.module)) {
-            let ScopeDef::ModuleDef(ModuleDef::Module(child)) = def else {
-                continue;
+            let child = match def {
+                ScopeDef::ModuleDef(ModuleDef::Module(child)) => child,
+                ScopeDef::ModuleDef(
+                    ModuleDef::Function(_)
+                    | ModuleDef::Adt(_)
+                    | ModuleDef::EnumVariant(_)
+                    | ModuleDef::Const(_)
+                    | ModuleDef::Static(_)
+                    | ModuleDef::Trait(_)
+                    | ModuleDef::TypeAlias(_)
+                    | ModuleDef::BuiltinType(_)
+                    | ModuleDef::Macro(_),
+                )
+                | ScopeDef::GenericParam(_)
+                | ScopeDef::ImplSelfType(_)
+                | ScopeDef::AdtSelfType(_)
+                | ScopeDef::Local(_)
+                | ScopeDef::Label(_)
+                | ScopeDef::Unknown => continue,
             };
             if paths.contains_key(&child) {
                 continue;
@@ -1483,8 +1502,15 @@ fn resolve_reexports(
     }
     path.syntax().ancestors().find_map(ast::UseTree::cast)?;
 
-    let PathResolution::Def(def) = ctx.sema.resolve_path(&path)? else {
-        return None;
+    let def = match ctx.sema.resolve_path(&path)? {
+        PathResolution::Def(def) => def,
+        PathResolution::Local(_)
+        | PathResolution::TypeParam(_)
+        | PathResolution::ConstParam(_)
+        | PathResolution::SelfType(_)
+        | PathResolution::BuiltinAttr(_)
+        | PathResolution::ToolModule(_)
+        | PathResolution::DeriveHelper(_) => return None,
     };
 
     Some(Reexports::new(public_paths(ctx, module_paths, def)))

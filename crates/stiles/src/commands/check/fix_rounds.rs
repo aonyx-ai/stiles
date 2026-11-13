@@ -126,12 +126,15 @@ impl FixRounds {
             last_rules.clear();
 
             for (index, (file, check)) in files.iter().zip(&checks).enumerate() {
-                let FileCheck::Checked {
-                    text: Some(text),
-                    result: Ok(diagnostics),
-                } = check
-                else {
-                    continue;
+                let (text, diagnostics) = match check {
+                    FileCheck::Checked {
+                        text: Some(text),
+                        result: Ok(diagnostics),
+                    } => (text, diagnostics),
+                    FileCheck::Checked { text: None, .. }
+                    | FileCheck::Checked { result: Err(_), .. }
+                    | FileCheck::Unreadable { .. }
+                    | FileCheck::NoGrammar => continue,
                 };
                 let admitted: Vec<Diagnostic> = diagnostics
                     .iter()

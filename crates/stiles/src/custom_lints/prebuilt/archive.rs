@@ -150,8 +150,12 @@ pub(crate) fn extract(archive: &Path, directory: &Path) -> anyhow::Result<()> {
 fn root_file_name(path: &Path) -> Option<&std::ffi::OsStr> {
     let mut components = path.components();
 
-    let Some(Component::Normal(name)) = components.next() else {
-        return None;
+    let name = match components.next() {
+        Some(Component::Normal(name)) => name,
+        Some(
+            Component::Prefix(_) | Component::RootDir | Component::CurDir | Component::ParentDir,
+        )
+        | None => return None,
     };
 
     match components.next() {
