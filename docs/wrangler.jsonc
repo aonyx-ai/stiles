@@ -1,0 +1,24 @@
+{
+  // The Worker serves the documentation at stiles.aonyx.ai. The Custom Domain
+  // that binds the address to the Worker lives in den, and it gives the Worker
+  // by this name, so the two names have to agree.
+  "name": "stiles",
+  "compatibility_date": "2026-11-01",
+  // The Worker has no code: Cloudflare serves every request from the assets.
+  // A workers.dev hostname would be a second public origin of the same site,
+  // so the Worker answers only on its Custom Domain.
+  "workers_dev": false,
+  // A pull request uploads a version of the site, and Cloudflare serves it on
+  // a preview URL below the workers.dev subdomain of the account. The Access
+  // application that den declares for that subdomain admits only the team.
+  "preview_urls": true,
+  "assets": {
+    // `npm run build` writes the site here, relative to this file. The
+    // workflow builds it before every upload, and the directory is not in the
+    // repository.
+    "directory": "build",
+    // Docusaurus writes a page for a missing address, and Cloudflare sends it
+    // with the status 404.
+    "not_found_handling": "404-page",
+  },
+}
