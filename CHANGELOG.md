@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-11-13
+
+### Changed
+
+- A lint reads only the decorations it declares, and an undeclared read ends the run ([#669])
+
+### Removed
+
+- `DecoratedNode::raw` no longer exists, so a plugin reads the tree only through the stiles that loaded it ([#668])
+
 ## [0.7.1] - 2026-11-13
 
 ### Added
@@ -154,3 +164,6 @@ and this project adheres to
 [#660]: https://github.com/aonyx-ai/stiles/pull/660
 [#664]: https://github.com/aonyx-ai/stiles/pull/664
 [#662]: https://github.com/aonyx-ai/stiles/pull/662
+[0.8.0]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.8.0
+[#669]: https://github.com/aonyx-ai/stiles/pull/669
+[#668]: https://github.com/aonyx-ai/stiles/pull/668
