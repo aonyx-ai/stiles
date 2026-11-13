@@ -25,7 +25,7 @@ use stiles_types::{
 };
 
 use crate::decorations::{
-    AdtFlags, AdtKind, EnumVariants, ErrorType, Exhaustiveness, FnSignature, ImportSource,
+    AdtFlags, AdtKind, AdtPath, EnumVariants, ErrorType, Exhaustiveness, FnSignature, ImportSource,
     ItemExposure, NeverKind, OptionKind, PublicPath, Reexports, ResolvedType, ResultKind,
     ReturnMode, TypePath,
 };
@@ -86,10 +86,11 @@ impl RustDecorationProvider {
     /// ```
     ///
     /// [`wanting`]: RustDecorationProvider::wanting
-    pub const DECORATIONS: [DecorationIdentity; 7] = [
+    pub const DECORATIONS: [DecorationIdentity; 8] = [
         DecorationIdentity::of::<FnSignature>(),
         DecorationIdentity::of::<ResolvedType>(),
         DecorationIdentity::of::<AdtFlags>(),
+        DecorationIdentity::of::<AdtPath>(),
         DecorationIdentity::of::<EnumVariants>(),
         DecorationIdentity::of::<ImportSource>(),
         DecorationIdentity::of::<Reexports>(),
@@ -713,7 +714,7 @@ fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &m
             }
         }
         "match_expression" => {
-            if wanted.contains_any(&[ResolvedType::KEY, AdtFlags::KEY])
+            if wanted.contains_any(&[ResolvedType::KEY, AdtFlags::KEY, AdtPath::KEY])
                 && let Some(scrutinee) = node.child_by_field_name("value")
                 && let Some(scrutinee_range) = text_range_of(&scrutinee)
             {
@@ -749,7 +750,12 @@ fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &m
         }
         "let_condition" | "let_declaration" | "call_expression" | "binary_expression"
         | "macro_invocation"
-            if wanted.contains_any(&[ResolvedType::KEY, AdtFlags::KEY, EnumVariants::KEY]) =>
+            if wanted.contains_any(&[
+                ResolvedType::KEY,
+                AdtFlags::KEY,
+                AdtPath::KEY,
+                EnumVariants::KEY,
+            ]) =>
         {
             collect_branch_values(node, targets);
         }
@@ -1134,10 +1140,11 @@ fn resolve_function(ctx: &DecorateCtx<'_, '_>, range: TextRange) -> Option<FnSig
     )
 }
 
-/// Attaches the type of a match scrutinee and, for an enum, its flags
+/// Attaches the type of a match scrutinee, its ADT's path, and an enum's flags
 ///
-/// The scrutinee is typed once. Each of the two decorations is built only
-/// when a pass reads it.
+/// The scrutinee is typed once. Each of the three decorations is built only
+/// when a pass reads it. The path looks through references, so `match self`
+/// in a `&self` method names the enum. The flags do not.
 fn decorate_match_scrutinee(
     ctx: &DecorateCtx<'_, '_>,
     decorations: &mut WantedDecorations<'_>,
@@ -1170,6 +1177,15 @@ fn decorate_match_scrutinee(
         Some(Adt::Enum(e)) => Some(adt_flags(ctx, e, func)),
         Some(Adt::Struct(_) | Adt::Union(_)) | None => None,
     });
+    decorations.insert(node_id, || adt_path(ctx, &ty.strip_references()));
+}
+
+/// Returns where the ADT of `ty` is defined, or [`None`] for any other type
+///
+/// The caller strips references first when a reference should count as
+/// the ADT it points to.
+fn adt_path(ctx: &DecorateCtx<'_, '_>, ty: &Type<'_>) -> Option<AdtPath> {
+    type_path(ctx, ty).map(AdtPath::new)
 }
 
 /// Returns the flags of an enum as seen from the function that names it
@@ -1190,7 +1206,7 @@ fn adt_flags(ctx: &DecorateCtx<'_, '_>, e: Enum, func: Option<Function>) -> AdtF
 ///
 /// The provider looks through references, because `self` in a method that
 /// takes `&self` tests the same variants as an owned value. Each of the
-/// three decorations is built only when a pass reads it.
+/// four decorations is built only when a pass reads it.
 fn decorate_branch_value(
     ctx: &DecorateCtx<'_, '_>,
     decorations: &mut WantedDecorations<'_>,
@@ -1218,6 +1234,7 @@ fn decorate_branch_value(
                 .with_option_kind(option_kind(ctx, &ty)),
         )
     });
+    decorations.insert(node_id, || adt_path(ctx, &ty));
 
     let Some(Adt::Enum(e)) = ty.as_adt() else {
         return;

@@ -6,6 +6,7 @@
 
 mod adt_flags;
 mod adt_kind;
+mod adt_path;
 mod enum_variants;
 mod error_type;
 mod exhaustiveness;
@@ -24,6 +25,7 @@ mod type_path_ref;
 
 pub use self::adt_flags::AdtFlags;
 pub use self::adt_kind::AdtKind;
+pub use self::adt_path::AdtPath;
 pub use self::enum_variants::EnumVariants;
 pub use self::error_type::ErrorType;
 pub use self::exhaustiveness::Exhaustiveness;

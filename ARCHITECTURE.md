@@ -167,9 +167,11 @@ For every file it covers, the provider resolves a fixed set of node kinds.
 Those are function items, match scrutinees, else branches, the operand of
 `?`, use declarations, and the paths each use declaration imports. It
 records what it finds as decorations: function signatures, resolved types,
-ADT flags, import sources, and re-exports. The re-exports of an imported
-path are the public paths to the same item through the other crates the
-current crate depends on, which rust-analyzer's import maps prove.
+ADT flags, ADT paths, import sources, and re-exports. An ADT path names where
+the enum, struct, or union of a value is defined, not where a crate re-exports
+it. The re-exports of an imported path are the public paths to the same item
+through the other crates the current crate depends on, which rust-analyzer's
+import maps prove.
 
 #### TypeScript
 
