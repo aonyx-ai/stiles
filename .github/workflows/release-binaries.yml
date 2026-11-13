@@ -147,7 +147,13 @@ jobs:
           # GNU long spellings is not something a release should rely on.
           tar -czf "dist/${name}.tar.gz" -C dist "${name}"
           rm -rf "dist/${name}"
-          (cd dist && shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256")
+          # macOS carries shasum and no sha256sum, and the bash of Git on Windows
+          # carries sha256sum and no shasum. Both write the same line.
+          if command -v shasum > /dev/null; then
+              (cd dist && shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256")
+          else
+              (cd dist && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256")
+          fi
 
       - name: Attach the archive to the release
         env:
