@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-11-13
+
+### Added
+
+- The Rust provider names the definition of the enum, struct, or union that a match or a branch tests ([#660])
+
+### Fixed
+
+- Two runs of stiles on Windows no longer fail each other when they share a build directory ([#664])
+- A release publishes its archive for Windows ([#662])
+
 ## [0.7.0] - 2026-11-13
 
 ### Added
@@ -139,3 +150,7 @@ and this project adheres to
 [#639]: https://github.com/aonyx-ai/stiles/pull/639
 [#648]: https://github.com/aonyx-ai/stiles/pull/648
 [#649]: https://github.com/aonyx-ai/stiles/pull/649
+[0.7.1]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.7.1
+[#660]: https://github.com/aonyx-ai/stiles/pull/660
+[#664]: https://github.com/aonyx-ai/stiles/pull/664
+[#662]: https://github.com/aonyx-ai/stiles/pull/662
