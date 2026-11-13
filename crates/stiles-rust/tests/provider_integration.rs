@@ -1067,13 +1067,17 @@ impl BranchSite {
     }
 }
 
-/// Returns the variants decorated on the first `site` inside `function`
-fn branch_node(tree: &DecoratedTree, function: &str, site: BranchSite) -> Vec<String> {
+/// Returns the value that decides the first `site` inside `function`
+fn branch_value<'a>(
+    tree: &'a DecoratedTree,
+    function: &str,
+    site: BranchSite,
+) -> DecoratedNode<'a> {
     let root = tree.root_node();
     let func =
         find_function_by_name(&root, function).unwrap_or_else(|| panic!("should find {function}"));
     let node = find_first_node_of_kind(&func, site.kind()).expect("should find the site");
-    let value = match site {
+    match site {
         BranchSite::Call => node
             .child_by_field_name("function")
             .and_then(|f| f.child_by_field_name("value"))
@@ -1083,9 +1087,12 @@ fn branch_node(tree: &DecoratedTree, function: &str, site: BranchSite) -> Vec<St
         BranchSite::LetCondition | BranchSite::LetDeclaration => {
             node.child_by_field_name("value").expect("value field")
         }
-    };
+    }
+}
 
-    value
+/// Returns the variants decorated on the first `site` inside `function`
+fn branch_node(tree: &DecoratedTree, function: &str, site: BranchSite) -> Vec<String> {
+    branch_value(tree, function, site)
         .decoration::<EnumVariants>()
         .map(|variants| variants.names().map(str::to_owned).collect())
         .unwrap_or_default()
