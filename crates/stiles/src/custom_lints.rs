@@ -655,6 +655,63 @@ fn build(
     self::artifact::cdylib_artifacts(&stdout, directory)
 }
 
+/// Returns the path that the loader opens for a library
+///
+/// Windows locks the file of a loaded library, so cargo cannot rebuild a
+/// library while a run of stiles holds it. Two runs that share a build
+/// directory then fail each other. On Windows, the loader therefore opens a
+/// copy in a directory of its own process, and a rebuild never meets a loaded
+/// file. A later process with the same id can overwrite the copies, because
+/// the process that held them has ended.
+///
+/// Other systems let a rebuild replace a loaded library, so the loader opens
+/// the library where it is.
+///
+/// # Errors
+///
+/// Returns an error on Windows when the copy cannot be written.
+#[cfg(windows)]
+fn loadable(library_path: &Path) -> anyhow::Result<PathBuf> {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+    let directory = std::env::temp_dir()
+        .join("stiles-loaded")
+        .join(std::process::id().to_string());
+    std::fs::create_dir_all(&directory)
+        .with_context(|| format!("failed to create {}", directory.display()))?;
+    let name = library_path
+        .file_name()
+        .with_context(|| format!("{} names no file", library_path.display()))?;
+    let index = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let copy = directory.join(format!("{index}-{}", name.to_string_lossy()));
+    std::fs::copy(library_path, &copy).with_context(|| {
+        format!(
+            "failed to copy {} to {}",
+            library_path.display(),
+            copy.display()
+        )
+    })?;
+
+    Ok(copy)
+}
+
+/// Returns the path that the loader opens for a library
+///
+/// Other systems than Windows let a rebuild replace a loaded library, so the
+/// loader opens the library where it is.
+///
+/// # Errors
+///
+/// Returns no error. The signature matches the one for Windows.
+#[cfg(not(windows))]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "The function on Windows can fail, and both share one signature."
+)]
+fn loadable(library_path: &Path) -> anyhow::Result<PathBuf> {
+    Ok(library_path.to_path_buf())
+}
+
 /// Opens the built library, performs the handshake, and registers its lints
 ///
 /// The loader never forms a `&PluginDeclaration`. A plugin built against
@@ -672,6 +729,9 @@ fn build(
 /// struct. The version of a plugin has to equal the version of this
 /// binary, so every field that a plugin exports is one this version
 /// knows.
+///
+/// On Windows, the loader opens a copy of the library and not the library
+/// itself, as [`loadable`] explains.
 ///
 /// The loader deliberately leaks the library. The factories that the
 /// plugin registers, and the table of every pass they build, point into
@@ -692,11 +752,13 @@ fn build(
 /// [`Panic`]: stiles_types::Panic
 /// [`RuleId`]: stiles_types::RuleId
 fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loaded> {
+    let opened = loadable(library_path)
+        .with_context(|| format!("failed to prepare {} for loading", library_path.display()))?;
     // SAFETY: opening a library runs its initializers, which is unsound
     // for any library whose initializers are. Stiles opens only what a
     // project's configuration names, which the project already trusts to
     // run as a lint.
-    let library = unsafe { Library::new(library_path) }
+    let library = unsafe { Library::new(&opened) }
         .with_context(|| format!("failed to open {}", library_path.display()))?;
 
     let declaration =
@@ -987,6 +1049,28 @@ mod tests {
             .expect("nothing to configure");
 
         assert!(passes.is_empty());
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn loadable_off_windows_opens_the_library_in_place() {
+        let library = Path::new("/lints/target/release/liblint.so");
+
+        let opened = loadable(library).expect("the path should be returned");
+
+        assert_eq!(opened, library);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn loadable_on_windows_opens_a_copy() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let library = directory.path().join("lint.dll");
+        std::fs::write(&library, "image").expect("the library should be written");
+
+        let opened = loadable(&library).expect("the copy should be written");
+
+        assert_ne!(opened, library);
     }
 
     /// Builds nothing, because no test here calls it
