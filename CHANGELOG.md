@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-11-13
+
+### Added
+
+- A node gives its siblings, its start and end positions, `has_error`, and `parse` for a snippet ([#645])
+- A lint declares the decorations it reads, stiles computes only those, and a decoration no longer moves the language fingerprint ([#652])
+- Stiles publishes a build for Windows ([#646])
+
+### Changed
+
+- An ABI version rises once per release, and stiles trusts the version of published plugins ([#639])
+- A rule reads a node through the stiles that loaded it, so a plugin walks the tree with the host's tree-sitter ([#645])
+- A lint pass reports each diagnostic through the host's sink, so a field added to a diagnostic no longer refuses a plugin ([#648])
+- A plugin registers its lints through the host, and each pass crosses as a table of hooks, so a later hook no longer refuses a plugin ([#649])
+
 ## [0.6.0] - 2026-11-09
 
 ### Added
@@ -117,3 +132,10 @@ and this project adheres to
 [#634]: https://github.com/aonyx-ai/stiles/pull/634
 [#635]: https://github.com/aonyx-ai/stiles/pull/635
 [#636]: https://github.com/aonyx-ai/stiles/pull/636
+[0.7.0]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.7.0
+[#645]: https://github.com/aonyx-ai/stiles/pull/645
+[#652]: https://github.com/aonyx-ai/stiles/pull/652
+[#646]: https://github.com/aonyx-ai/stiles/pull/646
+[#639]: https://github.com/aonyx-ai/stiles/pull/639
+[#648]: https://github.com/aonyx-ai/stiles/pull/648
+[#649]: https://github.com/aonyx-ai/stiles/pull/649
