@@ -752,11 +752,12 @@ fn loadable(library_path: &Path) -> anyhow::Result<PathBuf> {
 /// [`Panic`]: stiles_types::Panic
 /// [`RuleId`]: stiles_types::RuleId
 fn load_library(library_path: &Path, host: &AbiIdentity) -> anyhow::Result<Loaded> {
+    let opened = loadable(library_path)
+        .with_context(|| format!("failed to prepare {} for loading", library_path.display()))?;
     // SAFETY: opening a library runs its initializers, which is unsound
     // for any library whose initializers are. Stiles opens only what a
     // project's configuration names, which the project already trusts to
     // run as a lint.
-    let opened = loadable(library_path)?;
     let library = unsafe { Library::new(&opened) }
         .with_context(|| format!("failed to open {}", library_path.display()))?;
 
