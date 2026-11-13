@@ -110,7 +110,12 @@ fn shared_build_directory() -> PathBuf {
 /// both proves that stiles loaded both libraries. Their dependencies are
 /// path dependencies on this repository. That is what makes the handshake
 /// pass: stiles and both plugins are built from the same stiles source.
-fn workspace_of_lints() -> TempDir {
+///
+/// Each test names its packages with its own `prefix`. The tests share one
+/// build directory and run at once. On Windows a build cannot replace a
+/// library that another test's stiles has loaded. Two tests therefore never
+/// build a library of the same name.
+fn workspace_of_lints(prefix: &str) -> TempDir {
     let directory = tempfile::tempdir().expect("temporary directory should be created");
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let crates = std::fs::canonicalize(crates).expect("the crates directory should exist");
@@ -149,7 +154,7 @@ fn workspace_of_lints() -> TempDir {
         std::fs::write(
             member.join("Cargo.toml"),
             format!(
-                "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\
+                "[package]\nname = \"{prefix}_{name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\
                  publish = false\n\n[lib]\ncrate-type = [\"cdylib\"]\n\n[dependencies]\n\
                  stiles-plugin = {{ path = {plugin} }}\n\
                  stiles-rust = {{ path = {rust}, default-features = false }}\n\
@@ -193,7 +198,7 @@ fn workspace_of_lints() -> TempDir {
 #[test]
 fn check_with_a_disabled_rule_runs_the_rest() {
     let target = package(TODO_SOURCE);
-    let lints = workspace_of_lints();
+    let lints = workspace_of_lints("disabled");
     let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
     write_config(
         target.path(),
@@ -322,7 +327,7 @@ fn check_with_a_plugin_from_another_protocol_refuses_it() {
 #[test]
 fn check_with_a_rule_no_lint_reports_fails() {
     let target = package(TODO_SOURCE);
-    let lints = workspace_of_lints();
+    let lints = workspace_of_lints("misspelled");
     let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
     write_config(
         target.path(),
@@ -347,7 +352,7 @@ fn check_with_a_rule_no_lint_reports_fails() {
 #[test]
 fn check_with_a_workspace_of_lints_reports_every_member() {
     let target = package(TODO_SOURCE);
-    let workspace = workspace_of_lints();
+    let workspace = workspace_of_lints("every_member");
     configure_lint(target.path(), workspace.path());
 
     stiles()
@@ -364,7 +369,7 @@ fn check_with_a_workspace_of_lints_reports_every_member() {
 #[test]
 fn check_with_an_enabled_rule_runs_only_that_rule() {
     let target = package(TODO_SOURCE);
-    let lints = workspace_of_lints();
+    let lints = workspace_of_lints("enabled");
     let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
     write_config(
         target.path(),
@@ -569,7 +574,7 @@ fn check_without_an_option_leaves_the_rule_at_its_default() {
 #[test]
 fn rules_lists_every_declared_rule_and_marks_the_disabled_one() {
     let target = package(TODO_SOURCE);
-    let lints = workspace_of_lints();
+    let lints = workspace_of_lints("listed");
     let lint_path = toml::Value::from(lints.path().to_str().expect("the path should be UTF-8"));
     write_config(
         target.path(),

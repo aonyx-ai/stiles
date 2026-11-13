@@ -259,6 +259,18 @@ pub fn if_let_on_a_foreign_non_exhaustive_enum(kind: std::io::ErrorKind) {
     }
 }
 
+pub fn if_let_on_a_reexported_enum(tint: facade::Tint) {
+    if let facade::Tint::Warm = tint {
+    } else {
+    }
+}
+
+pub fn match_on_struct(palette: Palette) {
+    match palette {
+        Palette { primary: _ } => {}
+    }
+}
+
 pub fn predicate_on_a_reference(color: &Color) -> bool {
     color.is_red()
 }
