@@ -5,10 +5,10 @@ use std::sync::OnceLock;
 
 use decoration_probes::{AnyhowBareTry, FunctionScopedImport, WildcardMatchArm};
 use stiles_rust::decorations::{
-    AdtFlags, AdtPath, EnumVariants, FnSignature, ImportSource, ItemExposure, PublicPath,
-    Reexports, ResolvedType, ReturnMode, TypePathRef,
+    AdtFlags, AdtPath, Edition, EnumVariants, FnSignature, ImportSource, ItemExposure, PublicPath,
+    Reexports, ResolvedType, ReturnMode, Target, TargetKind, TargetKinds, TestCode, TypePathRef,
 };
-use stiles_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter};
+use stiles_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter, is_test_code};
 use stiles_types::{
     Coverage, CoverageGap, DecoratedNode, DecoratedTree, Decoration as _, DecorationProvider,
     DecorationSet, Diagnostic, Language, LintPass, Severity, Span,
@@ -16,8 +16,15 @@ use stiles_types::{
 
 static PROVIDER: OnceLock<RustDecorationProvider> = OnceLock::new();
 
+static TARGETS_PROVIDER: OnceLock<RustDecorationProvider> = OnceLock::new();
+
 fn fixture_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/sample_project")
+}
+
+/// Returns the fixture that holds one Cargo target of every kind
+fn targets_fixture_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/targets_project")
 }
 
 /// Writes a Cargo project whose crate reaches two files that are not UTF-8
@@ -113,6 +120,57 @@ fn load_provider() -> &'static RustDecorationProvider {
         .get_or_init(|| RustDecorationProvider::load(&fixture_path()).expect("should load fixture"))
 }
 
+/// Loads the fixture of every target kind once and lends it to every test
+fn load_targets_provider() -> &'static RustDecorationProvider {
+    TARGETS_PROVIDER.get_or_init(|| {
+        RustDecorationProvider::load(&targets_fixture_path()).expect("should load fixture")
+    })
+}
+
+/// Parses and decorates `relative` in `root`, which the provider must cover
+fn decorate_file_in(
+    provider: &RustDecorationProvider,
+    root: &Path,
+    relative: &str,
+) -> DecoratedTree {
+    let file_path = root.join(relative);
+    let source = std::fs::read_to_string(&file_path).expect("should read fixture source");
+    let mut decorated = parse_source(source, file_path);
+
+    let coverage = provider
+        .decorate(&decorated)
+        .expect("decorate should succeed");
+
+    match coverage {
+        Coverage::Covered(decorations) => decorated.merge_decorations(decorations),
+        Coverage::NotCovered(gap) => panic!("fixture should be covered, got: {gap}"),
+    }
+    decorated
+}
+
+/// Returns the [`Target`] of the file at `relative` in the targets fixture
+fn target_of(relative: &str) -> Target {
+    let tree = decorate_targets_file(relative);
+
+    tree.root_node()
+        .decoration::<Target>()
+        .cloned()
+        .expect("the source file should carry a target")
+}
+
+/// Parses and decorates the file at `relative` in the targets fixture
+fn decorate_targets_file(relative: &str) -> DecoratedTree {
+    decorate_file_in(load_targets_provider(), &targets_fixture_path(), relative)
+}
+
+/// Returns the [`TestCode`] of the item that `name` names in `tree`
+fn test_code_in(tree: &DecoratedTree, name: &str) -> Option<TestCode> {
+    find_item_by_name(&tree.root_node(), name)
+        .expect("should find the item")
+        .decoration::<TestCode>()
+        .copied()
+}
+
 fn parse_source(source: String, file_path: PathBuf) -> DecoratedTree {
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&stiles_rust::language()).unwrap();
@@ -139,17 +197,7 @@ fn parse_and_decorate_fixture(provider: &RustDecorationProvider) -> DecoratedTre
 
 /// Parses and decorates the fixture file at `relative`, which must be covered
 fn decorate_fixture_file(provider: &RustDecorationProvider, relative: &str) -> DecoratedTree {
-    let mut decorated = parse_fixture_file(relative);
-
-    let coverage = provider
-        .decorate(&decorated)
-        .expect("decorate should succeed");
-
-    match coverage {
-        Coverage::Covered(decorations) => decorated.merge_decorations(decorations),
-        Coverage::NotCovered(gap) => panic!("fixture should be covered, got: {gap}"),
-    }
-    decorated
+    decorate_file_in(provider, &fixture_path(), relative)
 }
 
 fn find_function_by_name<'a>(root: &DecoratedNode<'a>, name: &str) -> Option<DecoratedNode<'a>> {
@@ -1369,6 +1417,133 @@ fn import_source_on_an_uppercase_module_is_module() {
     );
 }
 
+/// Returns whether [`is_test_code`] counts the item that `name` names in `tree`
+fn item_is_test_code(tree: &DecoratedTree, name: &str) -> bool {
+    let item = find_item_by_name(&tree.root_node(), name).expect("should find the item");
+
+    is_test_code(&item)
+}
+
+#[test]
+fn is_test_code_in_a_bench_is_true() {
+    let tree = decorate_targets_file("benches/speed.rs");
+
+    let test_code = item_is_test_code(&tree, "main");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_in_a_binary_is_false() {
+    let tree = decorate_targets_file("src/main.rs");
+
+    let test_code = item_is_test_code(&tree, "main");
+
+    assert!(!test_code);
+}
+
+#[test]
+fn is_test_code_in_a_build_script_is_false() {
+    let tree = decorate_targets_file("build.rs");
+
+    let test_code = item_is_test_code(&tree, "main");
+
+    assert!(!test_code);
+}
+
+/// The walk climbs from a statement, which carries no decoration, to its item
+#[test]
+fn is_test_code_in_a_cfg_test_module_reaches_a_statement() {
+    let tree = decorate_targets_file("src/test_code.rs");
+    let helper = find_item_by_name(&tree.root_node(), "helper").expect("should find the item");
+    let binding = find_first_node_of_kind(&helper, "let_declaration").expect("should find a let");
+
+    let test_code = is_test_code(&binding);
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_in_a_file_declared_under_cfg_test_is_true() {
+    let tree = decorate_targets_file("src/declared.rs");
+
+    let test_code = item_is_test_code(&tree, "declared_helper");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_in_a_library_is_false() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = item_is_test_code(&tree, "shipped");
+
+    assert!(!test_code);
+}
+
+#[test]
+fn is_test_code_in_a_module_of_an_integration_test_is_true() {
+    let tree = decorate_targets_file("tests/common/mod.rs");
+
+    let test_code = item_is_test_code(&tree, "setup");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_in_a_module_that_opens_with_cfg_test_is_true() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = item_is_test_code(&tree, "gated_helper");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_in_an_example_is_false() {
+    let tree = decorate_targets_file("examples/demo.rs");
+
+    let test_code = item_is_test_code(&tree, "main");
+
+    assert!(!test_code);
+}
+
+#[test]
+fn is_test_code_in_an_integration_test_is_true() {
+    let tree = decorate_targets_file("tests/api.rs");
+
+    let test_code = item_is_test_code(&tree, "greets");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_on_a_cfg_all_holding_test_is_true() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = item_is_test_code(&tree, "only_with_the_feature");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_on_a_cfg_not_test_item_is_false() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = item_is_test_code(&tree, "only_outside_tests");
+
+    assert!(!test_code);
+}
+
+#[test]
+fn is_test_code_on_a_test_function_is_true() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = item_is_test_code(&tree, "a_test");
+
+    assert!(test_code);
+}
+
 /// Returns the node of the item called `name`, anywhere under `root`
 fn find_item_by_name<'a>(root: &DecoratedNode<'a>, name: &str) -> Option<DecoratedNode<'a>> {
     for child in root.named_children() {
@@ -1791,6 +1966,251 @@ fn reexports_on_an_item_the_facade_leaves_out_is_empty() {
 }
 
 #[test]
+fn target_of_a_bench_is_a_bench() {
+    let target = target_of("benches/speed.rs");
+
+    assert_eq!(target.kinds(), TargetKinds::from_iter([TargetKind::Bench]));
+}
+
+#[test]
+fn target_of_a_binary_in_src_bin_is_a_binary() {
+    let target = target_of("src/bin/tool.rs");
+
+    assert_eq!(target.kinds(), TargetKinds::from_iter([TargetKind::Binary]));
+}
+
+#[test]
+fn target_of_a_binary_in_src_bin_names_the_binary() {
+    let target = target_of("src/bin/tool.rs");
+
+    assert_eq!(target.krate(), Some("tool"));
+}
+
+#[test]
+fn target_of_a_build_script_is_a_build_script() {
+    let target = target_of("build.rs");
+
+    assert_eq!(
+        target.kinds(),
+        TargetKinds::from_iter([TargetKind::BuildScript])
+    );
+}
+
+#[test]
+fn target_of_a_build_script_names_the_build_script_crate() {
+    let target = target_of("build.rs");
+
+    assert_eq!(target.krate(), Some("build_script_build"));
+}
+
+#[test]
+fn target_of_a_library_has_the_edition_of_its_package() {
+    let target = target_of("src/lib.rs");
+
+    assert_eq!(target.edition(), Edition::Edition2021);
+}
+
+#[test]
+fn target_of_a_library_is_a_library() {
+    let target = target_of("src/lib.rs");
+
+    assert_eq!(
+        target.kinds(),
+        TargetKinds::from_iter([TargetKind::Library])
+    );
+}
+
+/// The package name holds a dash, and the crate name an underscore
+#[test]
+fn target_of_a_library_names_the_crate_with_underscores() {
+    let target = target_of("src/lib.rs");
+
+    assert_eq!(target.krate(), Some("targets_project"));
+}
+
+#[test]
+fn target_of_a_main_file_is_a_binary() {
+    let target = target_of("src/main.rs");
+
+    assert_eq!(target.kinds(), TargetKinds::from_iter([TargetKind::Binary]));
+}
+
+/// A module file is no target root, so only the crate that declares it counts
+#[test]
+fn target_of_a_module_of_an_integration_test_is_an_integration_test() {
+    let target = target_of("tests/common/mod.rs");
+
+    assert_eq!(
+        target.kinds(),
+        TargetKinds::from_iter([TargetKind::IntegrationTest])
+    );
+}
+
+#[test]
+fn target_of_a_module_the_library_and_the_binary_share_is_both() {
+    let target = target_of("src/shared.rs");
+
+    assert_eq!(
+        target.kinds(),
+        TargetKinds::from_iter([TargetKind::Library, TargetKind::Binary])
+    );
+}
+
+#[test]
+fn target_of_an_example_is_an_example() {
+    let target = target_of("examples/demo.rs");
+
+    assert_eq!(
+        target.kinds(),
+        TargetKinds::from_iter([TargetKind::Example])
+    );
+}
+
+#[test]
+fn target_of_an_integration_test_is_an_integration_test() {
+    let target = target_of("tests/api.rs");
+
+    assert_eq!(
+        target.kinds(),
+        TargetKinds::from_iter([TargetKind::IntegrationTest])
+    );
+}
+
+#[test]
+fn target_of_an_integration_test_names_its_own_crate() {
+    let target = target_of("tests/api.rs");
+
+    assert_eq!(target.krate(), Some("api"));
+}
+
+#[test]
+fn test_code_encloses_an_item_in_a_cfg_test_module() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+#[test]
+fn test_code_encloses_an_item_in_a_module_that_opens_with_cfg_test() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "gated_helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+/// `src/declared.rs` holds no mark, and `#[cfg(test)] mod declared;` makes it test code
+#[test]
+fn test_code_encloses_the_items_of_a_file_declared_under_cfg_test() {
+    let tree = decorate_targets_file("src/declared.rs");
+
+    let test_code = test_code_in(&tree, "declared_helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+#[test]
+fn test_code_encloses_the_items_of_a_file_in_a_file_that_opens_with_cfg_test() {
+    let tree = decorate_targets_file("src/gated/inner.rs");
+
+    let test_code = test_code_in(&tree, "inner_helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+#[test]
+fn test_code_encloses_the_items_of_a_file_in_a_module_declared_under_cfg_test() {
+    let tree = decorate_targets_file("src/declared/nested.rs");
+
+    let test_code = test_code_in(&tree, "nested_helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+#[test]
+fn test_code_encloses_the_items_of_a_file_that_opens_with_cfg_test() {
+    let tree = decorate_targets_file("src/gated.rs");
+
+    let test_code = test_code_in(&tree, "gated_file_helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+#[test]
+fn test_code_is_absent_on_a_cfg_not_test_item() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "only_outside_tests");
+
+    assert!(test_code.is_none());
+}
+
+#[test]
+fn test_code_is_absent_on_a_module_shared_by_shipped_targets() {
+    let tree = decorate_targets_file("src/shared.rs");
+
+    let test_code = test_code_in(&tree, "greet");
+
+    assert!(test_code.is_none());
+}
+
+#[test]
+fn test_code_is_absent_on_ordinary_code() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "shipped");
+
+    assert!(test_code.is_none());
+}
+
+#[test]
+fn test_code_marks_a_cfg_all_holding_test() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "only_with_the_feature");
+
+    assert_eq!(test_code, Some(TestCode::Marked));
+}
+
+#[test]
+fn test_code_marks_a_cfg_test_module() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "tests");
+
+    assert_eq!(test_code, Some(TestCode::Marked));
+}
+
+#[test]
+fn test_code_marks_a_module_that_opens_with_cfg_test() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "inner_gated");
+
+    assert_eq!(test_code, Some(TestCode::Marked));
+}
+
+#[test]
+fn test_code_marks_a_test_function() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "a_test");
+
+    assert_eq!(test_code, Some(TestCode::Marked));
+}
+
+#[test]
+fn test_code_marks_a_test_in_a_cfg_test_module() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "works");
+
+    assert_eq!(test_code, Some(TestCode::Marked));
+}
+
+#[test]
 fn try_operand_on_call_expression_is_the_whole_call() {
     let (text, _) = try_operand_of("returns_anyhow_result");
 
@@ -1850,6 +2270,30 @@ fn load_provider_wanting(wanted: DecorationSet) -> RustDecorationProvider {
         .wanting(wanted)
 }
 
+/// Loads the fixture of every target kind with a provider that computes only `wanted`
+fn load_targets_provider_wanting(wanted: DecorationSet) -> RustDecorationProvider {
+    RustDecorationProvider::load(&targets_fixture_path())
+        .expect("should load fixture")
+        .wanting(wanted)
+}
+
+/// Returns whether the library root of the targets fixture carries a [`Target`]
+fn library_has_target(provider: &RustDecorationProvider) -> bool {
+    let tree = decorate_file_in(provider, &targets_fixture_path(), "src/lib.rs");
+
+    tree.root_node().decoration::<Target>().is_some()
+}
+
+/// Returns whether the test `a_test` of the targets fixture carries [`TestCode`]
+fn test_has_test_code(provider: &RustDecorationProvider) -> bool {
+    let tree = decorate_file_in(provider, &targets_fixture_path(), "src/test_code.rs");
+
+    find_item_by_name(&tree.root_node(), "a_test")
+        .expect("should find the test")
+        .decoration::<TestCode>()
+        .is_some()
+}
+
 /// Returns the scrutinee of the first match in `match_on_enum`
 fn match_on_enum_scrutinee<'a>(root: &DecoratedNode<'a>) -> DecoratedNode<'a> {
     let func = find_function_by_name(root, "match_on_enum").expect("should find the function");
@@ -1889,6 +2333,24 @@ fn wanting_no_decorations_attaches_no_signature() {
     let func = find_function_by_name(&root, "match_on_enum").expect("should find the function");
 
     assert!(func.decoration::<FnSignature>().is_none());
+}
+
+#[test]
+fn wanting_no_decorations_attaches_no_target() {
+    let provider = load_targets_provider_wanting(DecorationSet::default());
+
+    let attached = library_has_target(&provider);
+
+    assert!(!attached);
+}
+
+#[test]
+fn wanting_no_decorations_attaches_no_test_code() {
+    let provider = load_targets_provider_wanting(DecorationSet::default());
+
+    let attached = test_has_test_code(&provider);
+
+    assert!(!attached);
 }
 
 #[test]
@@ -2000,6 +2462,15 @@ fn wanting_only_resolved_types_types_a_branch_value() {
 }
 
 #[test]
+fn wanting_only_signatures_leaves_a_file_without_a_target() {
+    let provider = load_targets_provider_wanting(DecorationSet::from_iter([FnSignature::KEY]));
+
+    let attached = library_has_target(&provider);
+
+    assert!(!attached);
+}
+
+#[test]
 fn wanting_only_signatures_leaves_a_scrutinee_untyped() {
     let provider = load_provider_wanting(DecorationSet::from_iter([FnSignature::KEY]));
     let tree = parse_and_decorate_fixture(&provider);
@@ -2030,6 +2501,33 @@ fn wanting_only_signatures_signs_a_function() {
     let func = find_function_by_name(&root, "match_on_enum").expect("should find the function");
 
     assert!(func.decoration::<FnSignature>().is_some());
+}
+
+#[test]
+fn wanting_only_target_attaches_a_target() {
+    let provider = load_targets_provider_wanting(DecorationSet::from_iter([Target::KEY]));
+
+    let attached = library_has_target(&provider);
+
+    assert!(attached);
+}
+
+#[test]
+fn wanting_only_target_leaves_a_test_without_test_code() {
+    let provider = load_targets_provider_wanting(DecorationSet::from_iter([Target::KEY]));
+
+    let attached = test_has_test_code(&provider);
+
+    assert!(!attached);
+}
+
+#[test]
+fn wanting_only_test_code_marks_a_test() {
+    let provider = load_targets_provider_wanting(DecorationSet::from_iter([TestCode::KEY]));
+
+    let attached = test_has_test_code(&provider);
+
+    assert!(attached);
 }
 
 #[test]

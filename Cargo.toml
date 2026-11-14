@@ -11,6 +11,7 @@ members = ["crates/*", "tools/bundle-tsrs"]
 exclude = [
   "crates/stiles-rust/tests/fixtures/lints/decoration_probes",
   "crates/stiles-rust/tests/fixtures/sample_project",
+  "crates/stiles-rust/tests/fixtures/targets_project",
   "examples/sample_project",
   "vendor",
 ]

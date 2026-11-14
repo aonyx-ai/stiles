@@ -211,21 +211,23 @@ The rule sweep of stiles-aonyx-rules and stiles-lint-rules set this list. The
 count is roughly the number of rules that work around the missing fact today, or
 read the decoration that it replaces.
 
-| Decoration    | Attaches to                          | Carries                                                      | Rules |
-| ------------- | ------------------------------------ | ------------------------------------------------------------ | ----- |
-| `Target`      | `source_file`                        | crate name, target kind, test cfg, edition                   | 11    |
-| `Resolution`  | every path and identifier that names | definition kind, crate, path, whether local, span when local | 6     |
-| `Implements`  | every type item                      | traits it implements, with whether each is derived           | 9     |
-| `Attributes`  | every item                           | attributes after `cfg` and `cfg_attr`, evaluated `doc` text  | 6     |
-| `ExprType`    | every expression                     | the `ResolvedType` of today, plus variants and their shapes  | 3     |
-| `Exposure`    | every item, associated items too     | public or internal from another crate                        | 1     |
-| `Reexports`   | every path in a `use`                | as today                                                     | 1     |
-| `FnSignature` | every function and closure           | as today, closures added                                     | 2     |
+| Decoration           | Attaches to                          | Carries                                                      | Rules |
+| -------------------- | ------------------------------------ | ------------------------------------------------------------ | ----- |
+| `Target` (shipped)   | `source_file`                        | crate name, target kinds, edition                            | 11    |
+| `TestCode` (shipped) | every item that is test code         | whether its own mark or an enclosing one makes it test code  | 11    |
+| `Resolution`         | every path and identifier that names | definition kind, crate, path, whether local, span when local | 6     |
+| `Implements`         | every type item                      | traits it implements, with whether each is derived           | 9     |
+| `Attributes`         | every item                           | attributes after `cfg` and `cfg_attr`, evaluated `doc` text  | 6     |
+| `ExprType`           | every expression                     | the `ResolvedType` of today, plus variants and their shapes  | 3     |
+| `Exposure`           | every item, associated items too     | public or internal from another crate                        | 1     |
+| `Reexports`          | every path in a `use`                | as today                                                     | 1     |
+| `FnSignature`        | every function and closure           | as today, closures added                                     | 2     |
 
 `ExprType` replaces `ResolvedType`, `AdtFlags`, and `EnumVariants` at their
 fixed positions. It carries the variant shapes that a `matches!` fix needs,
-which names alone cannot build. `Target` replaces the five `test_code.rs` copies
-and every path guess.
+which names alone cannot build. `Target` and `TestCode` replace the five
+`test_code.rs` copies and every path guess. A rule asks
+`stiles_rust::is_test_code`, which reads both.
 
 TypeScript gets `ExprType` on every expression and `Resolution` on every
 identifier from the tsrs checker. `ImportSource` stays. Its other decorations

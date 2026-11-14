@@ -14,7 +14,10 @@ use ra_ap_ide_db::famous_defs::FamousDefs;
 use ra_ap_ide_db::prime_caches::parallel_prime_caches;
 use ra_ap_ide_db::{ChangeWithProcMacros, FileId, RootDatabase};
 use ra_ap_load_cargo::{LoadCargoConfig, ProcMacroServerChoice};
-use ra_ap_project_model::{CargoConfig, ProjectManifest, ProjectWorkspace};
+use ra_ap_project_model::{
+    CargoConfig, CargoWorkspace, ProjectManifest, ProjectWorkspace, ProjectWorkspaceKind,
+    TargetData, TargetKind as CargoTargetKind,
+};
 use ra_ap_syntax::{
     AstNode, Edition, NodeOrToken, SyntaxNode, SyntaxToken, TextRange, TextSize, ast,
 };
@@ -24,14 +27,16 @@ use stiles_types::{
     DecorationIdentity, DecorationMap, DecorationProvider, DecorationSet, ProviderName,
 };
 
+use crate::decorations;
 use crate::decorations::{
     AdtFlags, AdtKind, AdtPath, EnumVariants, ErrorType, Exhaustiveness, FnSignature, ImportSource,
     ItemExposure, NeverKind, OptionKind, PublicPath, Reexports, ResolvedType, ResultKind,
-    ReturnMode, TypePath,
+    ReturnMode, TargetKind, TargetKinds, TestCode, TypePath,
 };
 
 mod change_rust_files_error;
 mod load_rust_workspace_error;
+mod test_code;
 
 pub use self::change_rust_files_error::ChangeRustFilesError;
 pub use self::load_rust_workspace_error::LoadRustWorkspaceError;
@@ -46,6 +51,10 @@ pub use self::load_rust_workspace_error::LoadRustWorkspaceError;
 /// The provider stores the workspace root. Every gap except
 /// [`CoverageGap::StaleSource`] names this root.
 ///
+/// It also keeps the kind of each Cargo target, by the root file of the
+/// target. rust-analyzer turns every target into a crate and drops the
+/// kind, so the provider reads it from the Cargo metadata before the load.
+///
 /// # Examples
 ///
 /// ```ignore
@@ -56,6 +65,7 @@ pub struct RustDecorationProvider {
     db: Mutex<RootDatabase>,
     vfs: Vfs,
     root: Arc<Path>,
+    target_kinds: HashMap<FileId, TargetKinds>,
     wanted: DecorationSet,
 }
 
@@ -86,7 +96,7 @@ impl RustDecorationProvider {
     /// ```
     ///
     /// [`wanting`]: RustDecorationProvider::wanting
-    pub const DECORATIONS: [DecorationIdentity; 8] = [
+    pub const DECORATIONS: [DecorationIdentity; 10] = [
         DecorationIdentity::of::<FnSignature>(),
         DecorationIdentity::of::<ResolvedType>(),
         DecorationIdentity::of::<AdtFlags>(),
@@ -95,6 +105,8 @@ impl RustDecorationProvider {
         DecorationIdentity::of::<ImportSource>(),
         DecorationIdentity::of::<Reexports>(),
         DecorationIdentity::of::<ItemExposure>(),
+        DecorationIdentity::of::<decorations::Target>(),
+        DecorationIdentity::of::<TestCode>(),
     ];
 
     /// Returns the provider, computing only the decoration types of `wanted`
@@ -204,6 +216,7 @@ impl RustDecorationProvider {
         }
 
         let root: Arc<Path> = Arc::from(workspace.workspace_root().as_ref() as &Path);
+        let cargo_targets = cargo_targets(&workspace);
 
         let (mut db, vfs, _proc_macro_client) =
             ra_ap_load_cargo::load_workspace(workspace, &cargo_config.extra_env, &load_config)
@@ -211,11 +224,13 @@ impl RustDecorationProvider {
 
         give_text_to_files_that_have_none(&mut db, &vfs, &root);
         prime_caches(&db);
+        let target_kinds = target_kinds_by_root_file(&vfs, cargo_targets);
 
         Ok(Self {
             db: Mutex::new(db),
             vfs,
             root,
+            target_kinds,
             wanted: Self::DECORATIONS
                 .iter()
                 .map(DecorationIdentity::key)
@@ -304,6 +319,7 @@ impl RustDecorationProvider {
             db: Mutex::new(RootDatabase::default()),
             vfs: Vfs::default(),
             root: Arc::from(Path::new(".")),
+            target_kinds: HashMap::new(),
             wanted: Self::DECORATIONS
                 .iter()
                 .map(DecorationIdentity::key)
@@ -342,6 +358,74 @@ fn prime_caches(db: &RootDatabase) {
     let crates = all_crates(db);
 
     parallel_prime_caches(db, &crates, threads, &|_progress| {});
+}
+
+/// Returns the root file and the kind of every target of the Cargo metadata
+///
+/// A project that `rust-project.json` describes has no Cargo metadata, and
+/// neither has a detached file outside a Cargo script, so both yield none.
+/// A target of a kind [`TargetKind`] cannot name yields none either.
+fn cargo_targets(workspace: &ProjectWorkspace) -> Vec<(AbsPathBuf, TargetKind)> {
+    let cargo = match &workspace.kind {
+        ProjectWorkspaceKind::Cargo { cargo, .. } => cargo,
+        ProjectWorkspaceKind::DetachedFile {
+            cargo: Some((cargo, ..)),
+            ..
+        } => cargo,
+        ProjectWorkspaceKind::DetachedFile { cargo: None, .. } | ProjectWorkspaceKind::Json(_) => {
+            return Vec::new();
+        }
+    };
+
+    targets_of(cargo)
+}
+
+/// Returns the root file and the kind of every target of `cargo`
+fn targets_of(cargo: &CargoWorkspace) -> Vec<(AbsPathBuf, TargetKind)> {
+    cargo
+        .packages()
+        .flat_map(|package| cargo[package].targets.iter())
+        .filter_map(|&target| {
+            let TargetData { root, kind, .. } = &cargo[target];
+            Some((root.clone(), target_kind(*kind)?))
+        })
+        .collect()
+}
+
+/// Returns the kind of a Cargo target, or [`None`] for one Cargo left unnamed
+fn target_kind(kind: CargoTargetKind) -> Option<TargetKind> {
+    match kind {
+        CargoTargetKind::Lib { .. } => Some(TargetKind::Library),
+        CargoTargetKind::Bin => Some(TargetKind::Binary),
+        CargoTargetKind::Test => Some(TargetKind::IntegrationTest),
+        CargoTargetKind::Bench => Some(TargetKind::Bench),
+        CargoTargetKind::Example => Some(TargetKind::Example),
+        CargoTargetKind::BuildScript => Some(TargetKind::BuildScript),
+        CargoTargetKind::Other => None,
+    }
+}
+
+/// Returns the kinds of the targets whose root is each interned file
+///
+/// Two targets can share a root file, so a file can carry several kinds. A
+/// root that the load did not intern, or that it excluded, names no crate.
+/// The map leaves such a root out.
+fn target_kinds_by_root_file(
+    vfs: &Vfs,
+    targets: Vec<(AbsPathBuf, TargetKind)>,
+) -> HashMap<FileId, TargetKinds> {
+    let mut kinds: HashMap<FileId, TargetKinds> = HashMap::new();
+
+    for (root, kind) in targets {
+        let file_id = match vfs.file_id(&VfsPath::from(root)) {
+            Some((file_id, FileExcluded::No)) => file_id,
+            Some((_, FileExcluded::Yes)) | None => continue,
+        };
+        let entry = kinds.entry(file_id).or_default();
+        *entry = entry.with(kind);
+    }
+
+    kinds
 }
 
 /// Records lossy UTF-8 text for interned files under `root` that have none
@@ -473,19 +557,66 @@ impl DecorationProvider for RustDecorationProvider {
                 return Coverage::NotCovered(CoverageGap::StaleSource);
             }
 
-            match targets.is_empty() {
-                true => Coverage::Covered(DecorationMap::new()),
-                false => Coverage::Covered(resolve_targets(
-                    &sema,
-                    file_id,
-                    module,
-                    &targets,
-                    &self.wanted,
-                )),
-            }
+            let mut decorations = WantedDecorations {
+                decorations: match targets.is_empty() {
+                    true => DecorationMap::new(),
+                    false => resolve_targets(&sema, file_id, module, &targets, &self.wanted),
+                },
+                wanted: &self.wanted,
+            };
+            decorations.insert(tree.root_node().id(), || {
+                Some(file_target(&sema, file_id, module, &self.target_kinds))
+            });
+            decorations.insert_each(|| {
+                self::test_code::collect_test_code(
+                    &tree.root_node(),
+                    self::test_code::file_scope(&sema, file_id),
+                )
+            });
+
+            Coverage::Covered(decorations.decorations)
         });
 
         Ok(coverage)
+    }
+}
+
+/// Returns the crate, the target kinds, and the edition of a file
+///
+/// The crate and the edition are those of `module`, the module the other
+/// decorations of the file resolve in. The kinds cover every crate whose
+/// module tree holds the file, because rust-analyzer gives each Cargo
+/// target a crate of its own. A crate whose root `target_kinds` leaves out,
+/// such as a crate of the sysroot, adds no kind.
+fn file_target(
+    sema: &Semantics<'_, RootDatabase>,
+    file_id: FileId,
+    module: Module,
+    target_kinds: &HashMap<FileId, TargetKinds>,
+) -> decorations::Target {
+    let db = sema.db;
+    let krate = module.krate(db);
+    let kinds = sema
+        .file_to_module_defs(file_id)
+        .filter_map(|module| target_kinds.get(&module.krate(db).root_file(db)))
+        .flat_map(|kinds| kinds.iter())
+        .collect();
+    let name = krate.display_name(db).map(|name| name.to_string());
+
+    decorations::Target::builder()
+        .maybe_krate(name.as_deref())
+        .kinds(kinds)
+        .edition(edition_of(krate.edition(db)))
+        .build()
+}
+
+/// Returns the edition of rust-analyzer as the edition a rule reads
+fn edition_of(edition: Edition) -> decorations::Edition {
+    match edition {
+        Edition::Edition2015 => decorations::Edition::Edition2015,
+        Edition::Edition2018 => decorations::Edition::Edition2018,
+        Edition::Edition2021 => decorations::Edition::Edition2021,
+        Edition::Edition2024 => decorations::Edition::Edition2024,
     }
 }
 
@@ -607,6 +738,19 @@ impl WantedDecorations<'_> {
             return;
         }
         if let Some(value) = build() {
+            self.decorations.insert(node_id, value);
+        }
+    }
+
+    /// Attaches each value `build` returns to its node, when a pass reads `D`
+    ///
+    /// `build` runs only when `wanted` holds `D`. It suits a type that one
+    /// walk of the file finds on many nodes at once.
+    fn insert_each<D: Decoration>(&mut self, build: impl FnOnce() -> Vec<(usize, D)>) {
+        if !self.wanted.contains_any(&[D::KEY]) {
+            return;
+        }
+        for (node_id, value) in build() {
             self.decorations.insert(node_id, value);
         }
     }
@@ -1777,6 +1921,7 @@ mod tests {
             db: Mutex::new(RootDatabase::default()),
             vfs,
             root: Arc::from(Path::new("/")),
+            target_kinds: HashMap::new(),
             wanted: RustDecorationProvider::DECORATIONS
                 .iter()
                 .map(DecorationIdentity::key)
