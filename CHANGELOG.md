@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-11-14
+
+### Added
+
+- The Rust provider names what each identifier, type, and path refers to, through globs and re-exports ([#678])
+
 ## [0.8.1] - 2026-11-14
 
 ### Added
@@ -177,3 +183,5 @@ and this project adheres to
 [#668]: https://github.com/aonyx-ai/stiles/pull/668
 [0.8.1]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.8.1
 [#673]: https://github.com/aonyx-ai/stiles/pull/673
+[0.8.2]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.8.2
+[#678]: https://github.com/aonyx-ai/stiles/pull/678
