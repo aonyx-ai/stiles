@@ -20,6 +20,12 @@ pub mod kinds {
     }
 }
 
+pub mod renamed {
+    pub struct Opened;
+
+    pub struct Shut;
+}
+
 pub mod globbed {
     pub fn tally() -> u8 {
         1
@@ -105,4 +111,16 @@ pub fn takes_a_point_in_its_signature(point: Point) -> Point {
 
 pub fn calls_a_macro() -> u8 {
     twice!(2)
+}
+
+pub fn reads_a_local_named_like_a_module() -> u8 {
+    let kinds = 1;
+    kinds + 1
+}
+
+pub fn imports_a_name_that_another_import_holds() -> u8 {
+    use self::renamed::{Opened as Renamed, Shut};
+
+    let _ = (Renamed, Shut);
+    0
 }

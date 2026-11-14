@@ -2284,6 +2284,29 @@ fn resolution_of_a_local_binding_is_a_local_binding() {
     );
 }
 
+/// A local shadows the module `kinds` in an expression, which reads values
+#[test]
+fn resolution_of_a_local_named_like_a_module_is_a_local_binding() {
+    let kinds: Vec<Option<DefinitionKind>> = resolutions_of(
+        "reads_a_local_named_like_a_module",
+        Spelling {
+            kind: "identifier",
+            text: "kinds",
+        },
+    )
+    .iter()
+    .map(|resolution| resolution.as_ref().map(Resolution::kind))
+    .collect();
+
+    assert_eq!(
+        kinds,
+        [
+            Some(DefinitionKind::LocalBinding),
+            Some(DefinitionKind::LocalBinding)
+        ]
+    );
+}
+
 #[test]
 fn resolution_of_a_macro_call_is_a_macro() {
     let kind = resolution_kind_of(
@@ -2363,6 +2386,23 @@ fn resolution_of_a_module_qualifier_is_the_module() {
     );
 
     assert_eq!(path.as_deref(), Some("facade_core::thing"));
+}
+
+/// The list continues the path before it, though the file imports another `Opened`
+#[test]
+fn resolution_of_a_name_in_a_use_list_is_the_item_the_list_imports() {
+    let path = resolution_path_of(
+        "imports_a_name_that_another_import_holds",
+        Spelling {
+            kind: "identifier",
+            text: "Opened",
+        },
+    );
+
+    assert_eq!(
+        path.as_deref(),
+        Some("sample_project::resolution::renamed::Opened")
+    );
 }
 
 #[test]
