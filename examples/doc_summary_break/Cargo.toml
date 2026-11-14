@@ -27,14 +27,14 @@ license = "Apache-2.0 OR MIT"
 # >
 
 [dependencies]
-stiles-plugin = "=0.1.0"
-stiles-rust = { version = "=0.1.0", default-features = false }
-stiles-types = "=0.1.0"
+stiles-plugin = "=0.8.0"
+stiles-rust = { version = "=0.8.0", default-features = false }
+stiles-types = "=0.8.0"
 
 [lib]
 crate-type = ["cdylib"]
 
 # <
 [dev-dependencies]
-stiles-testing = "=0.1.0"
+stiles-testing = "=0.8.0"
 # >
