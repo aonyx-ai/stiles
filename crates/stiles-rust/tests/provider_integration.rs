@@ -5,8 +5,9 @@ use std::sync::OnceLock;
 
 use decoration_probes::{AnyhowBareTry, FunctionScopedImport, WildcardMatchArm};
 use stiles_rust::decorations::{
-    AdtFlags, AdtPath, Edition, EnumVariants, FnSignature, ImportSource, ItemExposure, PublicPath,
-    Reexports, ResolvedType, ReturnMode, Target, TargetKind, TargetKinds, TestCode, TypePathRef,
+    AdtFlags, AdtPath, DefinitionKind, DefinitionOrigin, Edition, EnumVariants, FnSignature,
+    ImportSource, ItemExposure, PublicPath, Reexports, Resolution, ResolvedType, ReturnMode,
+    Target, TargetKind, TargetKinds, TestCode, TypePathRef,
 };
 use stiles_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter, is_test_code};
 use stiles_types::{
@@ -103,6 +104,28 @@ fn changed_files_project(name: &str) -> PathBuf {
     .expect("should write the fixture manifest");
     std::fs::write(root.join("src/lib.rs"), "pub fn one() -> u8 {\n    1\n}\n")
         .expect("should write the fixture crate root");
+
+    root
+}
+
+/// Writes a Cargo project that calls a function no crate defines
+///
+/// Rustc rejects the call, so it cannot sit in a fixture that compiles.
+/// Rust-analyzer resolves the name to nothing, and the provider must then
+/// attach no [`Resolution`].
+fn unresolved_name_project() -> PathBuf {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("unresolved_name_project");
+    std::fs::create_dir_all(root.join("src")).expect("should create the fixture directories");
+    std::fs::write(
+        root.join("Cargo.toml"),
+        "[workspace]\n\n[package]\nname = \"unresolved_name_project\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .expect("should write the fixture manifest");
+    std::fs::write(
+        root.join("src/lib.rs"),
+        "pub fn calls_nothing() -> u8 {\n    nowhere()\n}\n",
+    )
+    .expect("should write the fixture crate root");
 
     root
 }
@@ -1965,6 +1988,570 @@ fn reexports_on_an_item_the_facade_leaves_out_is_empty() {
     }
 }
 
+/// A name as a test looks it up: the kind of its node and its text
+///
+/// One function can spell a name as more than one kind of node, such as
+/// `make` alone and `facade::thing::make` around it.
+#[derive(Copy, Clone)]
+struct Spelling<'a> {
+    kind: &'a str,
+    text: &'a str,
+}
+
+/// Collects every node under `node` that matches `spelling`, in the order of the source
+fn find_all_spelled<'a>(
+    node: &DecoratedNode<'a>,
+    spelling: Spelling<'_>,
+    found: &mut Vec<DecoratedNode<'a>>,
+) {
+    let Spelling { kind, text } = spelling;
+    if node.kind() == kind && node.text() == text {
+        found.push(*node);
+    }
+    for child in node.named_children() {
+        find_all_spelled(&child, spelling, found);
+    }
+}
+
+/// Returns the [`Resolution`] of every node in `function` that matches `spelling`
+///
+/// The function sits in `src/resolution.rs` of the sample fixture. The
+/// nodes come in the order of the source.
+fn resolutions_of(function: &str, spelling: Spelling<'_>) -> Vec<Option<Resolution>> {
+    let tree = decorate_fixture_file(load_provider(), "src/resolution.rs");
+    let func = find_function_by_name(&tree.root_node(), function)
+        .unwrap_or_else(|| panic!("should find {function}"));
+    let mut found = Vec::new();
+    find_all_spelled(&func, spelling, &mut found);
+    if found.is_empty() {
+        let Spelling { kind, text } = spelling;
+        panic!("{function} should spell {text} as {kind}");
+    }
+
+    found
+        .iter()
+        .map(|node| node.decoration::<Resolution>().cloned())
+        .collect()
+}
+
+/// Returns the [`Resolution`] of the first node in `function` that matches `spelling`
+fn resolution_of(function: &str, spelling: Spelling<'_>) -> Option<Resolution> {
+    resolutions_of(function, spelling).swap_remove(0)
+}
+
+/// Returns the kind of definition of the first node that matches `spelling`
+fn resolution_kind_of(function: &str, spelling: Spelling<'_>) -> Option<DefinitionKind> {
+    resolution_of(function, spelling).map(|resolution| resolution.kind())
+}
+
+/// Returns the rendered path of the first node that matches `spelling`
+fn resolution_path_of(function: &str, spelling: Spelling<'_>) -> Option<String> {
+    resolution_of(function, spelling)?
+        .path()
+        .map(ToString::to_string)
+}
+
+/// Returns the rendered parent of the first node that matches `spelling`
+fn resolution_parent_of(function: &str, spelling: Spelling<'_>) -> Option<String> {
+    resolution_of(function, spelling)?
+        .parent()
+        .map(ToString::to_string)
+}
+
+/// Returns the [`Resolution`] of the type that the first struct pattern of `function` names
+fn struct_pattern_resolution(function: &str) -> Option<Resolution> {
+    let tree = decorate_fixture_file(load_provider(), "src/resolution.rs");
+    let func = find_function_by_name(&tree.root_node(), function)
+        .unwrap_or_else(|| panic!("should find {function}"));
+    let pattern =
+        find_first_node_of_kind(&func, "struct_pattern").expect("should find a struct pattern");
+
+    pattern
+        .child_by_field_name("type")
+        .expect("a struct pattern names its type")
+        .decoration::<Resolution>()
+        .cloned()
+}
+
+/// A name rust-analyzer resolves to nothing carries no decoration
+#[test]
+fn resolution_is_absent_on_a_name_that_resolves_to_nothing() {
+    let root = unresolved_name_project();
+    let provider = RustDecorationProvider::load(&root).expect("should load the fixture");
+    let tree = decorate_file_in(&provider, &root, "src/lib.rs");
+    let func = find_function_by_name(&tree.root_node(), "calls_nothing")
+        .expect("should find the function");
+    let mut found = Vec::new();
+    find_all_spelled(
+        &func,
+        Spelling {
+            kind: "identifier",
+            text: "nowhere",
+        },
+        &mut found,
+    );
+
+    let resolution = found
+        .first()
+        .expect("the function should call `nowhere`")
+        .decoration::<Resolution>();
+
+    assert!(resolution.is_none());
+}
+
+/// The name of an item defines it and refers to nothing
+#[test]
+fn resolution_is_absent_on_the_name_of_a_function() {
+    let resolution = resolution_of(
+        "calls_a_macro",
+        Spelling {
+            kind: "identifier",
+            text: "calls_a_macro",
+        },
+    );
+
+    assert!(resolution.is_none());
+}
+
+#[test]
+fn resolution_of_a_binding_in_a_tuple_struct_pattern_is_a_local_binding() {
+    let kind = resolution_kind_of(
+        "matches_a_struct_and_a_variant",
+        Spelling {
+            kind: "identifier",
+            text: "count",
+        },
+    );
+
+    assert_eq!(kind, Some(DefinitionKind::LocalBinding));
+}
+
+/// An item of a trait impl spells its path through the trait, not the type
+#[test]
+fn resolution_of_a_call_into_a_trait_impl_names_the_trait() {
+    let path = resolution_path_of(
+        "calls_a_trait_method",
+        Spelling {
+            kind: "field_identifier",
+            text: "describe",
+        },
+    );
+
+    assert_eq!(
+        path.as_deref(),
+        Some("sample_project::resolution::Describe::describe")
+    );
+}
+
+#[test]
+fn resolution_of_a_call_through_a_glob_is_in_the_same_crate() {
+    let origin = resolution_of(
+        "calls_through_a_glob",
+        Spelling {
+            kind: "identifier",
+            text: "tally",
+        },
+    )
+    .map(|resolution| resolution.origin());
+
+    assert_eq!(origin, Some(DefinitionOrigin::SameCrate));
+}
+
+#[test]
+fn resolution_of_a_call_through_a_glob_is_the_function() {
+    let path = resolution_path_of(
+        "calls_through_a_glob",
+        Spelling {
+            kind: "identifier",
+            text: "tally",
+        },
+    );
+
+    assert_eq!(
+        path.as_deref(),
+        Some("sample_project::resolution::globbed::tally")
+    );
+}
+
+#[test]
+fn resolution_of_a_call_through_a_reexport_is_in_another_crate() {
+    let origin = resolution_of(
+        "calls_through_a_reexport",
+        Spelling {
+            kind: "scoped_identifier",
+            text: "facade::thing::make",
+        },
+    )
+    .map(|resolution| resolution.origin());
+
+    assert_eq!(origin, Some(DefinitionOrigin::OtherCrate));
+}
+
+/// `facade::thing` re-exports the module that `facade_core` defines
+#[test]
+fn resolution_of_a_call_through_a_reexport_is_the_definition() {
+    let path = resolution_path_of(
+        "calls_through_a_reexport",
+        Spelling {
+            kind: "scoped_identifier",
+            text: "facade::thing::make",
+        },
+    );
+
+    assert_eq!(path.as_deref(), Some("facade_core::thing::make"));
+}
+
+#[test]
+fn resolution_of_a_call_through_a_use_is_a_function() {
+    let kind = resolution_kind_of(
+        "calls_through_a_use",
+        Spelling {
+            kind: "identifier",
+            text: "make",
+        },
+    );
+
+    assert_eq!(kind, Some(DefinitionKind::Function));
+}
+
+#[test]
+fn resolution_of_a_call_through_a_use_is_the_function() {
+    let path = resolution_path_of(
+        "calls_through_a_use",
+        Spelling {
+            kind: "identifier",
+            text: "make",
+        },
+    );
+
+    assert_eq!(path.as_deref(), Some("facade_core::thing::make"));
+}
+
+/// The first segment of a path names the crate, which has no path itself
+#[test]
+fn resolution_of_a_crate_segment_names_the_crate() {
+    let krate = resolution_of(
+        "calls_through_a_reexport",
+        Spelling {
+            kind: "identifier",
+            text: "facade",
+        },
+    )
+    .map(|resolution| (resolution.kind(), resolution.krate().map(str::to_owned)));
+
+    assert_eq!(
+        krate,
+        Some((DefinitionKind::Crate, Some("facade".to_owned())))
+    );
+}
+
+#[test]
+fn resolution_of_a_local_binding_has_no_path() {
+    let paths: Vec<bool> = resolutions_of(
+        "reads_a_local_binding",
+        Spelling {
+            kind: "identifier",
+            text: "total",
+        },
+    )
+    .iter()
+    .map(|resolution| resolution.as_ref().and_then(Resolution::path).is_some())
+    .collect();
+
+    assert_eq!(paths, [false, false]);
+}
+
+/// The binding and the read of `total` both resolve to the binding
+#[test]
+fn resolution_of_a_local_binding_is_a_local_binding() {
+    let kinds: Vec<Option<DefinitionKind>> = resolutions_of(
+        "reads_a_local_binding",
+        Spelling {
+            kind: "identifier",
+            text: "total",
+        },
+    )
+    .iter()
+    .map(|resolution| resolution.as_ref().map(Resolution::kind))
+    .collect();
+
+    assert_eq!(
+        kinds,
+        [
+            Some(DefinitionKind::LocalBinding),
+            Some(DefinitionKind::LocalBinding)
+        ]
+    );
+}
+
+#[test]
+fn resolution_of_a_macro_call_is_a_macro() {
+    let kind = resolution_kind_of(
+        "calls_a_macro",
+        Spelling {
+            kind: "identifier",
+            text: "twice",
+        },
+    );
+
+    assert_eq!(kind, Some(DefinitionKind::Macro));
+}
+
+#[test]
+fn resolution_of_a_macro_call_is_the_macro() {
+    let path = resolution_path_of(
+        "calls_a_macro",
+        Spelling {
+            kind: "identifier",
+            text: "twice",
+        },
+    );
+
+    assert_eq!(path.as_deref(), Some("sample_project::resolution::twice"));
+}
+
+#[test]
+fn resolution_of_a_method_call_is_a_method() {
+    let kind = resolution_kind_of(
+        "calls_a_method",
+        Spelling {
+            kind: "field_identifier",
+            text: "sum",
+        },
+    );
+
+    assert_eq!(kind, Some(DefinitionKind::Method));
+}
+
+#[test]
+fn resolution_of_a_method_call_names_its_type() {
+    let parent = resolution_parent_of(
+        "calls_a_method",
+        Spelling {
+            kind: "field_identifier",
+            text: "sum",
+        },
+    );
+
+    assert_eq!(parent.as_deref(), Some("sample_project::resolution::Point"));
+}
+
+#[test]
+fn resolution_of_a_method_call_spells_its_path_through_its_type() {
+    let path = resolution_path_of(
+        "calls_a_method",
+        Spelling {
+            kind: "field_identifier",
+            text: "sum",
+        },
+    );
+
+    assert_eq!(
+        path.as_deref(),
+        Some("sample_project::resolution::Point::sum")
+    );
+}
+
+#[test]
+fn resolution_of_a_module_qualifier_is_the_module() {
+    let path = resolution_path_of(
+        "calls_through_a_reexport",
+        Spelling {
+            kind: "scoped_identifier",
+            text: "facade::thing",
+        },
+    );
+
+    assert_eq!(path.as_deref(), Some("facade_core::thing"));
+}
+
+#[test]
+fn resolution_of_a_primitive_type_is_builtin() {
+    let origin = resolution_of(
+        "calls_through_a_glob",
+        Spelling {
+            kind: "primitive_type",
+            text: "u8",
+        },
+    )
+    .map(|resolution| resolution.origin());
+
+    assert_eq!(origin, Some(DefinitionOrigin::Builtin));
+}
+
+#[test]
+fn resolution_of_a_shorthand_field_pattern_is_a_local_binding() {
+    let kind = resolution_kind_of(
+        "destructures_a_struct",
+        Spelling {
+            kind: "shorthand_field_identifier",
+            text: "x",
+        },
+    );
+
+    assert_eq!(kind, Some(DefinitionKind::LocalBinding));
+}
+
+#[test]
+fn resolution_of_a_struct_pattern_is_a_struct() {
+    let kind =
+        struct_pattern_resolution("destructures_a_struct").map(|resolution| resolution.kind());
+
+    assert_eq!(kind, Some(DefinitionKind::Struct));
+}
+
+#[test]
+fn resolution_of_a_struct_pattern_is_the_struct() {
+    let path = struct_pattern_resolution("destructures_a_struct")
+        .and_then(|resolution| resolution.path().map(ToString::to_string));
+
+    assert_eq!(path.as_deref(), Some("sample_project::resolution::Point"));
+}
+
+/// `use Kind::*` brings the variant in, so the pattern names no struct
+#[test]
+fn resolution_of_a_tuple_struct_pattern_of_a_glob_variant_is_a_variant() {
+    let kind = resolution_kind_of(
+        "matches_a_struct_and_a_variant",
+        Spelling {
+            kind: "identifier",
+            text: "Pending",
+        },
+    );
+
+    assert_eq!(kind, Some(DefinitionKind::EnumVariant));
+}
+
+#[test]
+fn resolution_of_a_tuple_struct_pattern_of_a_glob_variant_names_its_enum() {
+    let parent = resolution_parent_of(
+        "matches_a_struct_and_a_variant",
+        Spelling {
+            kind: "identifier",
+            text: "Pending",
+        },
+    );
+
+    assert_eq!(
+        parent.as_deref(),
+        Some("sample_project::resolution::kinds::Kind")
+    );
+}
+
+#[test]
+fn resolution_of_a_tuple_struct_pattern_of_a_glob_variant_spells_its_path_through_its_enum() {
+    let path = resolution_path_of(
+        "matches_a_struct_and_a_variant",
+        Spelling {
+            kind: "identifier",
+            text: "Pending",
+        },
+    );
+
+    assert_eq!(
+        path.as_deref(),
+        Some("sample_project::resolution::kinds::Kind::Pending")
+    );
+}
+
+#[test]
+fn resolution_of_a_tuple_struct_pattern_of_a_struct_is_a_struct() {
+    let kind = resolution_kind_of(
+        "matches_a_struct_and_a_variant",
+        Spelling {
+            kind: "identifier",
+            text: "Opened",
+        },
+    );
+
+    assert_eq!(kind, Some(DefinitionKind::Struct));
+}
+
+/// `Some` comes from the prelude, so its enum is the one of `core`
+#[test]
+fn resolution_of_a_tuple_struct_pattern_of_some_names_core_option() {
+    let parent = resolution_parent_of(
+        "matches_a_struct_and_a_variant",
+        Spelling {
+            kind: "identifier",
+            text: "Some",
+        },
+    );
+
+    assert_eq!(parent.as_deref(), Some("core::option::Option"));
+}
+
+/// Both mentions of `Point` in the signature name the struct
+#[test]
+fn resolution_of_a_type_in_a_signature_is_the_struct() {
+    let kinds: Vec<Option<DefinitionKind>> = resolutions_of(
+        "takes_a_point_in_its_signature",
+        Spelling {
+            kind: "type_identifier",
+            text: "Point",
+        },
+    )
+    .iter()
+    .map(|resolution| resolution.as_ref().map(Resolution::kind))
+    .collect();
+
+    assert_eq!(
+        kinds,
+        [Some(DefinitionKind::Struct), Some(DefinitionKind::Struct)]
+    );
+}
+
+/// A unit variant in a pattern is a variant in scope, not a new binding
+#[test]
+fn resolution_of_a_unit_variant_pattern_is_a_variant() {
+    let kind = resolution_kind_of(
+        "matches_a_struct_and_a_variant",
+        Spelling {
+            kind: "identifier",
+            text: "Closed",
+        },
+    );
+
+    assert_eq!(kind, Some(DefinitionKind::EnumVariant));
+}
+
+/// `Self` in an impl names the type the impl is for
+#[test]
+fn resolution_of_self_in_an_impl_names_its_type() {
+    let path = resolution_path_of(
+        "origin",
+        Spelling {
+            kind: "type_identifier",
+            text: "Self",
+        },
+    );
+
+    assert_eq!(path.as_deref(), Some("sample_project::resolution::Point"));
+}
+
+/// The name at the end of a path refers to what the whole path refers to
+#[test]
+fn resolution_of_the_last_name_of_a_path_matches_the_path() {
+    let name = resolution_of(
+        "calls_through_a_reexport",
+        Spelling {
+            kind: "identifier",
+            text: "make",
+        },
+    );
+
+    assert_eq!(
+        name,
+        resolution_of(
+            "calls_through_a_reexport",
+            Spelling {
+                kind: "scoped_identifier",
+                text: "facade::thing::make"
+            }
+        )
+    );
+}
+
 #[test]
 fn target_of_a_bench_is_a_bench() {
     let target = target_of("benches/speed.rs");
@@ -2277,6 +2864,28 @@ fn load_targets_provider_wanting(wanted: DecorationSet) -> RustDecorationProvide
         .wanting(wanted)
 }
 
+/// Returns whether the method call of `calls_a_method` carries a [`Resolution`]
+fn method_call_is_resolved(provider: &RustDecorationProvider) -> bool {
+    let tree = decorate_fixture_file(provider, "src/resolution.rs");
+    let func = find_function_by_name(&tree.root_node(), "calls_a_method")
+        .expect("should find the function");
+    let mut found = Vec::new();
+    find_all_spelled(
+        &func,
+        Spelling {
+            kind: "field_identifier",
+            text: "sum",
+        },
+        &mut found,
+    );
+
+    found
+        .first()
+        .expect("the function should call `sum`")
+        .decoration::<Resolution>()
+        .is_some()
+}
+
 /// Returns whether the library root of the targets fixture carries a [`Target`]
 fn library_has_target(provider: &RustDecorationProvider) -> bool {
     let tree = decorate_file_in(provider, &targets_fixture_path(), "src/lib.rs");
@@ -2322,6 +2931,15 @@ fn wanting_item_exposure_decorates_an_item() {
     let item = find_item_by_name(&root, "exposed_to_the_crate").expect("should find the item");
 
     assert!(item.decoration::<ItemExposure>().is_some());
+}
+
+#[test]
+fn wanting_no_decorations_attaches_no_resolution() {
+    let provider = load_provider_wanting(DecorationSet::default());
+
+    let resolved = method_call_is_resolved(&provider);
+
+    assert!(!resolved);
 }
 
 #[test]
@@ -2449,6 +3067,15 @@ fn wanting_only_enum_variants_names_the_variants_of_a_branch_value() {
     assert_eq!(variants, COLORS);
 }
 
+#[test]
+fn wanting_only_resolution_resolves_a_method_call() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([Resolution::KEY]));
+
+    let resolved = method_call_is_resolved(&provider);
+
+    assert!(resolved);
+}
+
 /// A branch value is typed for a pass that reads types and no variants
 #[test]
 fn wanting_only_resolved_types_types_a_branch_value() {
@@ -2468,6 +3095,15 @@ fn wanting_only_signatures_leaves_a_file_without_a_target() {
     let attached = library_has_target(&provider);
 
     assert!(!attached);
+}
+
+#[test]
+fn wanting_only_signatures_leaves_a_method_call_unresolved() {
+    let provider = load_provider_wanting(DecorationSet::from_iter([FnSignature::KEY]));
+
+    let resolved = method_call_is_resolved(&provider);
+
+    assert!(!resolved);
 }
 
 #[test]

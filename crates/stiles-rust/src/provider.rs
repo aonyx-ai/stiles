@@ -6,10 +6,12 @@ use std::sync::{Arc, Mutex};
 
 use ra_ap_hir::import_map::{ImportInfo, ImportMap};
 use ra_ap_hir::{
-    Adt, AsAssocItem as _, Crate, CrateDependency, Enum, Function, HasAttrs, HirDisplay, ItemInNs,
-    Module, ModuleDef, Name, PathResolution, ScopeDef, Semantics, Type, attach_db,
+    Adt, AsAssocItem as _, AssocItem, AssocItemContainer, Crate, CrateDependency, Enum, Function,
+    GenericParam, HasAttrs, HirDisplay, ItemInNs, Module, ModuleDef, Name, PathResolution,
+    ScopeDef, Semantics, Type, attach_db,
 };
 use ra_ap_ide_db::base_db::{SourceDatabase as _, VfsPath, all_crates};
+use ra_ap_ide_db::defs::{Definition, NameClass, NameRefClass};
 use ra_ap_ide_db::famous_defs::FamousDefs;
 use ra_ap_ide_db::prime_caches::parallel_prime_caches;
 use ra_ap_ide_db::{ChangeWithProcMacros, FileId, RootDatabase};
@@ -29,9 +31,10 @@ use stiles_types::{
 
 use crate::decorations;
 use crate::decorations::{
-    AdtFlags, AdtKind, AdtPath, EnumVariants, ErrorType, Exhaustiveness, FnSignature, ImportSource,
-    ItemExposure, NeverKind, OptionKind, PublicPath, Reexports, ResolvedType, ResultKind,
-    ReturnMode, TargetKind, TargetKinds, TestCode, TypePath,
+    AdtFlags, AdtKind, AdtPath, DefinitionKind, DefinitionOrigin, EnumVariants, ErrorType,
+    Exhaustiveness, FnSignature, ImportSource, ItemExposure, NeverKind, OptionKind, PublicPath,
+    Reexports, Resolution, ResolvedType, ResultKind, ReturnMode, TargetKind, TargetKinds, TestCode,
+    TypePath,
 };
 
 mod change_rust_files_error;
@@ -96,7 +99,7 @@ impl RustDecorationProvider {
     /// ```
     ///
     /// [`wanting`]: RustDecorationProvider::wanting
-    pub const DECORATIONS: [DecorationIdentity; 10] = [
+    pub const DECORATIONS: [DecorationIdentity; 11] = [
         DecorationIdentity::of::<FnSignature>(),
         DecorationIdentity::of::<ResolvedType>(),
         DecorationIdentity::of::<AdtFlags>(),
@@ -107,6 +110,7 @@ impl RustDecorationProvider {
         DecorationIdentity::of::<ItemExposure>(),
         DecorationIdentity::of::<decorations::Target>(),
         DecorationIdentity::of::<TestCode>(),
+        DecorationIdentity::of::<Resolution>(),
     ];
 
     /// Returns the provider, computing only the decoration types of `wanted`
@@ -654,6 +658,7 @@ fn resolve_targets(
     };
 
     let mut module_paths = ModulePaths::default();
+    let mut names = NameResolutions::default();
     let mut decorations = WantedDecorations {
         decorations: DecorationMap::new(),
         wanted,
@@ -711,6 +716,13 @@ fn resolve_targets(
             }
             Target::ModuleItem { node_id, range } => {
                 decorations.insert(*node_id, || resolve_item_exposure(&ctx, *range));
+            }
+            Target::Name {
+                node_id,
+                name,
+                path_start,
+            } => {
+                decorations.insert(*node_id, || names.of(&ctx, *name, *path_start));
             }
         }
     }
@@ -810,6 +822,16 @@ enum Target {
         node_id: usize,
         range: TextRange,
     },
+    /// A name, or a path, whose definition the provider looks up
+    ///
+    /// `name` spans the identifier the lookup starts from, which is the
+    /// last segment of a path. A path also records where it starts, so
+    /// the lookup can check that both parsers see the same path.
+    Name {
+        node_id: usize,
+        name: TextRange,
+        path_start: Option<TextSize>,
+    },
 }
 
 /// Converts a byte range into rust-analyzer's 32-bit one
@@ -836,6 +858,17 @@ fn text_range_of(node: &DecoratedNode<'_>) -> Option<TextRange> {
 }
 
 fn collect_targets(node: &DecoratedNode<'_>, wanted: &DecorationSet, targets: &mut Vec<Target>) {
+    match node.kind() {
+        "token_tree" | "token_tree_pattern" => return,
+        _ => {}
+    }
+
+    if wanted.contains_any(&[Resolution::KEY])
+        && let Some(target) = name_target(node)
+    {
+        targets.push(target);
+    }
+
     if wanted.contains_any(&[ItemExposure::KEY])
         && is_module_item(node)
         && let Some(range) = text_range_of(node)
@@ -1075,6 +1108,70 @@ fn collect_import_paths(node: &DecoratedNode<'_>, targets: &mut Vec<Target>) {
         }
         _ => {}
     }
+}
+
+/// Returns the target of a node that names a definition, if it is one
+///
+/// A leaf name spans its own identifier. A scoped path looks the name up
+/// from its last segment, and records its start for the check of both
+/// parsers. A field counts only where it names the method of a call.
+/// Every other node names nothing that [`Resolution`] describes.
+fn name_target(node: &DecoratedNode<'_>) -> Option<Target> {
+    let (name, path_start) = match node.kind() {
+        "identifier" | "type_identifier" | "primitive_type" | "shorthand_field_identifier" => {
+            (*node, None)
+        }
+        "field_identifier" => {
+            names_a_called_method(node).then_some(())?;
+            (*node, None)
+        }
+        "scoped_identifier" | "scoped_type_identifier" => {
+            let name = node.child_by_field_name("name")?;
+            match name.kind() {
+                "identifier" | "type_identifier" => {}
+                _ => return None,
+            }
+            (name, Some(text_range_of(node)?.start()))
+        }
+        _ => return None,
+    };
+
+    Some(Target::Name {
+        node_id: node.id(),
+        name: text_range_of(&name)?,
+        path_start,
+    })
+}
+
+/// Returns whether a field identifier names the method of a call
+///
+/// Tree-sitter parses `value.name()` as a call of a field expression, and
+/// `value.name::<T>()` as a call of a generic function around it.
+fn names_a_called_method(field: &DecoratedNode<'_>) -> bool {
+    let Some(access) = field.parent() else {
+        return false;
+    };
+    if access.kind() != "field_expression" {
+        return false;
+    }
+
+    let callee = match access.parent() {
+        Some(turbofish) if turbofish.kind() == "generic_function" => {
+            is_function_of(&access, &turbofish).then_some(turbofish)
+        }
+        Some(_) | None => Some(access),
+    };
+
+    callee
+        .and_then(|callee| callee.parent().filter(|call| is_function_of(&callee, call)))
+        .is_some_and(|call| call.kind() == "call_expression")
+}
+
+/// Returns whether `child` is the `function` field of `parent`
+fn is_function_of(child: &DecoratedNode<'_>, parent: &DecoratedNode<'_>) -> bool {
+    parent
+        .child_by_field_name("function")
+        .is_some_and(|function| function.id() == child.id())
 }
 
 /// Shared state for resolving one file's targets
@@ -1826,6 +1923,383 @@ fn public_paths(
     paths
 }
 
+/// The resolution of each name one file has asked about
+///
+/// A path and the name at its end start the lookup from the same
+/// identifier, so the second lookup reuses the first.
+#[derive(Default)]
+struct NameResolutions {
+    by_name: HashMap<TextRange, Option<Resolution>>,
+}
+
+impl NameResolutions {
+    /// Returns what the name at `name` refers to, looking it up once
+    ///
+    /// A path whose start `path_start` gives must start there in the tree
+    /// of rust-analyzer too. Otherwise the parsers disagree about the path,
+    /// and it yields [`None`].
+    fn of(
+        &mut self,
+        ctx: &DecorateCtx<'_, '_>,
+        name: TextRange,
+        path_start: Option<TextSize>,
+    ) -> Option<Resolution> {
+        let token = name_token(ctx.syntax, name)?;
+        if let Some(start) = path_start
+            && path_start_of(&token) != Some(start)
+        {
+            return None;
+        }
+
+        self.by_name
+            .entry(name)
+            .or_insert_with(|| resolve_name(ctx, &token))
+            .clone()
+    }
+}
+
+/// Returns the identifier token that spans exactly `range`
+///
+/// A lifetime is one token with its quote, so the identifier tree-sitter
+/// finds inside `'a` spans less than the token and yields [`None`].
+fn name_token(syntax: &SyntaxNode, range: TextRange) -> Option<SyntaxToken> {
+    token_at(syntax, range).filter(|token| token.text_range() == range)
+}
+
+/// Returns where the path ends at `token` starts, if `token` ends a path
+fn path_start_of(token: &SyntaxToken) -> Option<TextSize> {
+    let name_ref = ast::NameRef::cast(token.parent()?)?;
+    let segment = ast::PathSegment::cast(name_ref.syntax().parent()?)?;
+
+    Some(segment.parent_path().syntax().text_range().start())
+}
+
+/// Returns what the name at `token` refers to
+///
+/// A reference resolves through rust-analyzer's classification, which
+/// handles paths, method calls, and field shorthands. A name that defines
+/// something resolves only in a pattern: it binds a local, or it names a
+/// constant or a variant in scope. Every other definition yields [`None`].
+fn resolve_name(ctx: &DecorateCtx<'_, '_>, token: &SyntaxToken) -> Option<Resolution> {
+    let parent = token.parent()?;
+    let definition = match ast::NameRef::cast(parent.clone()) {
+        Some(name_ref) => match NameRefClass::classify(ctx.sema, &name_ref)? {
+            NameRefClass::Definition(definition, _) => definition,
+            NameRefClass::FieldShorthand { local_ref, .. } => Definition::Local(local_ref),
+            NameRefClass::ExternCrateShorthand { krate, .. } => Definition::Crate(krate),
+        },
+        None => {
+            let name = ast::Name::cast(parent)?;
+            ast::IdentPat::cast(name.syntax().parent()?)?;
+            match NameClass::classify(ctx.sema, &name)? {
+                NameClass::Definition(definition) | NameClass::ConstReference(definition) => {
+                    definition
+                }
+                NameClass::PatFieldShorthand { local_def, .. } => Definition::Local(local_def),
+            }
+        }
+    };
+
+    resolution_of(ctx, definition)
+}
+
+/// Returns the [`Resolution`] of a definition, or [`None`] for one it leaves out
+///
+/// The provider asks at no field, lifetime, or label, and at no token of
+/// an inline assembly block. Their definitions therefore yield [`None`]
+/// should rust-analyzer ever report one.
+fn resolution_of(ctx: &DecorateCtx<'_, '_>, definition: Definition<'_>) -> Option<Resolution> {
+    let db = ctx.sema.db;
+
+    let resolution = match definition {
+        Definition::Crate(krate) => crate_resolution(ctx, krate),
+        Definition::ExternCrateDecl(decl) => crate_resolution(ctx, decl.resolved_crate(db)?),
+        Definition::Module(module) => module_resolution(ctx, module),
+        Definition::Function(function) => function_resolution(ctx, function),
+        Definition::Adt(Adt::Struct(it)) => item_resolution(
+            ctx,
+            DefinitionKind::Struct,
+            it.module(db),
+            Some(it.name(db)),
+        ),
+        Definition::Adt(Adt::Enum(it)) => {
+            item_resolution(ctx, DefinitionKind::Enum, it.module(db), Some(it.name(db)))
+        }
+        Definition::Adt(Adt::Union(it)) => {
+            item_resolution(ctx, DefinitionKind::Union, it.module(db), Some(it.name(db)))
+        }
+        Definition::EnumVariant(variant) => {
+            let owner = variant.parent_enum(db);
+            let parent = definition_path(ctx, owner.module(db), &owner.name(db));
+            resolution_in(
+                ctx,
+                DefinitionKind::EnumVariant,
+                owner.module(db).krate(db),
+                Placement {
+                    path: path_within(ctx, parent.as_ref(), Some(variant.name(db))),
+                    parent,
+                },
+            )
+        }
+        Definition::Trait(it) => {
+            item_resolution(ctx, DefinitionKind::Trait, it.module(db), Some(it.name(db)))
+        }
+        Definition::TypeAlias(it) => {
+            let placement = match it.as_assoc_item(db) {
+                Some(assoc) => assoc_placement(ctx, assoc, Some(it.name(db))),
+                None => Placement {
+                    path: item_path(ctx, it.module(db), Some(it.name(db))),
+                    parent: None,
+                },
+            };
+            resolution_in(
+                ctx,
+                DefinitionKind::TypeAlias,
+                it.module(db).krate(db),
+                placement,
+            )
+        }
+        Definition::Const(it) => {
+            let placement = match it.as_assoc_item(db) {
+                Some(assoc) => assoc_placement(ctx, assoc, it.name(db)),
+                None => Placement {
+                    path: item_path(ctx, it.module(db), it.name(db)),
+                    parent: None,
+                },
+            };
+            resolution_in(
+                ctx,
+                DefinitionKind::Const,
+                it.module(db).krate(db),
+                placement,
+            )
+        }
+        Definition::Static(it) => item_resolution(
+            ctx,
+            DefinitionKind::Static,
+            it.module(db),
+            Some(it.name(db)),
+        ),
+        Definition::Macro(it) => {
+            item_resolution(ctx, DefinitionKind::Macro, it.module(db), Some(it.name(db)))
+        }
+        Definition::Local(local) => resolution_in(
+            ctx,
+            DefinitionKind::LocalBinding,
+            local.module(db).krate(db),
+            Placement::default(),
+        ),
+        Definition::GenericParam(GenericParam::TypeParam(param)) => resolution_in(
+            ctx,
+            DefinitionKind::TypeParameter,
+            param.module(db).krate(db),
+            Placement::default(),
+        ),
+        Definition::GenericParam(GenericParam::ConstParam(param)) => resolution_in(
+            ctx,
+            DefinitionKind::ConstParameter,
+            param.module(db).krate(db),
+            Placement::default(),
+        ),
+        Definition::SelfType(imp) => resolution_in(
+            ctx,
+            DefinitionKind::SelfType,
+            imp.module(db).krate(db),
+            Placement {
+                path: type_path(ctx, &imp.self_ty(db)),
+                parent: None,
+            },
+        ),
+        Definition::DeriveHelper(helper) => resolution_in(
+            ctx,
+            DefinitionKind::DeriveHelper,
+            helper.derive().module(db).krate(db),
+            Placement::default(),
+        ),
+        Definition::BuiltinType(_) => builtin_resolution(DefinitionKind::BuiltinType),
+        Definition::BuiltinAttr(_) => builtin_resolution(DefinitionKind::BuiltinAttribute),
+        Definition::ToolModule(_) => builtin_resolution(DefinitionKind::ToolModule),
+        Definition::GenericParam(GenericParam::LifetimeParam(_))
+        | Definition::Field(_)
+        | Definition::TupleField(_)
+        | Definition::Label(_)
+        | Definition::BuiltinLifetime(_)
+        | Definition::InlineAsmRegOrRegClass(_)
+        | Definition::InlineAsmOperand(_) => return None,
+    };
+
+    Some(resolution)
+}
+
+/// Where a definition sits among the items of its crate
+///
+/// A definition without a path, such as a local binding, has neither.
+#[derive(Default)]
+struct Placement {
+    path: Option<TypePath>,
+    parent: Option<TypePath>,
+}
+
+/// Returns the path of an item that `module` defines
+///
+/// An item without a name, such as `const _`, gets no path.
+fn item_path(ctx: &DecorateCtx<'_, '_>, module: Module, name: Option<Name>) -> Option<TypePath> {
+    definition_path(ctx, module, &name?)
+}
+
+/// Returns the path of an item inside `parent`, spelled through the parent
+///
+/// Without a parent or a name, the item gets no path.
+fn path_within(
+    ctx: &DecorateCtx<'_, '_>,
+    parent: Option<&TypePath>,
+    name: Option<Name>,
+) -> Option<TypePath> {
+    let db = ctx.sema.db;
+    let (parent, name) = parent.zip(name)?;
+
+    Some(
+        TypePath::builder()
+            .krate(parent.krate())
+            .modules(parent.modules().chain([parent.name()]))
+            .name(&name.display(db, ctx.edition).to_string())
+            .build(),
+    )
+}
+
+/// Places an associated item inside its trait or its type
+fn assoc_placement(ctx: &DecorateCtx<'_, '_>, assoc: AssocItem, name: Option<Name>) -> Placement {
+    let parent = assoc_parent(ctx, assoc);
+
+    Placement {
+        path: path_within(ctx, parent.as_ref(), name),
+        parent,
+    }
+}
+
+/// Returns the trait or the type that holds an associated item
+///
+/// An item of a trait impl names the trait, so its path does not depend on
+/// the type rust-analyzer infers for a receiver. An item of an inherent
+/// impl names the ADT the impl is for, and [`None`] for any other type.
+fn assoc_parent(ctx: &DecorateCtx<'_, '_>, assoc: AssocItem) -> Option<TypePath> {
+    let db = ctx.sema.db;
+    let owner = match assoc.container(db) {
+        AssocItemContainer::Trait(owner) => owner,
+        AssocItemContainer::Impl(imp) => match imp.trait_(db) {
+            Some(owner) => owner,
+            None => return type_path(ctx, &imp.self_ty(db)),
+        },
+    };
+
+    definition_path(ctx, owner.module(db), &owner.name(db))
+}
+
+/// Returns the [`Resolution`] of an item that sits in `module`
+fn item_resolution(
+    ctx: &DecorateCtx<'_, '_>,
+    kind: DefinitionKind,
+    module: Module,
+    name: Option<Name>,
+) -> Resolution {
+    let krate = module.krate(ctx.sema.db);
+
+    resolution_in(
+        ctx,
+        kind,
+        krate,
+        Placement {
+            path: item_path(ctx, module, name),
+            parent: None,
+        },
+    )
+}
+
+/// Returns the [`Resolution`] of a function, by where it sits
+fn function_resolution(ctx: &DecorateCtx<'_, '_>, function: Function) -> Resolution {
+    let db = ctx.sema.db;
+    let krate = function.module(db).krate(db);
+    let name = Some(function.name(db));
+
+    let (kind, placement) = match function.as_assoc_item(db) {
+        Some(assoc) => {
+            let kind = match function.has_self_param(db) {
+                true => DefinitionKind::Method,
+                false => DefinitionKind::AssociatedFunction,
+            };
+            (kind, assoc_placement(ctx, assoc, name))
+        }
+        None => (
+            DefinitionKind::Function,
+            Placement {
+                path: item_path(ctx, function.module(db), name),
+                parent: None,
+            },
+        ),
+    };
+
+    resolution_in(ctx, kind, krate, placement)
+}
+
+/// Returns the [`Resolution`] of a module, which is a crate's at its root
+fn module_resolution(ctx: &DecorateCtx<'_, '_>, module: Module) -> Resolution {
+    let db = ctx.sema.db;
+    if module.is_crate_root(db) {
+        return crate_resolution(ctx, module.krate(db));
+    }
+
+    let path = module
+        .parent(db)
+        .zip(module.name(db))
+        .and_then(|(parent, name)| definition_path(ctx, parent, &name));
+
+    resolution_in(
+        ctx,
+        DefinitionKind::Module,
+        module.krate(db),
+        Placement { path, parent: None },
+    )
+}
+
+/// Returns the [`Resolution`] of the root module of `krate`, which has no path
+fn crate_resolution(ctx: &DecorateCtx<'_, '_>, krate: Crate) -> Resolution {
+    resolution_in(ctx, DefinitionKind::Crate, krate, Placement::default())
+}
+
+/// Returns the [`Resolution`] of a definition that `krate` holds
+///
+/// The origin compares `krate` with the crate the file resolves in.
+fn resolution_in(
+    ctx: &DecorateCtx<'_, '_>,
+    kind: DefinitionKind,
+    krate: Crate,
+    placement: Placement,
+) -> Resolution {
+    let db = ctx.sema.db;
+    let Placement { path, parent } = placement;
+    let origin = match krate == ctx.module.krate(db) {
+        true => DefinitionOrigin::SameCrate,
+        false => DefinitionOrigin::OtherCrate,
+    };
+    let name = krate.display_name(db).map(|name| name.to_string());
+
+    Resolution::builder()
+        .kind(kind)
+        .origin(origin)
+        .maybe_krate(name.as_deref())
+        .maybe_path(path)
+        .maybe_parent(parent)
+        .build()
+}
+
+/// Returns the [`Resolution`] of a definition the language makes
+fn builtin_resolution(kind: DefinitionKind) -> Resolution {
+    Resolution::builder()
+        .kind(kind)
+        .origin(DefinitionOrigin::Builtin)
+        .build()
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -2070,6 +2544,18 @@ mod tests {
     }
 
     #[test]
+    fn trait_send_name_resolutions() {
+        fn assert_send<T: Send>() {}
+        assert_send::<NameResolutions>();
+    }
+
+    #[test]
+    fn trait_send_placement() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Placement>();
+    }
+
+    #[test]
     fn trait_send_rust_decoration_provider() {
         fn assert_send<T: Send>() {}
         assert_send::<RustDecorationProvider>();
@@ -2091,6 +2577,18 @@ mod tests {
     fn trait_sync_module_paths() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<ModulePaths>();
+    }
+
+    #[test]
+    fn trait_sync_name_resolutions() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<NameResolutions>();
+    }
+
+    #[test]
+    fn trait_sync_placement() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<Placement>();
     }
 
     #[test]
@@ -2121,6 +2619,18 @@ mod tests {
     fn trait_unpin_module_paths() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<ModulePaths>();
+    }
+
+    #[test]
+    fn trait_unpin_name_resolutions() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<NameResolutions>();
+    }
+
+    #[test]
+    fn trait_unpin_placement() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<Placement>();
     }
 
     #[test]

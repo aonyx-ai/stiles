@@ -188,6 +188,16 @@ asks `stiles_rust::is_test_code` about a node. The helper reads the marks of the
 items around the node and the target of the file, and `ReadsTestCode` declares
 both reads.
 
+Every name that resolves gets a resolution: an identifier, a type, a path, a
+binding in a pattern, and the method of a call. It names the kind of the
+definition, its crate, whether that crate is the file's own, and its path.
+rust-analyzer follows globs, renames, and re-exports, so the path is the
+definition's, and a variant or an associated item spells it through its parent.
+A rule therefore asks what a name refers to, and scopes no `use` itself. The
+tokens of a macro call get none, because the provider does not expand macros.
+A name in a body resolves against the inferred types of that body, so a run
+whose rules read resolutions infers every function of the files it covers.
+
 #### TypeScript
 
 TypeScript's provider uses [tsrs][tsrs], a Rust port of the TypeScript 7
