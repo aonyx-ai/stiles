@@ -4,6 +4,7 @@ mod language_fingerprint;
 mod provenance;
 #[cfg(feature = "provider")]
 mod provider;
+mod test_code;
 
 pub use stiles_types::RuleId;
 
@@ -12,6 +13,7 @@ pub use self::language_fingerprint::LANGUAGE_FINGERPRINT;
 pub use self::provenance::PROVENANCE;
 #[cfg(feature = "provider")]
 pub use self::provider::{ChangeRustFilesError, LoadRustWorkspaceError, RustDecorationProvider};
+pub use self::test_code::{ReadsTestCode, is_test_code};
 
 include!(concat!(env!("OUT_DIR"), "/lint_pass.rs"));
 

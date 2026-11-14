@@ -8,7 +8,7 @@ use stiles_rust::decorations::{
     AdtFlags, AdtPath, Edition, EnumVariants, FnSignature, ImportSource, ItemExposure, PublicPath,
     Reexports, ResolvedType, ReturnMode, Target, TargetKind, TargetKinds, TestCode, TypePathRef,
 };
-use stiles_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter};
+use stiles_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter, is_test_code};
 use stiles_types::{
     Coverage, CoverageGap, DecoratedNode, DecoratedTree, Decoration as _, DecorationProvider,
     DecorationSet, Diagnostic, Language, LintPass, Severity, Span,
@@ -1415,6 +1415,133 @@ fn import_source_on_an_uppercase_module_is_module() {
         import_source_in(&tree, "import_from_uppercase_module"),
         ImportSource::Module
     );
+}
+
+/// Returns whether [`is_test_code`] counts the item that `name` names in `tree`
+fn item_is_test_code(tree: &DecoratedTree, name: &str) -> bool {
+    let item = find_item_by_name(&tree.root_node(), name).expect("should find the item");
+
+    is_test_code(&item)
+}
+
+#[test]
+fn is_test_code_in_a_bench_is_true() {
+    let tree = decorate_targets_file("benches/speed.rs");
+
+    let test_code = item_is_test_code(&tree, "main");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_in_a_binary_is_false() {
+    let tree = decorate_targets_file("src/main.rs");
+
+    let test_code = item_is_test_code(&tree, "main");
+
+    assert!(!test_code);
+}
+
+#[test]
+fn is_test_code_in_a_build_script_is_false() {
+    let tree = decorate_targets_file("build.rs");
+
+    let test_code = item_is_test_code(&tree, "main");
+
+    assert!(!test_code);
+}
+
+/// The walk climbs from a statement, which carries no decoration, to its item
+#[test]
+fn is_test_code_in_a_cfg_test_module_reaches_a_statement() {
+    let tree = decorate_targets_file("src/test_code.rs");
+    let helper = find_item_by_name(&tree.root_node(), "helper").expect("should find the item");
+    let binding = find_first_node_of_kind(&helper, "let_declaration").expect("should find a let");
+
+    let test_code = is_test_code(&binding);
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_in_a_file_declared_under_cfg_test_is_true() {
+    let tree = decorate_targets_file("src/declared.rs");
+
+    let test_code = item_is_test_code(&tree, "declared_helper");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_in_a_library_is_false() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = item_is_test_code(&tree, "shipped");
+
+    assert!(!test_code);
+}
+
+#[test]
+fn is_test_code_in_a_module_of_an_integration_test_is_true() {
+    let tree = decorate_targets_file("tests/common/mod.rs");
+
+    let test_code = item_is_test_code(&tree, "setup");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_in_a_module_that_opens_with_cfg_test_is_true() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = item_is_test_code(&tree, "gated_helper");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_in_an_example_is_false() {
+    let tree = decorate_targets_file("examples/demo.rs");
+
+    let test_code = item_is_test_code(&tree, "main");
+
+    assert!(!test_code);
+}
+
+#[test]
+fn is_test_code_in_an_integration_test_is_true() {
+    let tree = decorate_targets_file("tests/api.rs");
+
+    let test_code = item_is_test_code(&tree, "greets");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_on_a_cfg_all_holding_test_is_true() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = item_is_test_code(&tree, "only_with_the_feature");
+
+    assert!(test_code);
+}
+
+#[test]
+fn is_test_code_on_a_cfg_not_test_item_is_false() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = item_is_test_code(&tree, "only_outside_tests");
+
+    assert!(!test_code);
+}
+
+#[test]
+fn is_test_code_on_a_test_function_is_true() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = item_is_test_code(&tree, "a_test");
+
+    assert!(test_code);
 }
 
 /// Returns the node of the item called `name`, anywhere under `root`

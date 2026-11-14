@@ -226,7 +226,8 @@ read the decoration that it replaces.
 `ExprType` replaces `ResolvedType`, `AdtFlags`, and `EnumVariants` at their
 fixed positions. It carries the variant shapes that a `matches!` fix needs,
 which names alone cannot build. `Target` and `TestCode` replace the five
-`test_code.rs` copies and every path guess.
+`test_code.rs` copies and every path guess. A rule asks
+`stiles_rust::is_test_code`, which reads both.
 
 TypeScript gets `ExprType` on every expression and `Resolution` on every
 identifier from the tsrs checker. `ImportSource` stays. Its other decorations

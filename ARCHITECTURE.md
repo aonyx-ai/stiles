@@ -183,7 +183,10 @@ counts when it carries `#[test]`, `#[bench]`, or a `cfg` whose predicate
 holds only in a test build, before it or as an inner attribute of its body.
 Every item nested in such an item counts too, and so does every item of a file
 whose module is declared that way. The provider reads the attributes from the
-syntax, and rust-analyzer only finds the declaration of the module.
+syntax, and rust-analyzer only finds the declaration of the module. A rule
+asks `stiles_rust::is_test_code` about a node. The helper reads the marks of the
+items around the node and the target of the file, and `ReadsTestCode` declares
+both reads.
 
 #### TypeScript
 
