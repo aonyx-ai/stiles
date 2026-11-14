@@ -1,6 +1,7 @@
 use anyhow::Context as _;
 
 mod reexports;
+mod resolution;
 mod seal;
 
 pub enum Color {
