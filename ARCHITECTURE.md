@@ -171,6 +171,13 @@ it. The re-exports of an imported path are the public paths to the same item
 through the other crates the current crate depends on, which rust-analyzer's
 import maps prove.
 
+The provider also attaches a target to the root node of every file it covers.
+The target names the crate, its edition, and the kinds of the Cargo targets
+that compile the file: library, binary, integration test, bench, example, or
+build script. rust-analyzer turns each Cargo target into a crate and keeps no
+kind, so the provider reads the kinds from the Cargo metadata before the load.
+A rule therefore tells a test from shipped code without a guess from the path.
+
 #### TypeScript
 
 TypeScript's provider uses [tsrs][tsrs], a Rust port of the TypeScript 7

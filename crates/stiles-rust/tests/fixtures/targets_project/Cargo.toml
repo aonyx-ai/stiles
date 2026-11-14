@@ -1,0 +1,15 @@
+# Every kind of Cargo target, so that a test can read the kinds the provider
+# attaches. The package name holds a dash, so the crate name proves that the
+# provider reports it with an underscore. The edition differs from the other
+# fixtures, so a test can tell the package's edition from a default.
+[workspace]
+
+[package]
+name = "targets-project"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bench]]
+name = "speed"
+harness = false
