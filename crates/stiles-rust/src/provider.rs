@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use ra_ap_hir::import_map::{ImportInfo, ImportMap};
 use ra_ap_hir::{
     Adt, AsAssocItem as _, Crate, CrateDependency, Enum, Function, HasAttrs, HirDisplay, ItemInNs,
-    Module, ModuleDef, PathResolution, ScopeDef, Semantics, Type, attach_db,
+    Module, ModuleDef, Name, PathResolution, ScopeDef, Semantics, Type, attach_db,
 };
 use ra_ap_ide_db::base_db::{SourceDatabase as _, VfsPath, all_crates};
 use ra_ap_ide_db::famous_defs::FamousDefs;
@@ -1211,13 +1211,22 @@ fn never_kind(ty: &Type<'_>) -> NeverKind {
 fn type_path(ctx: &DecorateCtx<'_, '_>, ty: &Type<'_>) -> Option<TypePath> {
     let db = ctx.sema.db;
     let adt = ty.as_adt()?;
-    let module = adt.module(db);
+
+    definition_path(ctx, adt.module(db), &adt.name(db))
+}
+
+/// Returns the path of the item `name` that `module` defines
+///
+/// The crate segment is the crate's display name, and a crate without one
+/// yields [`None`].
+fn definition_path(ctx: &DecorateCtx<'_, '_>, module: Module, name: &Name) -> Option<TypePath> {
+    let db = ctx.sema.db;
     let krate = module.krate(db).display_name(db)?;
     let modules: Vec<String> = module
         .path_segments(db)
         .map(|segment| segment.display(db, ctx.edition).to_string())
         .collect();
-    let name = adt.name(db).display(db, ctx.edition).to_string();
+    let name = name.display(db, ctx.edition).to_string();
 
     Some(
         TypePath::builder()
