@@ -166,7 +166,7 @@ tree-sitter-typescript = "0.23"
 # unicode-ident at 1.0.24, which carries Unicode 17, and unicode-properties
 # 0.1.5 moves to Unicode 18. ra_ap_hir_def 0.0.360 no longer depends on
 # unicode-ident, so the entry goes when stiles moves to rust-analyzer 0.0.360.
-unicode-properties = { version = "=0.1.4", default-features = false }
+unicode-properties = { version = "=0.1.5", default-features = false }
 stiles-core = { path = "crates/stiles-core", version = "=0.8.0" }
 stiles-macros = { path = "crates/stiles-macros", version = "=0.8.0" }
 stiles-codegen = { path = "crates/stiles-codegen", version = "=0.8.0" }
