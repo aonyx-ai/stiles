@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-11-14
+
+### Added
+
+- A Rust rule asks `stiles_rust::is_test_code` whether a node sits in code that only a test build compiles ([#673])
+- The Rust provider names the crate, the edition, and the kinds of Cargo target that compile each file ([#673])
+- The Rust provider marks each item that only a test build compiles ([#673])
+
 ## [0.8.0] - 2026-11-13
 
 ### Changed
@@ -167,3 +175,5 @@ and this project adheres to
 [0.8.0]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.8.0
 [#669]: https://github.com/aonyx-ai/stiles/pull/669
 [#668]: https://github.com/aonyx-ai/stiles/pull/668
+[0.8.1]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.8.1
+[#673]: https://github.com/aonyx-ai/stiles/pull/673
