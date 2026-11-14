@@ -24,6 +24,7 @@ mod return_mode;
 mod target;
 mod target_kind;
 mod target_kinds;
+mod test_code;
 mod type_path;
 mod type_path_ref;
 
@@ -47,5 +48,6 @@ pub use self::return_mode::ReturnMode;
 pub use self::target::Target;
 pub use self::target_kind::TargetKind;
 pub use self::target_kinds::TargetKinds;
+pub use self::test_code::TestCode;
 pub use self::type_path::TypePath;
 pub use self::type_path_ref::TypePathRef;

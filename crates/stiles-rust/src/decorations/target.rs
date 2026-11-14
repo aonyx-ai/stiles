@@ -23,6 +23,8 @@ use crate::decorations::{Edition, TargetKinds};
 /// name has [`None`]. An empty [`TargetKinds`] means the provider knows no
 /// Cargo target for the file.
 ///
+/// Whether a single item is test code is a question for [`TestCode`].
+///
 /// A rule reads it out of memory the host allocated, so stabby lays it
 /// out. The crate name is stabby's [`Option`] of stabby's `String`.
 ///
@@ -41,6 +43,7 @@ use crate::decorations::{Edition, TargetKinds};
 /// ```
 ///
 /// [`Option`]: stabby::option::Option
+/// [`TestCode`]: crate::decorations::TestCode
 #[stabby::stabby]
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Decoration)]
 #[decoration(cardinality = "one")]

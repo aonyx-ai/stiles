@@ -178,6 +178,13 @@ build script. rust-analyzer turns each Cargo target into a crate and keeps no
 kind, so the provider reads the kinds from the Cargo metadata before the load.
 A rule therefore tells a test from shipped code without a guess from the path.
 
+Every item that only a test build compiles gets a test-code mark. An item
+counts when it carries `#[test]`, `#[bench]`, or a `cfg` whose predicate
+holds only in a test build, before it or as an inner attribute of its body.
+Every item nested in such an item counts too, and so does every item of a file
+whose module is declared that way. The provider reads the attributes from the
+syntax, and rust-analyzer only finds the declaration of the module.
+
 #### TypeScript
 
 TypeScript's provider uses [tsrs][tsrs], a Rust port of the TypeScript 7

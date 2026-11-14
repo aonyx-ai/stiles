@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use decoration_probes::{AnyhowBareTry, FunctionScopedImport, WildcardMatchArm};
 use stiles_rust::decorations::{
     AdtFlags, AdtPath, Edition, EnumVariants, FnSignature, ImportSource, ItemExposure, PublicPath,
-    Reexports, ResolvedType, ReturnMode, Target, TargetKind, TargetKinds, TypePathRef,
+    Reexports, ResolvedType, ReturnMode, Target, TargetKind, TargetKinds, TestCode, TypePathRef,
 };
 use stiles_rust::{RuleId, RustDecorationProvider, RustLintPassAdapter};
 use stiles_types::{
@@ -150,12 +150,25 @@ fn decorate_file_in(
 
 /// Returns the [`Target`] of the file at `relative` in the targets fixture
 fn target_of(relative: &str) -> Target {
-    let tree = decorate_file_in(load_targets_provider(), &targets_fixture_path(), relative);
+    let tree = decorate_targets_file(relative);
 
     tree.root_node()
         .decoration::<Target>()
         .cloned()
         .expect("the source file should carry a target")
+}
+
+/// Parses and decorates the file at `relative` in the targets fixture
+fn decorate_targets_file(relative: &str) -> DecoratedTree {
+    decorate_file_in(load_targets_provider(), &targets_fixture_path(), relative)
+}
+
+/// Returns the [`TestCode`] of the item that `name` names in `tree`
+fn test_code_in(tree: &DecoratedTree, name: &str) -> Option<TestCode> {
+    find_item_by_name(&tree.root_node(), name)
+        .expect("should find the item")
+        .decoration::<TestCode>()
+        .copied()
 }
 
 fn parse_source(source: String, file_path: PathBuf) -> DecoratedTree {
@@ -1944,6 +1957,133 @@ fn target_of_an_integration_test_names_its_own_crate() {
 }
 
 #[test]
+fn test_code_encloses_an_item_in_a_cfg_test_module() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+#[test]
+fn test_code_encloses_an_item_in_a_module_that_opens_with_cfg_test() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "gated_helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+/// `src/declared.rs` holds no mark, and `#[cfg(test)] mod declared;` makes it test code
+#[test]
+fn test_code_encloses_the_items_of_a_file_declared_under_cfg_test() {
+    let tree = decorate_targets_file("src/declared.rs");
+
+    let test_code = test_code_in(&tree, "declared_helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+#[test]
+fn test_code_encloses_the_items_of_a_file_in_a_file_that_opens_with_cfg_test() {
+    let tree = decorate_targets_file("src/gated/inner.rs");
+
+    let test_code = test_code_in(&tree, "inner_helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+#[test]
+fn test_code_encloses_the_items_of_a_file_in_a_module_declared_under_cfg_test() {
+    let tree = decorate_targets_file("src/declared/nested.rs");
+
+    let test_code = test_code_in(&tree, "nested_helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+#[test]
+fn test_code_encloses_the_items_of_a_file_that_opens_with_cfg_test() {
+    let tree = decorate_targets_file("src/gated.rs");
+
+    let test_code = test_code_in(&tree, "gated_file_helper");
+
+    assert_eq!(test_code, Some(TestCode::Enclosed));
+}
+
+#[test]
+fn test_code_is_absent_on_a_cfg_not_test_item() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "only_outside_tests");
+
+    assert!(test_code.is_none());
+}
+
+#[test]
+fn test_code_is_absent_on_a_module_shared_by_shipped_targets() {
+    let tree = decorate_targets_file("src/shared.rs");
+
+    let test_code = test_code_in(&tree, "greet");
+
+    assert!(test_code.is_none());
+}
+
+#[test]
+fn test_code_is_absent_on_ordinary_code() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "shipped");
+
+    assert!(test_code.is_none());
+}
+
+#[test]
+fn test_code_marks_a_cfg_all_holding_test() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "only_with_the_feature");
+
+    assert_eq!(test_code, Some(TestCode::Marked));
+}
+
+#[test]
+fn test_code_marks_a_cfg_test_module() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "tests");
+
+    assert_eq!(test_code, Some(TestCode::Marked));
+}
+
+#[test]
+fn test_code_marks_a_module_that_opens_with_cfg_test() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "inner_gated");
+
+    assert_eq!(test_code, Some(TestCode::Marked));
+}
+
+#[test]
+fn test_code_marks_a_test_function() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "a_test");
+
+    assert_eq!(test_code, Some(TestCode::Marked));
+}
+
+#[test]
+fn test_code_marks_a_test_in_a_cfg_test_module() {
+    let tree = decorate_targets_file("src/test_code.rs");
+
+    let test_code = test_code_in(&tree, "works");
+
+    assert_eq!(test_code, Some(TestCode::Marked));
+}
+
+#[test]
 fn try_operand_on_call_expression_is_the_whole_call() {
     let (text, _) = try_operand_of("returns_anyhow_result");
 
@@ -2017,6 +2157,16 @@ fn library_has_target(provider: &RustDecorationProvider) -> bool {
     tree.root_node().decoration::<Target>().is_some()
 }
 
+/// Returns whether the test `a_test` of the targets fixture carries [`TestCode`]
+fn test_has_test_code(provider: &RustDecorationProvider) -> bool {
+    let tree = decorate_file_in(provider, &targets_fixture_path(), "src/test_code.rs");
+
+    find_item_by_name(&tree.root_node(), "a_test")
+        .expect("should find the test")
+        .decoration::<TestCode>()
+        .is_some()
+}
+
 /// Returns the scrutinee of the first match in `match_on_enum`
 fn match_on_enum_scrutinee<'a>(root: &DecoratedNode<'a>) -> DecoratedNode<'a> {
     let func = find_function_by_name(root, "match_on_enum").expect("should find the function");
@@ -2063,6 +2213,15 @@ fn wanting_no_decorations_attaches_no_target() {
     let provider = load_targets_provider_wanting(DecorationSet::default());
 
     let attached = library_has_target(&provider);
+
+    assert!(!attached);
+}
+
+#[test]
+fn wanting_no_decorations_attaches_no_test_code() {
+    let provider = load_targets_provider_wanting(DecorationSet::default());
+
+    let attached = test_has_test_code(&provider);
 
     assert!(!attached);
 }
@@ -2222,6 +2381,24 @@ fn wanting_only_target_attaches_a_target() {
     let provider = load_targets_provider_wanting(DecorationSet::from_iter([Target::KEY]));
 
     let attached = library_has_target(&provider);
+
+    assert!(attached);
+}
+
+#[test]
+fn wanting_only_target_leaves_a_test_without_test_code() {
+    let provider = load_targets_provider_wanting(DecorationSet::from_iter([Target::KEY]));
+
+    let attached = test_has_test_code(&provider);
+
+    assert!(!attached);
+}
+
+#[test]
+fn wanting_only_test_code_marks_a_test() {
+    let provider = load_targets_provider_wanting(DecorationSet::from_iter([TestCode::KEY]));
+
+    let attached = test_has_test_code(&provider);
 
     assert!(attached);
 }

@@ -31,11 +31,12 @@ use crate::decorations;
 use crate::decorations::{
     AdtFlags, AdtKind, AdtPath, EnumVariants, ErrorType, Exhaustiveness, FnSignature, ImportSource,
     ItemExposure, NeverKind, OptionKind, PublicPath, Reexports, ResolvedType, ResultKind,
-    ReturnMode, TargetKind, TargetKinds, TypePath,
+    ReturnMode, TargetKind, TargetKinds, TestCode, TypePath,
 };
 
 mod change_rust_files_error;
 mod load_rust_workspace_error;
+mod test_code;
 
 pub use self::change_rust_files_error::ChangeRustFilesError;
 pub use self::load_rust_workspace_error::LoadRustWorkspaceError;
@@ -95,7 +96,7 @@ impl RustDecorationProvider {
     /// ```
     ///
     /// [`wanting`]: RustDecorationProvider::wanting
-    pub const DECORATIONS: [DecorationIdentity; 9] = [
+    pub const DECORATIONS: [DecorationIdentity; 10] = [
         DecorationIdentity::of::<FnSignature>(),
         DecorationIdentity::of::<ResolvedType>(),
         DecorationIdentity::of::<AdtFlags>(),
@@ -105,6 +106,7 @@ impl RustDecorationProvider {
         DecorationIdentity::of::<Reexports>(),
         DecorationIdentity::of::<ItemExposure>(),
         DecorationIdentity::of::<decorations::Target>(),
+        DecorationIdentity::of::<TestCode>(),
     ];
 
     /// Returns the provider, computing only the decoration types of `wanted`
@@ -565,6 +567,12 @@ impl DecorationProvider for RustDecorationProvider {
             decorations.insert(tree.root_node().id(), || {
                 Some(file_target(&sema, file_id, module, &self.target_kinds))
             });
+            decorations.insert_each(|| {
+                self::test_code::collect_test_code(
+                    &tree.root_node(),
+                    self::test_code::file_scope(&sema, file_id),
+                )
+            });
 
             Coverage::Covered(decorations.decorations)
         });
@@ -730,6 +738,19 @@ impl WantedDecorations<'_> {
             return;
         }
         if let Some(value) = build() {
+            self.decorations.insert(node_id, value);
+        }
+    }
+
+    /// Attaches each value `build` returns to its node, when a pass reads `D`
+    ///
+    /// `build` runs only when `wanted` holds `D`. It suits a type that one
+    /// walk of the file finds on many nodes at once.
+    fn insert_each<D: Decoration>(&mut self, build: impl FnOnce() -> Vec<(usize, D)>) {
+        if !self.wanted.contains_any(&[D::KEY]) {
+            return;
+        }
+        for (node_id, value) in build() {
             self.decorations.insert(node_id, value);
         }
     }
