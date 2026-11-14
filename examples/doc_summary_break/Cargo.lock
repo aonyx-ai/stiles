@@ -141,6 +141,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
+name = "once_cell"
+version = "1.21.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "pin-project-lite"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
+
+[[package]]
 name = "prettyplease"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -320,9 +332,9 @@ dependencies = [
 
 [[package]]
 name = "stiles-codegen"
-version = "0.1.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8a195a1226d12de3ec48d79593e483f57fb0f0d43b5905656049d0d859ea642"
+checksum = "8391c63b7e793630a93ca64be79f1eb014d3b6e35fed912e91d1c87c9213f976"
 dependencies = [
  "serde",
  "serde_json",
@@ -330,21 +342,22 @@ dependencies = [
 
 [[package]]
 name = "stiles-core"
-version = "0.1.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "128bcefc789b7062c7a6d6a7c873ae2f2a777af8239669856c3ee302d1a85b9d"
+checksum = "fbcbf768e979ef4f9d3d10f95759100be76d6d5dd08ee4c58e222feccb555655"
 dependencies = [
  "bon",
  "stiles-types",
  "thiserror",
+ "tracing",
  "tree-sitter",
 ]
 
 [[package]]
 name = "stiles-macros"
-version = "0.1.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "435cb754203a535194e90f4c73a2778b45af449a3ea9e3dd76ef7558235369ec"
+checksum = "822e44e17f1cdf2aeec2ff033cf998c04ced6db039abe95370f6a91b81feea7c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -353,11 +366,11 @@ dependencies = [
 
 [[package]]
 name = "stiles-plugin"
-version = "0.1.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "734111773690d093488598997048929ef64442acbdf0d1f38d7d9d3fb5b8494d"
+checksum = "e9a3b189a2ad515b3831278cf31db9b8458e0f8ef5d5af9d4901edee53690056"
 dependencies = [
- "stabby",
+ "stiles-codegen",
  "stiles-rust",
  "stiles-types",
  "stiles-typescript",
@@ -365,9 +378,9 @@ dependencies = [
 
 [[package]]
 name = "stiles-rust"
-version = "0.1.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bc91373abbbbf979489641b542aa8c13ec6c672dc5fd963eb773f2f33f4c9ad"
+checksum = "344c0909888a121a269312a39a48b2a353c7c52e874afca3f68adbf1038f00a9"
 dependencies = [
  "bon",
  "stabby",
@@ -380,10 +393,11 @@ dependencies = [
 
 [[package]]
 name = "stiles-testing"
-version = "0.1.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "581368b9f905d9c3825a9ac782868adc326b78c424444290ce32a723a571a1b3"
+checksum = "21cbc0c5d79f901ef74bf9e5631358888a46bb751f1ac3d11c799b9f4039699b"
 dependencies = [
+ "bon",
  "stiles-core",
  "stiles-types",
  "tree-sitter",
@@ -393,21 +407,24 @@ dependencies = [
 
 [[package]]
 name = "stiles-types"
-version = "0.1.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f11da20b9d1bf95e427242ebcca28e0c8d3ad994b3d444136a011c87c173b495"
+checksum = "5e916cf9117e4c0c7e0b6b818c0ad9710c2894d9b6c2be4c0ec1ee1901462ac7"
 dependencies = [
  "bon",
  "stabby",
+ "stiles-codegen",
  "thiserror",
  "tree-sitter",
+ "tree-sitter-rust",
+ "tree-sitter-typescript",
 ]
 
 [[package]]
 name = "stiles-typescript"
-version = "0.1.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01182a4dd96151e7377bc613e3268c06c3dd74b37ce826b3f7b7214847ffe6ce"
+checksum = "f47ea9e5f02500a4b83ff599a4c6e61a97d25adf7637f0c3306956ea9bd532dc"
 dependencies = [
  "bon",
  "stabby",
@@ -500,6 +517,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baa693a8032d7e1cada7d0041e96126df243179ff061456783ac7f12bda4744c"
 dependencies = [
  "winnow",
+]
+
+[[package]]
+name = "tracing"
+version = "0.1.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
+dependencies = [
+ "pin-project-lite",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-core"
+version = "0.1.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
+dependencies = [
+ "once_cell",
 ]
 
 [[package]]

@@ -33,11 +33,12 @@ comments to code.
 name = "doc_summary_break"
 version = "0.1.0"
 edition = "2024"
+publish = false
 
 [dependencies]
-stiles-plugin = "=0.1.0"
-stiles-rust = { version = "=0.1.0", default-features = false }
-stiles-types = "=0.1.0"
+stiles-plugin = "=0.8.0"
+stiles-rust = { version = "=0.8.0", default-features = false }
+stiles-types = "=0.8.0"
 
 [lib]
 crate-type = ["cdylib"]
@@ -54,6 +55,14 @@ language.
 impl RustLintPass for DocSummaryBreak {
     fn check_line_comment(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
         if !is_doc_line(node) {
+            return Vec::new();
+        }
+
+        let Some(next_doc_line) = get_next_doc_line(node) else {
+            return Vec::new();
+        };
+
+        if !is_doc_line(&next_doc_line) || is_blank(&next_doc_line) {
             return Vec::new();
         }
 
