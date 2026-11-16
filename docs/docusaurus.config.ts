@@ -23,8 +23,14 @@ const config: Config = {
     locales: ["en"],
   },
 
+  // A page carries its outline in HTML comments, and the docs desk reads
+  // them there. MDX rejects HTML comments unless this keeps them, and the v4
+  // flag above turns it off by default.
   markdown: {
     format: "detect",
+    mdx1Compat: {
+      comments: true,
+    },
   },
 
   presets: [

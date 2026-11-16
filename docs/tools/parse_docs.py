@@ -31,7 +31,7 @@ FILES = [
     "docs/explanation/how-stiles-works.md",
     "docs/explanation/package-and-abi-versioning.md",
     "docs/explanation/pinning-and-trust.md",
-    "authoring/how-to/write-a-rule.md",
+    "authoring/how-to/write-a-rule.mdx",
     "authoring/reference/api.md",
     "authoring/reference/prebuilt-archives.md",
     "authoring/explanation/plugin-boundary.md",

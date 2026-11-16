@@ -1,3 +1,6 @@
+import DocSummaryBreakSource from "!!raw-loader!@site/../examples/doc_summary_break/src/lib.rs";
+import FilteredCodeBlock from "@site/src/components/FilteredCodeBlock";
+
 # Write a rule
 
 <!--
@@ -51,32 +54,9 @@ checks Rust, so it implements `RustLintPass`. The
 [supported languages][supported-languages] page names the trait of each
 language.
 
-```rust
-impl RustLintPass for DocSummaryBreak {
-    fn check_line_comment(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-        if !is_doc_line(node) || is_blank(node) {
-            return Vec::new();
-        }
-
-        let Some(next_doc_line) = get_next_doc_line(node) else {
-            return Vec::new();
-        };
-
-        if !is_doc_line(&next_doc_line) || is_blank(&next_doc_line) {
-            return Vec::new();
-        }
-
-        vec![
-            Diagnostic::builder()
-                .rule_id(RULE_ID)
-                .severity(Severity::Warn)
-                .message("the summary line needs a blank `///` line after it")
-                .span(node.span())
-                .build(),
-        ]
-    }
-}
-```
+<FilteredCodeBlock language="rust" region="check">
+  {DocSummaryBreakSource}
+</FilteredCodeBlock>
 
 ## Declare and export the rule
 
@@ -142,7 +122,7 @@ leaves out a decoration that the rule reads, and only a real run catches it.
 
 ```rust
 use stiles_rust::RustLintPassAdapter;
-use stiles_testing::{assert_diagnostic, assert_no_diagnostics, execute, parse};
+use stiles_testing::{assert_diagnostic, assert_fix, assert_no_diagnostics, execute, parse};
 use stiles_types::{Language, LintPass};
 
 fn passes() -> Vec<Box<dyn LintPass>> {
@@ -166,48 +146,22 @@ A fix is a set of edits that apply together, all in the file of the diagnostic.
 `stiles check --fix` applies every fix without review, so attach one only when
 the change is correct in every case the rule reports.
 
-```rust
-let end = node.span().end();
-let after_summary = Span::builder()
-    .file(node.span().file())
-    .start(end)
-    .end(end)
-    .build();
-let fix = Fix::builder()
-    .message("add a blank `///` line")
-    .edits(vec![
-        Edit::builder()
-            .span(after_summary)
-            .replacement("///\n")
-            .build(),
-    ])
-    .build()
-    .expect("one edit never overlaps itself");
+The fix of this rule inserts a blank `///` line after the summary:
 
-vec![
-    Diagnostic::builder()
-        .rule_id(RULE_ID)
-        .severity(Severity::Warn)
-        .message("the summary line needs a blank `///` line after it")
-        .span(node.span())
-        .build()
-        .with_fix(fix)
-        .expect("the fix lies in the file of the diagnostic"),
-]
-```
+<FilteredCodeBlock language="rust" region="fix">
+  {DocSummaryBreakSource}
+</FilteredCodeBlock>
+
+The new line takes the indentation of the next line and the line ending of the
+summary. Code before the next line leaves no indentation that fits. The rule
+then reports the diagnostic without a fix, as `check_line_comment` shows.
 
 `assert_fix` applies the fixes in rounds, as `--fix` does. It then checks the
 result byte for byte, and checks that the rule reports nothing on it.
 
-```rust
-#[test]
-fn the_fix_adds_a_blank_line_after_the_summary() {
-    assert_fix()
-        .tree(parse("/// Adds\n/// The rest.\nfn f() {}\n", Language::Rust))
-        .passes(passes)
-        .produces("/// Adds\n///\n/// The rest.\nfn f() {}\n");
-}
-```
+<FilteredCodeBlock language="rust" region="fix-test">
+  {DocSummaryBreakSource}
+</FilteredCodeBlock>
 
 ## Run the rule
 
