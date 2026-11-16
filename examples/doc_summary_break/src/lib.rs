@@ -1,5 +1,5 @@
 use stiles_rust::RustLintPass;
-use stiles_types::{DecoratedNode, Diagnostic, Edit, Fix, RuleId, Severity, Span};
+use stiles_types::{AttachFixError, DecoratedNode, Diagnostic, Edit, Fix, RuleId, Severity};
 
 // 1: Rule struct and documentation
 /// Flags a summary line that runs straight into the rest of the comment
@@ -35,7 +35,7 @@ impl RustLintPass for DocSummaryBreak {
         vec![
             diagnostic
                 .with_fix(fix)
-                .expect("the fix lies in the file of the diagnostic"),
+                .unwrap_or_else(AttachFixError::into_diagnostic),
         ]
     }
 }
@@ -67,34 +67,17 @@ stiles_plugin::export_lints![rust: [DocSummaryBreak]];
 /// Returns a fix that puts a blank `///` line after the summary
 ///
 /// The new line takes the indentation of the next line and the line ending
-/// of the summary, so it matches the lines around it. Answers [`None`] when
+/// of the file, so it matches the lines around it. Answers [`None`] when
 /// code stands before the next line, because no indentation fits there.
 fn add_blank_line(summary: &DecoratedNode<'_>, next: &DecoratedNode<'_>) -> Option<Fix> {
-    let parent = summary.parent()?;
-    let offset = parent.span().start();
-    let end = summary.span().end();
-    let between = parent
-        .text()
-        .get(end - offset..next.span().start() - offset)?;
-    let indent = between.rsplit('\n').next()?;
+    let text = summary.file_text();
+    let indent = text.indent(next.span().start())?;
+    let line_ending = text.line_ending().as_str();
 
-    if !indent.trim().is_empty() {
-        return None;
-    }
-
-    let line_ending = if summary.text().ends_with("\r\n") {
-        "\r\n"
-    } else {
-        "\n"
-    };
-    let after_summary = Span::builder()
+    let edit = Edit::insert()
         .file(summary.span().file())
-        .start(end)
-        .end(end)
-        .build();
-    let edit = Edit::builder()
-        .span(after_summary)
-        .replacement(format!("{indent}///{line_ending}"))
+        .offset(summary.span().end())
+        .text(format!("{indent}///{line_ending}"))
         .build();
 
     let fix = Fix::builder()
@@ -238,10 +221,7 @@ mod tests {
     #[test]
     fn the_fix_adds_a_blank_line_after_the_summary() {
         assert_fix()
-            .tree(parse(
-                "/// Adds\n/// The rest.\nfn f() {}\n",
-                Language::Rust,
-            ))
+            .source("/// Adds\n/// The rest.\nfn f() {}\n", Language::Rust)
             .passes(passes)
             .produces("/// Adds\n///\n/// The rest.\nfn f() {}\n");
     }
@@ -250,10 +230,7 @@ mod tests {
     #[test]
     fn the_fix_after_a_slash_rule_adds_a_blank_line() {
         assert_fix()
-            .tree(parse(
-                "////\n/// Adds\n/// The rest.\nfn f() {}\n",
-                Language::Rust,
-            ))
+            .source("////\n/// Adds\n/// The rest.\nfn f() {}\n", Language::Rust)
             .passes(passes)
             .produces("////\n/// Adds\n///\n/// The rest.\nfn f() {}\n");
     }
@@ -261,7 +238,7 @@ mod tests {
     #[test]
     fn the_fix_at_the_end_of_the_file_adds_a_blank_line() {
         assert_fix()
-            .tree(parse("/// Adds\n/// The rest.", Language::Rust))
+            .source("/// Adds\n/// The rest.", Language::Rust)
             .passes(passes)
             .produces("/// Adds\n///\n/// The rest.");
     }
@@ -269,10 +246,7 @@ mod tests {
     #[test]
     fn the_fix_in_a_crlf_file_ends_the_line_with_crlf() {
         assert_fix()
-            .tree(parse(
-                "/// Adds\r\n/// The rest.\r\nfn f() {}\r\n",
-                Language::Rust,
-            ))
+            .source("/// Adds\r\n/// The rest.\r\nfn f() {}\r\n", Language::Rust)
             .passes(passes)
             .produces("/// Adds\r\n///\r\n/// The rest.\r\nfn f() {}\r\n");
     }
@@ -280,10 +254,10 @@ mod tests {
     #[test]
     fn the_fix_in_a_long_block_adds_one_blank_line() {
         assert_fix()
-            .tree(parse(
+            .source(
                 "/// Adds\n/// The rest.\n/// And more.\nfn f() {}\n",
                 Language::Rust,
-            ))
+            )
             .passes(passes)
             .produces("/// Adds\n///\n/// The rest.\n/// And more.\nfn f() {}\n");
     }
@@ -291,10 +265,10 @@ mod tests {
     #[test]
     fn the_fix_keeps_the_indentation_of_the_block() {
         assert_fix()
-            .tree(parse(
+            .source(
                 "mod m {\n\t/// Adds\n\t/// The rest.\n\tfn f() {}\n}\n",
                 Language::Rust,
-            ))
+            )
             .passes(passes)
             .produces("mod m {\n\t/// Adds\n\t///\n\t/// The rest.\n\tfn f() {}\n}\n");
     }
@@ -302,10 +276,7 @@ mod tests {
     #[test]
     fn the_fix_over_an_empty_line_adds_a_blank_line_after_the_summary() {
         assert_fix()
-            .tree(parse(
-                "/// Adds\n\n/// The rest.\nfn f() {}\n",
-                Language::Rust,
-            ))
+            .source("/// Adds\n\n/// The rest.\nfn f() {}\n", Language::Rust)
             .passes(passes)
             .produces("/// Adds\n///\n\n/// The rest.\nfn f() {}\n");
     }
@@ -313,10 +284,7 @@ mod tests {
     #[test]
     fn the_fix_with_a_blank_line_after_the_summary_changes_nothing() {
         assert_fix()
-            .tree(parse(
-                "/// Adds\n///\n/// The rest.\nfn f() {}\n",
-                Language::Rust,
-            ))
+            .source("/// Adds\n///\n/// The rest.\nfn f() {}\n", Language::Rust)
             .passes(passes)
             .produces("/// Adds\n///\n/// The rest.\nfn f() {}\n");
     }
@@ -336,7 +304,7 @@ mod tests {
     #[test]
     fn the_fix_with_inner_docs_changes_nothing() {
         assert_fix()
-            .tree(parse("//! Adds\n//! The rest.\n", Language::Rust))
+            .source("//! Adds\n//! The rest.\n", Language::Rust)
             .passes(passes)
             .produces("//! Adds\n//! The rest.\n");
     }
