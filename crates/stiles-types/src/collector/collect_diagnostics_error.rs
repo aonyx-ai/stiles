@@ -1,13 +1,15 @@
+use std::path::PathBuf;
+
 use thiserror::Error;
 
-use crate::{AttachFixError, BuildFixError, RuleId};
+use crate::{BuildFixError, RuleId};
 
 /// The reason a [`Collector`] could not build what a pass reported
 ///
 /// A pass reports through its [`Sink`] one part at a time, and the host
 /// builds each diagnostic from the parts once the pass returns. A fix gets
 /// the checks that [`Fix::builder`] and [`Diagnostic::with_fix`] make
-/// anywhere else, so the same errors say what went wrong. A call that names
+/// anywhere else, so the same faults say what went wrong. A call that names
 /// a diagnostic the sink never started cannot fail at the boundary, so the
 /// collector keeps it and reports it here.
 ///
@@ -32,15 +34,6 @@ use crate::{AttachFixError, BuildFixError, RuleId};
 /// [`Sink`]: crate::Sink
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Error)]
 pub enum CollectDiagnosticsError {
-    /// The fix of a diagnostic did not fit the diagnostic
-    #[error("failed to attach a fix to a diagnostic of `{rule}`")]
-    AttachFix {
-        /// The rule of the diagnostic
-        rule: RuleId,
-        /// Why the fix did not fit
-        source: AttachFixError,
-    },
-
     /// The edits of a fix did not form one
     #[error("failed to build a fix for a diagnostic of `{rule}`")]
     BuildFix {
@@ -48,6 +41,36 @@ pub enum CollectDiagnosticsError {
         rule: RuleId,
         /// Why the edits did not form a fix
         source: BuildFixError,
+    },
+
+    /// The fix of a diagnostic edits another file than the diagnostic names
+    ///
+    /// [`Diagnostic::with_fix`] refuses such a fix anywhere else.
+    ///
+    /// [`Diagnostic::with_fix`]: crate::Diagnostic::with_fix
+    #[error(
+        "a fix for `{rule}` edits {}, but its diagnostic reports on {}",
+        fix.display(),
+        diagnostic.display()
+    )]
+    OtherFile {
+        /// The rule of the diagnostic
+        rule: RuleId,
+        /// The file of the span of the diagnostic
+        diagnostic: PathBuf,
+        /// The file that the fix edits
+        fix: PathBuf,
+    },
+
+    /// A pass named a second fix for one diagnostic
+    ///
+    /// A diagnostic holds one fix, as [`Diagnostic::with_fix`] says.
+    ///
+    /// [`Diagnostic::with_fix`]: crate::Diagnostic::with_fix
+    #[error("a lint pass named a second fix for a diagnostic of `{rule}`")]
+    SecondFix {
+        /// The rule of the diagnostic
+        rule: RuleId,
     },
 
     /// A pass added to a diagnostic that its sink never started
@@ -83,6 +106,22 @@ pub enum CollectDiagnosticsError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn display_of_other_file_names_both_files() {
+        let error = CollectDiagnosticsError::OtherFile {
+            rule: RuleId::new("lint.example"),
+            diagnostic: PathBuf::from("a.rs"),
+            fix: PathBuf::from("b.rs"),
+        };
+
+        let message = error.to_string();
+
+        assert_eq!(
+            message,
+            "a fix for `lint.example` edits b.rs, but its diagnostic reports on a.rs"
+        );
+    }
 
     #[test]
     fn trait_send() {

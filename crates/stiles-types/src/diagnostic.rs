@@ -145,6 +145,10 @@ impl Diagnostic {
     /// between them. The fix must lie in the file of the diagnostic, so
     /// that a fix never changes a file the reader was not shown.
     ///
+    /// The error holds the diagnostic, so a fix that does not attach never
+    /// loses the finding. A rule reports it without the fix, through
+    /// [`AttachFixError::into_diagnostic`].
+    ///
     /// # Errors
     ///
     /// Returns [`AttachFixError::OtherFile`] if the fix edits another file
@@ -154,7 +158,7 @@ impl Diagnostic {
     /// # Examples
     ///
     /// ```
-    /// use stiles_types::{Diagnostic, Edit, Fix, RuleId, Severity, Span};
+    /// use stiles_types::{AttachFixError, Diagnostic, Edit, Fix, RuleId, Severity, Span};
     ///
     /// let span = Span::builder().file("src/lib.rs").start(3).end(7).build();
     /// let diagnostic = Diagnostic::builder()
@@ -168,20 +172,22 @@ impl Diagnostic {
     ///     .edits(vec![Edit::builder().span(span).replacement("Some(_)").build()])
     ///     .build()?;
     ///
-    /// let diagnostic = diagnostic.with_fix(fix)?;
+    /// let diagnostic = diagnostic.with_fix(fix).unwrap_or_else(AttachFixError::into_diagnostic);
     ///
     /// assert!(diagnostic.fix().is_some());
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), stiles_types::BuildFixError>(())
     /// ```
     pub fn with_fix(mut self, fix: Fix) -> Result<Self, AttachFixError> {
         if fix.file() != self.span.file() {
             return Err(AttachFixError::OtherFile {
-                diagnostic: self.span.file().to_path_buf(),
                 fix: fix.file().to_path_buf(),
+                diagnostic: Box::new(self),
             });
         }
         if self.fix.is_some() {
-            return Err(AttachFixError::SecondFix);
+            return Err(AttachFixError::SecondFix {
+                diagnostic: Box::new(self),
+            });
         }
 
         self.fix = option::Option::Some(fix);
@@ -511,19 +517,33 @@ mod tests {
     }
 
     fn fix_in(file: &str) -> Fix {
+        fix_of(
+            Span::builder()
+                .file(PathBuf::from(file))
+                .start(0)
+                .end(10)
+                .build(),
+            "replacement",
+        )
+    }
+
+    /// Returns a fix in `test.rs` that differs from [`fix_in`]
+    fn second_fix() -> Fix {
+        fix_of(
+            Span::builder()
+                .file(PathBuf::from("test.rs"))
+                .start(0)
+                .end(10)
+                .build(),
+            "second",
+        )
+    }
+
+    fn fix_of(span: Span, replacement: &str) -> Fix {
         Fix::builder()
             .message("replace it")
             .edits(vec![
-                Edit::builder()
-                    .span(
-                        Span::builder()
-                            .file(PathBuf::from(file))
-                            .start(0)
-                            .end(10)
-                            .build(),
-                    )
-                    .replacement("replacement")
-                    .build(),
+                Edit::builder().span(span).replacement(replacement).build(),
             ])
             .build()
             .expect("the fix should build")
@@ -539,18 +559,40 @@ mod tests {
     }
 
     #[test]
-    fn with_fix_in_another_file_returns_other_file() {
+    fn with_fix_in_another_file_keeps_the_diagnostic_unfixed() {
         let error = test_diagnostic()
             .with_fix(fix_in("other.rs"))
             .expect_err("the fix should not attach");
 
-        assert_eq!(
-            error,
-            AttachFixError::OtherFile {
-                diagnostic: PathBuf::from("test.rs"),
-                fix: PathBuf::from("other.rs"),
-            }
-        );
+        let diagnostic = error.into_diagnostic();
+
+        assert!(diagnostic.fix().is_none());
+    }
+
+    #[test]
+    fn with_fix_in_another_file_names_the_file_of_the_fix() {
+        let error = test_diagnostic()
+            .with_fix(fix_in("other.rs"))
+            .expect_err("the fix should not attach");
+
+        let AttachFixError::OtherFile { fix, .. } = error else {
+            panic!("the error should be `OtherFile`, got {error:?}");
+        };
+
+        assert_eq!(fix, PathBuf::from("other.rs"));
+    }
+
+    #[test]
+    fn with_fix_on_a_fixed_diagnostic_keeps_the_first_fix() {
+        let diag = test_diagnostic()
+            .with_fix(fix_in("test.rs"))
+            .expect("the first fix should attach");
+
+        let error = diag
+            .with_fix(second_fix())
+            .expect_err("the second fix should not attach");
+
+        assert_eq!(error.into_diagnostic().fix(), Some(&fix_in("test.rs")));
     }
 
     #[test]
@@ -563,7 +605,10 @@ mod tests {
             .with_fix(fix_in("test.rs"))
             .expect_err("the second fix should not attach");
 
-        assert_eq!(error, AttachFixError::SecondFix);
+        match error {
+            AttachFixError::SecondFix { .. } => {}
+            AttachFixError::OtherFile { .. } => panic!("the error should be `SecondFix`"),
+        }
     }
 
     #[test]
