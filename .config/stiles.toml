@@ -29,7 +29,7 @@ stiles-source = "."
 # check here runs exactly the rules it ran yesterday.
 [[lints]]
 git = "https://github.com/aonyx-ai/stiles-aonyx-rules"
-rev = "1011729b72caee021be9e43cb3f4907ed071cc96"
+rev = "f04b5324011362649a335bf63c20fbf33aab40e0"
 
 # These enums grow like a `#[non_exhaustive]` enum but lack the attribute.
 # tar's `EntryType` predates it and hides a `__Nonexhaustive` variant, and
