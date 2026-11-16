@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use stiles_types::{DecoratedTree, DecorationMap, Diagnostic, Language, LintPass, Severity, Span};
 
-pub use self::assert_fix::assert_fix;
+pub use self::assert_fix::{AssertFixBuilder, assert_fix};
 
 /// Parses source text into a decorated tree for the given language
 ///
@@ -28,6 +28,32 @@ pub use self::assert_fix::assert_fix;
 /// assert_eq!(tree.root_node().kind(), "source_file");
 /// ```
 pub fn parse(source: &str, language: Language) -> DecoratedTree {
+    parse_at("<test>", source, language)
+}
+
+/// Parses source text into a decorated tree for a file at `path`
+///
+/// It parses as [`parse`] does, and the spans of the tree name `path`
+/// instead of `<test>`. A rule that reads the file name, such as one that
+/// reports only in `lib.rs`, tests through it.
+///
+/// # Panics
+///
+/// Panics if tree-sitter fails to parse.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::Path;
+///
+/// use stiles_testing::parse_at;
+/// use stiles_types::Language;
+///
+/// let tree = parse_at("src/lib.rs", "fn main() {}", Language::Rust);
+///
+/// assert_eq!(tree.root_node().span().file(), Path::new("src/lib.rs"));
+/// ```
+pub fn parse_at(path: impl AsRef<Path>, source: &str, language: Language) -> DecoratedTree {
     let ts_language = match language {
         Language::Rust => tree_sitter_rust::LANGUAGE.into(),
         Language::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
@@ -46,7 +72,7 @@ pub fn parse(source: &str, language: Language) -> DecoratedTree {
         .tree(tree)
         .language(language)
         .source(source.to_string())
-        .file(PathBuf::from("<test>"))
+        .file(path.as_ref())
         .build()
 }
 
@@ -592,6 +618,20 @@ mod tests {
         let diagnostics = execute(&tree, &mut Vec::new());
 
         assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn parse_at_names_the_path_in_spans() {
+        let tree = parse_at("src/lib.rs", "fn main() {}", Language::Rust);
+
+        assert_eq!(tree.root_node().span().file(), Path::new("src/lib.rs"));
+    }
+
+    #[test]
+    fn parse_names_the_test_file() {
+        let tree = parse("fn main() {}", Language::Rust);
+
+        assert_eq!(tree.root_node().span().file(), Path::new("<test>"));
     }
 
     #[test]
