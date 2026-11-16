@@ -146,46 +146,6 @@ mod tests {
         vec![Box::new(RustLintPassAdapter::new(DocSummaryBreak))]
     }
 
-    /// `////` is a plain comment, not a doc comment, so the summary below it
-    /// starts a block and wants a blank line after it
-    #[test]
-    fn a_summary_under_a_slash_rule_is_flagged() {
-        let tree = parse("////\n/// Adds\n/// The rest.\nfn f() {}", Language::Rust);
-
-        let diagnostics = execute(&tree, &mut passes());
-
-        assert_eq!(diagnostics[0].span().start(), 5);
-    }
-
-    /// `////` is a comment and not a doc comment, so it ends the block rather
-    /// than continuing it, and the summary above it stands alone
-    #[test]
-    fn a_summary_above_a_slash_rule_is_not_flagged() {
-        let tree = parse("/// Adds\n////\nfn f() {}", Language::Rust);
-
-        let diagnostics = execute(&tree, &mut passes());
-
-        assert_no_diagnostics(&diagnostics);
-    }
-
-    #[test]
-    fn trait_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<DocSummaryBreak>();
-    }
-
-    #[test]
-    fn trait_sync() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<DocSummaryBreak>();
-    }
-
-    #[test]
-    fn trait_unpin() {
-        fn assert_unpin<T: Unpin>() {}
-        assert_unpin::<DocSummaryBreak>();
-    }
-
     #[test]
     fn a_blank_first_line_is_not_flagged() {
         let tree = parse("///\n/// The rest.\nfn f() {}", Language::Rust);
@@ -230,6 +190,28 @@ mod tests {
 
         assert_eq!(diagnostics.len(), 1);
         assert_diagnostic(&diagnostics[0]).has_rule_id("lint.doc-summary-break");
+    }
+
+    /// `////` is a comment and not a doc comment, so it ends the block rather
+    /// than continuing it, and the summary above it stands alone
+    #[test]
+    fn a_summary_above_a_slash_rule_is_not_flagged() {
+        let tree = parse("/// Adds\n////\nfn f() {}", Language::Rust);
+
+        let diagnostics = execute(&tree, &mut passes());
+
+        assert_no_diagnostics(&diagnostics);
+    }
+
+    /// `////` is a plain comment, not a doc comment, so the summary below it
+    /// starts a block and wants a blank line after it
+    #[test]
+    fn a_summary_under_a_slash_rule_is_flagged() {
+        let tree = parse("////\n/// Adds\n/// The rest.\nfn f() {}", Language::Rust);
+
+        let diagnostics = execute(&tree, &mut passes());
+
+        assert_eq!(diagnostics[0].span().start(), 5);
     }
 
     #[test]
@@ -349,6 +331,24 @@ mod tests {
             .tree(parse("//! Adds\n//! The rest.\n", Language::Rust))
             .passes(passes)
             .produces("//! Adds\n//! The rest.\n");
+    }
+
+    #[test]
+    fn trait_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<DocSummaryBreak>();
+    }
+
+    #[test]
+    fn trait_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<DocSummaryBreak>();
+    }
+
+    #[test]
+    fn trait_unpin() {
+        fn assert_unpin<T: Unpin>() {}
+        assert_unpin::<DocSummaryBreak>();
     }
 }
 // >
