@@ -54,7 +54,7 @@ language.
 ```rust
 impl RustLintPass for DocSummaryBreak {
     fn check_line_comment(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-        if !is_doc_line(node) {
+        if !is_doc_line(node) || is_blank(node) {
             return Vec::new();
         }
 

@@ -8,7 +8,7 @@ pub struct DocSummaryBreak;
 // 2: LintPass implementation
 impl RustLintPass for DocSummaryBreak {
     fn check_line_comment(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
-        if !is_doc_line(node) {
+        if !is_doc_line(node) || is_blank(node) {
             return Vec::new();
         }
 
@@ -67,8 +67,11 @@ fn get_next_doc_line<'a>(node: &DecoratedNode<'a>) -> Option<DecoratedNode<'a>> 
 }
 
 /// Returns whether the node is a `///` line
+///
+/// Asks the grammar for the marker of an outer doc comment instead of
+/// reading the text, because `////` starts with `///` and is a plain comment.
 fn is_doc_line(node: &DecoratedNode<'_>) -> bool {
-    node.kind() == "line_comment" && node.text().starts_with("///")
+    node.kind() == "line_comment" && node.child_by_field_name("outer").is_some()
 }
 
 /// Returns whether the line carries nothing but its marker
@@ -97,7 +100,7 @@ mod tests {
 
         let diagnostics = execute(&tree, &mut passes());
 
-        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].span().start(), 5);
     }
 
     /// `////` is a comment and not a doc comment, so it ends the block rather
@@ -127,6 +130,15 @@ mod tests {
     fn trait_unpin() {
         fn assert_unpin<T: Unpin>() {}
         assert_unpin::<DocSummaryBreak>();
+    }
+
+    #[test]
+    fn a_blank_first_line_is_not_flagged() {
+        let tree = parse("///\n/// The rest.\nfn f() {}", Language::Rust);
+
+        let diagnostics = execute(&tree, &mut passes());
+
+        assert_no_diagnostics(&diagnostics);
     }
 
     #[test]
