@@ -117,6 +117,9 @@ The new line takes the indentation of the next line and the line ending of the
 file. Code before the next line leaves no indentation that fits. The rule
 then reports the diagnostic without a fix, as `check_line_comment` shows.
 
+`with_fix` fails when the fix edits another file or the diagnostic already holds
+a fix, and `AttachFixError::into_diagnostic` returns the diagnostic without it.
+
 One round of `--fix` applies a fix only when it overlaps no fix that the round
 already took. Two insertions at the same offset overlap, so fixes that insert
 at one point apply one per round, and `--fix` gives up after ten rounds. A rule
