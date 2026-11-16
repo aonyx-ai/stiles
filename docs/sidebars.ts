@@ -31,6 +31,7 @@ const sidebars: SidebarsConfig = {
         "how-to/github-actions",
         "how-to/shared-rules",
         "how-to/adopt-rules-gradually",
+        "how-to/apply-fixes",
         "how-to/troubleshooting",
       ],
     },
