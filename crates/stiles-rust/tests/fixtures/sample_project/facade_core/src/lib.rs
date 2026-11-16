@@ -8,6 +8,10 @@ pub mod thing {
     }
 }
 
+pub mod r#type {
+    pub struct Kind;
+}
+
 pub mod unexported {
     pub struct Internal;
 }
