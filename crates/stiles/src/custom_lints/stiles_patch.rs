@@ -6,16 +6,24 @@ use std::process::Command;
 use anyhow::Context as _;
 use serde::Deserialize;
 
-/// The stiles crates a lint package can depend on
+/// The crates that stiles publishes, each of which a lint package can depend on
 ///
 /// Stiles patches each one that a package names to the local source. The
-/// package then builds against the stiles that loads it.
-pub(super) const STILES_CRATES: [&str; 5] = [
-    "stiles-types",
+/// package then builds against the stiles that loads it. A crate left out
+/// stays at its registry version, and its types then differ from the
+/// patched crates' types.
+pub(super) const STILES_CRATES: [&str; 11] = [
+    "stiles",
+    "stiles-codegen",
+    "stiles-core",
+    "stiles-macros",
     "stiles-plugin",
+    "stiles-reporting",
     "stiles-rust",
-    "stiles-typescript",
     "stiles-testing",
+    "stiles-tsrs",
+    "stiles-types",
+    "stiles-typescript",
 ];
 
 /// The source id cargo gives crates.io
@@ -223,6 +231,21 @@ mod tests {
         let patches = plan_patches(&metadata).expect("the metadata should parse");
 
         assert_eq!(patches.len(), 1);
+    }
+
+    #[test]
+    fn plan_patches_of_a_core_dependency_patches_crates_io() {
+        let metadata = metadata(&[("stiles-core", Some(CRATES_IO))]);
+
+        let patches = plan_patches(&metadata).expect("the metadata should parse");
+
+        assert_eq!(
+            patches,
+            BTreeSet::from([StilesPatch {
+                table: PatchTable::CratesIo,
+                crate_name: "stiles-core",
+            }])
+        );
     }
 
     #[test]

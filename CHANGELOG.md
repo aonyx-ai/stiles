@@ -24,6 +24,7 @@ and this project adheres to
 ### Fixed
 
 - `stiles check --fix` counts every finding it fixed, including findings that share one fix ([#690])
+- `stiles-source` builds a lint that depends on any crate stiles publishes, such as `stiles-core`, against the local source ([#691])
 
 ## [0.8.2] - 2026-11-14
 
@@ -204,3 +205,4 @@ and this project adheres to
 [#678]: https://github.com/aonyx-ai/stiles/pull/678
 [0.9.0]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.9.0
 [#690]: https://github.com/aonyx-ai/stiles/pull/690
+[#691]: https://github.com/aonyx-ai/stiles/pull/691
