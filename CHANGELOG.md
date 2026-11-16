@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-11-16
+
+### Added
+
+- `assert_fix` takes a source text, decorates the tree of every round, and accepts findings that remain after the fixes ([#690])
+- `Edit::delete` and `Edit::insert` build a deletion and an insertion without a span builder ([#690])
+- `DecoratedNode::file_text` gives a rule the text, the lines, and the line ending of its file, and `DecoratedNode::file_decoration` reads a decoration of the file from any node ([#690])
+- `stiles_testing::parse_at` parses a test source under a file path, for a rule that reads the file name ([#690])
+
+### Changed
+
+- `Diagnostic::with_fix` returns the diagnostic inside its error, so a fix that does not attach never drops the finding ([#690])
+
+### Fixed
+
+- `stiles check --fix` counts every finding it fixed, including findings that share one fix ([#690])
+
 ## [0.8.2] - 2026-11-14
 
 ### Added
@@ -185,3 +202,5 @@ and this project adheres to
 [#673]: https://github.com/aonyx-ai/stiles/pull/673
 [0.8.2]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.8.2
 [#678]: https://github.com/aonyx-ai/stiles/pull/678
+[0.9.0]: https://github.com/aonyx-ai/stiles/releases/tag/stiles@0.9.0
+[#690]: https://github.com/aonyx-ai/stiles/pull/690
