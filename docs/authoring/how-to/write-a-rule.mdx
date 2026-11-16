@@ -1,3 +1,4 @@
+import DocSummaryBreakCargoToml from "!!raw-loader!@site/../examples/doc_summary_break/Cargo.toml";
 import DocSummaryBreakSource from "!!raw-loader!@site/../examples/doc_summary_break/src/lib.rs";
 import FilteredCodeBlock from "@site/src/components/FilteredCodeBlock";
 
@@ -31,21 +32,9 @@ comments to code.
 
 ## The crate manifest
 
-```toml title="lints/doc_summary_break/Cargo.toml"
-[package]
-name = "doc_summary_break"
-version = "0.1.0"
-edition = "2024"
-publish = false
-
-[dependencies]
-stiles-plugin = "=0.8.0"
-stiles-rust = { version = "=0.8.0", default-features = false }
-stiles-types = "=0.8.0"
-
-[lib]
-crate-type = ["cdylib"]
-```
+<FilteredCodeBlock language="toml" title="lints/doc_summary_break/Cargo.toml">
+  {DocSummaryBreakCargoToml}
+</FilteredCodeBlock>
 
 ## Hook a node kind
 
@@ -60,21 +49,9 @@ language.
 
 ## Declare and export the rule
 
-```rust
-const RULE_ID: RuleId = RuleId::new("lint.doc-summary-break");
-
-impl stiles_plugin::DeclaresRules for DocSummaryBreak {
-    fn rules(&self) -> Vec<RuleId> {
-        vec![RULE_ID]
-    }
-
-    fn reads(&self) -> stiles_plugin::Reads {
-        stiles_plugin::Reads::none()
-    }
-}
-
-stiles_plugin::export_lints![rust: [DocSummaryBreak]];
-```
+<FilteredCodeBlock language="rust" region="declare">
+  {DocSummaryBreakSource}
+</FilteredCodeBlock>
 
 `reads` names the decorations the rule reads, and this rule reads none.
 
@@ -120,25 +97,9 @@ leaves out a decoration that the rule reads, and only a real run catches it.
 
 ## Test the rule
 
-```rust
-use stiles_rust::RustLintPassAdapter;
-use stiles_testing::{assert_diagnostic, assert_fix, assert_no_diagnostics, execute, parse};
-use stiles_types::{Language, LintPass};
-
-fn passes() -> Vec<Box<dyn LintPass>> {
-    vec![Box::new(RustLintPassAdapter::new(DocSummaryBreak))]
-}
-
-#[test]
-fn a_second_line_against_the_summary_is_flagged() {
-    let tree = parse("/// Adds\n/// The rest.\nfn f() {}", Language::Rust);
-
-    let diagnostics = execute(&tree, &mut passes());
-
-    assert_eq!(diagnostics.len(), 1);
-    assert_diagnostic(&diagnostics[0]).has_rule_id("lint.doc-summary-break");
-}
-```
+<FilteredCodeBlock language="rust" region="test">
+  {DocSummaryBreakSource}
+</FilteredCodeBlock>
 
 ## Offer a fix
 

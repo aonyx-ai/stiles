@@ -59,6 +59,10 @@ function dedent(lines) {
 /**
  * Returns the lines of the named region, without any marker lines.
  *
+ * A name can mark several parts of the file. The block shows them in file
+ * order, with a blank line between two parts, and leaves out what lies
+ * between them.
+ *
  * A name that the file does not hold fails the build, so a page cannot show
  * an empty block after the file drops or renames a region.
  */
@@ -71,6 +75,9 @@ function regionLines(lines, name) {
     const lineMarker = marker(line);
 
     if (lineMarker?.kind === REGION && lineMarker.name === name) {
+      if (shown.length > 0) {
+        shown.push("");
+      }
       inside = true;
       found = true;
     } else if (lineMarker?.kind === END_REGION) {

@@ -42,6 +42,7 @@ impl RustLintPass for DocSummaryBreak {
 // endregion
 
 // 3: Rule ID
+// region: declare
 const RULE_ID: RuleId = RuleId::new("lint.doc-summary-break");
 
 impl stiles_plugin::DeclaresRules for DocSummaryBreak {
@@ -53,9 +54,12 @@ impl stiles_plugin::DeclaresRules for DocSummaryBreak {
         stiles_plugin::Reads::none()
     }
 }
+// endregion
 
 // 4: Lint registration
+// region: declare
 stiles_plugin::export_lints![rust: [DocSummaryBreak]];
+// endregion
 
 // ... and some helper functions for the lint
 
@@ -136,6 +140,7 @@ fn is_blank(node: &DecoratedNode<'_>) -> bool {
 // <
 #[cfg(test)]
 mod tests {
+    // region: test
     use stiles_rust::RustLintPassAdapter;
     use stiles_testing::{assert_diagnostic, assert_fix, assert_no_diagnostics, execute, parse};
     use stiles_types::{Language, LintPass};
@@ -145,6 +150,7 @@ mod tests {
     fn passes() -> Vec<Box<dyn LintPass>> {
         vec![Box::new(RustLintPassAdapter::new(DocSummaryBreak))]
     }
+    // endregion
 
     #[test]
     fn a_blank_first_line_is_not_flagged() {
@@ -182,6 +188,7 @@ mod tests {
         assert_no_diagnostics(&diagnostics);
     }
 
+    // region: test
     #[test]
     fn a_second_line_against_the_summary_is_flagged() {
         let tree = parse("/// Adds\n/// The rest.\nfn f() {}", Language::Rust);
@@ -191,6 +198,7 @@ mod tests {
         assert_eq!(diagnostics.len(), 1);
         assert_diagnostic(&diagnostics[0]).has_rule_id("lint.doc-summary-break");
     }
+    // endregion
 
     /// `////` is a comment and not a doc comment, so it ends the block rather
     /// than continuing it, and the summary above it stands alone
