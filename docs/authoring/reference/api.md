@@ -9,13 +9,13 @@ The API documentation for each Stiles crate is on docs.rs.
 
 ## Crates
 
-| Crate                                  | Holds                                                                                                |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| [stiles-plugin][stiles-plugin]         | `DeclaresRules` and `export_lints!`, which hand the lints of a crate to Stiles                       |
-| [stiles-types][stiles-types]           | `Diagnostic`, `Span`, `Fix`, `Edit`, `Severity`, `RuleId`, `DecoratedNode`, and the decoration types |
-| [stiles-testing][stiles-testing]       | `parse`, `decorate`, `execute`, `fixtures`, `assert_diagnostic`, and `assert_fix`                    |
-| [stiles-rust][stiles-rust]             | `RustLintPass` and the Rust decorations                                                              |
-| [stiles-typescript][stiles-typescript] | `TypeScriptLintPass` and the TypeScript decorations                                                  |
+| Crate                                  | Holds                                                                                                                                            |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [stiles-plugin][stiles-plugin]         | `DeclaresRules` and `export_lints!`, which hand the lints of a crate to Stiles                                                                   |
+| [stiles-types][stiles-types]           | `Diagnostic`, `AttachFixError`, `Span`, `Fix`, `Edit`, `FileText`, `LineEnding`, `Severity`, `RuleId`, `DecoratedNode`, and the decoration types |
+| [stiles-testing][stiles-testing]       | `parse`, `parse_at`, `decorate`, `execute`, `fixtures`, `assert_diagnostic`, and `assert_fix`                                                    |
+| [stiles-rust][stiles-rust]             | `RustLintPass` and the Rust decorations                                                                                                          |
+| [stiles-typescript][stiles-typescript] | `TypeScriptLintPass` and the TypeScript decorations                                                                                              |
 
 A lint depends on the crate of each language it checks. The
 [supported languages][supported-languages] page lists them.

@@ -31,14 +31,14 @@ dependencies = [
  "prettyplease",
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
 name = "cc"
-version = "1.10.0"
+version = "1.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86e055fa6e3e40ad6187ba25b6855eeb635d5271f8e0f0e1e9a5826b8d75bea0"
+checksum = "33ef9e3e8154a45c7a95cff4c1299702106ad94062d7bb85fdc5d3a5afd91d45"
 dependencies = [
  "find-msvc-tools",
  "shlex",
@@ -64,7 +64,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -75,7 +75,7 @@ checksum = "2ac7135c3ef02b2f7833bbeb1be5ba7f966dcde8a87c6b87f65a778d71a02785"
 dependencies = [
  "darling_core",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -130,9 +130,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "1.0.18"
+version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
+checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
 
 [[package]]
 name = "memchr"
@@ -159,7 +159,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bfe0f4c752e450fc2faf62654f1c134747922825d5b04ca717b8874f41a40c0"
 dependencies = [
  "proc-macro2",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -266,7 +266,7 @@ checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -332,9 +332,9 @@ dependencies = [
 
 [[package]]
 name = "stiles-codegen"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8391c63b7e793630a93ca64be79f1eb014d3b6e35fed912e91d1c87c9213f976"
+checksum = "998ccc5b3db98f70684155ffb496181edb904562d6f7e011b737bdc1366e364d"
 dependencies = [
  "serde",
  "serde_json",
@@ -342,9 +342,9 @@ dependencies = [
 
 [[package]]
 name = "stiles-core"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbcbf768e979ef4f9d3d10f95759100be76d6d5dd08ee4c58e222feccb555655"
+checksum = "0f18000359d170ba2f76e674543906dcd6850081a5fe2029a6a29aade4e2ecea"
 dependencies = [
  "bon",
  "stiles-types",
@@ -355,20 +355,20 @@ dependencies = [
 
 [[package]]
 name = "stiles-macros"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "822e44e17f1cdf2aeec2ff033cf998c04ced6db039abe95370f6a91b81feea7c"
+checksum = "cd453ce4dd341f8630ccc79d55ecf8d03e499570ec8e5ee2af448e50f1d84d0c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
 name = "stiles-plugin"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9a3b189a2ad515b3831278cf31db9b8458e0f8ef5d5af9d4901edee53690056"
+checksum = "2f2a95250dd074eaea5191a1c0438ef2ad9a15e1df5995cc0fd0ad79a32ded2d"
 dependencies = [
  "stiles-codegen",
  "stiles-rust",
@@ -378,9 +378,9 @@ dependencies = [
 
 [[package]]
 name = "stiles-rust"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "344c0909888a121a269312a39a48b2a353c7c52e874afca3f68adbf1038f00a9"
+checksum = "2a1580a84300f90858cacc0f3481d1dbdd04609a8072df6ade7fdb2145cbae35"
 dependencies = [
  "bon",
  "stabby",
@@ -393,9 +393,9 @@ dependencies = [
 
 [[package]]
 name = "stiles-testing"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21cbc0c5d79f901ef74bf9e5631358888a46bb751f1ac3d11c799b9f4039699b"
+checksum = "ab856464a48b30f84d8bc75be0aa378da16751b7a4ce3b81a20b687b1a5a7f2b"
 dependencies = [
  "bon",
  "stiles-core",
@@ -407,9 +407,9 @@ dependencies = [
 
 [[package]]
 name = "stiles-types"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e916cf9117e4c0c7e0b6b818c0ad9710c2894d9b6c2be4c0ec1ee1901462ac7"
+checksum = "cb655a64a621f5ece4d78aaf2eef5e95d749b893e6e7b783163619be84913bfa"
 dependencies = [
  "bon",
  "stabby",
@@ -422,9 +422,9 @@ dependencies = [
 
 [[package]]
 name = "stiles-typescript"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f47ea9e5f02500a4b83ff599a4c6e61a97d25adf7637f0c3306956ea9bd532dc"
+checksum = "643f308b0260e36f8641d0a17260c763dc12de21e08b8ad4c5369ac26e851fb1"
 dependencies = [
  "bon",
  "stabby",
@@ -460,9 +460,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "3.0.9"
+version = "3.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b"
+checksum = "4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -486,23 +486,23 @@ checksum = "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
 name = "toml_datetime"
-version = "1.1.2+spec-1.1.0"
+version = "1.1.3+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b86d767906c6c42421dcba507eb9d203e779497710a47782a224bb871653053"
+checksum = "173f25c883cd2176a2d8212155638c0a60d484a9d84546d270866f40f56b6e49"
 dependencies = [
  "serde_core",
 ]
 
 [[package]]
 name = "toml_edit"
-version = "0.25.17+spec-1.1.0"
+version = "0.25.19+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3641d5bbb5349a79e1020a242d251efbc546ad8048d133958323ce9c40a9c9c"
+checksum = "dd43688c4858d7264ae1cf9a9f874a67c3feb74a883b1cd7bebd6a4ea8307218"
 dependencies = [
  "indexmap",
  "toml_datetime",
@@ -540,9 +540,9 @@ dependencies = [
 
 [[package]]
 name = "tree-sitter"
-version = "0.27.1"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5129de2ccc97808c4583d48f1fb44576d015cf241e432800572bda11ef30c3b"
+checksum = "37b2bed8f39a73439f3b0b7ed8f452be5d2911b5e9da69d352ef113bb7448fb8"
 dependencies = [
  "cc",
  "regex",
@@ -585,9 +585,9 @@ checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
 
 [[package]]
 name = "winnow"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
+checksum = "8c3b93199df0ab874cdf0c6a94f0a0dc3423fe41f1cafb62b8bd7b1deb277aef"
 dependencies = [
  "memchr",
 ]

@@ -23,8 +23,8 @@ Releases][gh-releases]. You'll have to move the file someplace on your `$PATH`
 yourself.
 
 ```bash
-shasum -a 256 -c stiles-0.1.0-aarch64-apple-darwin.tar.gz.sha256
-tar -xzf stiles-0.1.0-aarch64-apple-darwin.tar.gz
+shasum -a 256 -c stiles-0.9.0-aarch64-apple-darwin.tar.gz.sha256
+tar -xzf stiles-0.9.0-aarch64-apple-darwin.tar.gz
 ```
 
 ## With Cargo

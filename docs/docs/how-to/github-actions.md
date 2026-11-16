@@ -14,9 +14,9 @@ We publish a Github Action to install Stiles directly from the Stiles
 repository:
 
 ```yaml
-- uses: aonyx-ai/stiles@d946285894be3f1888966daa35bf1f4f8adbaa8d # stiles@0.1.0
+- uses: aonyx-ai/stiles@ae7db8734c9e17c9856a6516810104492f3c3e52 # stiles@0.9.0
   with:
-    version: stiles@0.1.0
+    version: stiles@0.9.0
 - run: stiles check .
 ```
 
