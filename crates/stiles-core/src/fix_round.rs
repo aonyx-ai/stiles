@@ -18,6 +18,11 @@ pub use self::apply_fix_round_error::ApplyFixRoundError;
 /// Two fixes that only touch at a boundary both apply. An insertion at the
 /// start of a replaced span lands before the replacement.
 ///
+/// Several diagnostics can carry one fix, as a rule does that fixes a whole
+/// scope at once. A fix with the same edits as a fix the round took makes
+/// no further change, and it counts as applied. Each finding it resolves
+/// then counts once in [`FixRound::applied`].
+///
 /// # Examples
 ///
 /// ```
@@ -113,10 +118,15 @@ impl FixRound {
         });
 
         let mut taken: Vec<&Edit> = Vec::new();
+        let mut taken_fixes: Vec<&Fix> = Vec::new();
         let mut applied = Vec::new();
         let mut deferred = Vec::new();
 
         for (rule, fix) in fixes {
+            if taken_fixes.iter().any(|other| other.edits() == fix.edits()) {
+                applied.push(rule);
+                continue;
+            }
             let collides = fix
                 .edits()
                 .iter()
@@ -125,6 +135,7 @@ impl FixRound {
                 true => deferred.push(rule),
                 false => {
                     taken.extend(fix.edits());
+                    taken_fixes.push(fix);
                     applied.push(rule);
                 }
             }
@@ -182,7 +193,9 @@ impl FixRound {
 
     /// Returns the rule of each fix the round applied, in source order
     ///
-    /// A rule appears once for every fix of it that applied.
+    /// A rule appears once for every diagnostic whose fix applied. Two
+    /// diagnostics that share a fix therefore count twice, although the
+    /// round makes the change once.
     ///
     /// # Examples
     ///
@@ -200,7 +213,8 @@ impl FixRound {
 
     /// Returns the rule of each fix that waits for the next round
     ///
-    /// A fix waits when it overlaps a fix that sorts before it.
+    /// A fix waits when it overlaps a fix that sorts before it and has
+    /// other edits.
     ///
     /// # Examples
     ///
@@ -303,6 +317,21 @@ mod tests {
     }
 
     #[test]
+    fn apply_counts_each_diagnostic_that_shares_an_applied_fix() {
+        let diagnostics = [
+            fixed("lint.scope", vec![edit(0..1, ""), edit(4..5, "")]),
+            fixed("lint.scope", vec![edit(0..1, ""), edit(4..5, "")]),
+        ];
+
+        let round = round("abcdef", &diagnostics);
+
+        assert_eq!(
+            round.applied(),
+            [RuleId::new("lint.scope"), RuleId::new("lint.scope")]
+        );
+    }
+
+    #[test]
     fn apply_defers_a_fix_that_overlaps_an_earlier_one() {
         let diagnostics = [
             fixed("lint.later", vec![edit(2..4, "B")]),
@@ -312,6 +341,18 @@ mod tests {
         let round = round("abcdef", &diagnostics);
 
         assert_eq!(round.deferred(), [RuleId::new("lint.later")]);
+    }
+
+    #[test]
+    fn apply_defers_no_diagnostic_that_shares_an_applied_fix() {
+        let diagnostics = [
+            fixed("lint.scope", vec![edit(0..1, "")]),
+            fixed("lint.scope", vec![edit(0..1, "")]),
+        ];
+
+        let round = round("abcdef", &diagnostics);
+
+        assert!(round.deferred().is_empty());
     }
 
     #[test]
@@ -378,6 +419,18 @@ mod tests {
         let round = round("é.ü", &diagnostics);
 
         assert_eq!(round.text(), "é!ü");
+    }
+
+    #[test]
+    fn apply_with_a_shared_fix_makes_the_change_once() {
+        let diagnostics = [
+            fixed("lint.scope", vec![edit(2..2, "+")]),
+            fixed("lint.scope", vec![edit(2..2, "+")]),
+        ];
+
+        let round = round("abcdef", &diagnostics);
+
+        assert_eq!(round.text(), "ab+cdef");
     }
 
     #[test]
