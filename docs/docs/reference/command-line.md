@@ -30,13 +30,18 @@ stiles check [OPTIONS] [PATH]
 
 A rule can attach a fix to a finding. A fix is a set of edits that apply
 together, and a rule attaches one only when it is correct without review.
-The report marks such a finding with a `fix:` note.
+The report marks such a finding with a `fix:` note. Without `--fix`, a `help:`
+line counts these findings.
+
+`--fix` applies a fix whatever the severity of its finding. It skips the
+findings of the rules that `[rules]` turns off.
 
 `--fix` applies the fixes in rounds. A round applies every fix that does not
-overlap an earlier fix in the same file, and then checks the changed files
-again. A fix that overlaps waits for the next round. The rounds stop when a
-round changes nothing. Stiles then writes the changed files, and reports the
-findings that remain. The exit status depends on those findings only.
+overlap an earlier fix in the same file. It then checks every file again,
+because a change to one file can change the facts about another. A fix that
+overlaps waits for the next round. The rounds stop when a round changes
+nothing. Stiles then writes the changed files, and reports the findings that
+remain. The exit status depends on those findings only.
 
 Stiles writes nothing when the run fails. That covers every failure of
 [early stops](#early-stops), and two failures of the fixes themselves:
@@ -94,15 +99,15 @@ output or behavior:
 
 ## Early stops
 
-| Cause                                | Default      | With `--keep-going`     |
-| ------------------------------------ | ------------ | ----------------------- |
-| A directory Stiles cannot read       | Ends the run | Reported, run continues |
-| An ignore file Stiles cannot parse   | Ends the run | Reported, run continues |
-| A file Stiles cannot read or analyze | Ends the run | Reported, run continues |
-| A rule that panics                   | Ends the run | Reported, run continues |
-| A run that finds nothing to check    | Ends the run | Ends the run            |
-| A fix that lies outside its file     | Ends the run | Ends the run            |
-| Fixes that do not settle             | Ends the run | Ends the run            |
+| Cause                                                  | Default      | With `--keep-going`     |
+| ------------------------------------------------------ | ------------ | ----------------------- |
+| A directory Stiles cannot read                         | Ends the run | Reported, run continues |
+| An ignore file Stiles cannot parse                     | Ends the run | Reported, run continues |
+| A file Stiles cannot read or analyze                   | Ends the run | Reported, run continues |
+| A rule that panics                                     | Ends the run | Reported, run continues |
+| A run that finds nothing to check                      | Ends the run | Ends the run            |
+| A fix that lies outside its file or splits a character | Ends the run | Ends the run            |
+| Fixes that do not settle                               | Ends the run | Ends the run            |
 
 ## Exit status
 

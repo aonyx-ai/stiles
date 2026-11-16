@@ -20,6 +20,7 @@ FILES = [
     "docs/how-to/github-actions.md",
     "docs/how-to/shared-rules.md",
     "docs/how-to/adopt-rules-gradually.md",
+    "docs/how-to/apply-fixes.md",
     "docs/how-to/troubleshooting.md",
     "docs/reference/configuration.md",
     "docs/reference/command-line.md",
