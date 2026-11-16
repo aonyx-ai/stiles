@@ -25,6 +25,13 @@ use crate::{Edit, FilePath};
 /// an earlier one starts before that edit ends, and so does every edit that
 /// sorts between them. The fix therefore compares neighbors only.
 ///
+/// One round of `stiles check --fix` applies a fix only when it overlaps no
+/// fix the round took. Two insertions at one offset overlap, so two fixes
+/// that insert at one point take two rounds. A rule that inserts several
+/// things at one point, such as imports at the top of a module, therefore
+/// builds one fix per scope. Every finding in the scope carries that fix,
+/// and the round counts each of them as fixed.
+///
 /// A fix cannot check that its spans lie inside the file and on character
 /// boundaries, because it does not hold the text. The code that applies the
 /// fix checks that.

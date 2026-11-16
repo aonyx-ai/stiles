@@ -117,6 +117,13 @@ The new line takes the indentation of the next line and the line ending of the
 summary. Code before the next line leaves no indentation that fits. The rule
 then reports the diagnostic without a fix, as `check_line_comment` shows.
 
+One round of `--fix` applies a fix only when it overlaps no fix that the round
+already took. Two insertions at the same offset overlap, so fixes that insert
+at one point apply one per round, and `--fix` gives up after ten rounds. A rule
+that inserts several things at one point, such as imports at the top of a
+module, builds one fix for the whole scope. Every finding in the scope carries
+that same fix, and `--fix` counts each of them as fixed.
+
 `assert_fix` applies the fixes in rounds, as `--fix` does. It then checks the
 result byte for byte, and checks that the rule reports nothing on it.
 

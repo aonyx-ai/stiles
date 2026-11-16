@@ -1,7 +1,7 @@
 use std::ptr;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use crate::{Diagnostic, Edit, Fix, Location, RuleId, Severity, Sink, Span};
+use crate::{AttachFixError, Diagnostic, Edit, Fix, Location, RuleId, Severity, Sink, Span};
 
 mod collect_diagnostics_error;
 mod table;
@@ -128,11 +128,12 @@ impl Collector {
     ///
     /// Returns [`CollectDiagnosticsError::UnknownHandle`] if the pass named
     /// a diagnostic its sink never started, and
-    /// [`CollectDiagnosticsError::AttachFix`] if it named a fix twice.
+    /// [`CollectDiagnosticsError::SecondFix`] if it named a fix twice.
     /// Returns [`CollectDiagnosticsError::UnnamedFix`] for edits without a
-    /// fix message. Returns [`CollectDiagnosticsError::BuildFix`] or
-    /// [`CollectDiagnosticsError::AttachFix`] for a fix that
-    /// [`Fix::builder`] or [`Diagnostic::with_fix`] refuses.
+    /// fix message. Returns [`CollectDiagnosticsError::BuildFix`] for edits
+    /// that [`Fix::builder`] refuses, and
+    /// [`CollectDiagnosticsError::OtherFile`] for a fix that
+    /// [`Diagnostic::with_fix`] refuses.
     ///
     /// # Examples
     ///
@@ -225,9 +226,14 @@ impl Pending {
             .build()
             .map_err(|source| CollectDiagnosticsError::BuildFix { rule, source })?;
 
-        diagnostic
-            .with_fix(fix)
-            .map_err(|source| CollectDiagnosticsError::AttachFix { rule, source })
+        diagnostic.with_fix(fix).map_err(|error| match error {
+            AttachFixError::OtherFile { diagnostic, fix } => CollectDiagnosticsError::OtherFile {
+                rule,
+                diagnostic: diagnostic.span().file().to_path_buf(),
+                fix,
+            },
+            AttachFixError::SecondFix { .. } => CollectDiagnosticsError::SecondFix { rule },
+        })
     }
 }
 

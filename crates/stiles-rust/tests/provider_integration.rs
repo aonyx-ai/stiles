@@ -1922,6 +1922,20 @@ fn reexports_on_a_local_item_is_empty() {
     assert!(reexports.paths().is_empty());
 }
 
+/// A segment that is a keyword keeps its raw-identifier mark
+///
+/// The provider writes each name as the edition of the importing crate
+/// spells it, so the facade's `r#type` module stays `r#type`.
+#[test]
+fn reexports_on_a_path_through_a_keyword_module_keeps_the_raw_mark() {
+    let provider = load_provider();
+    let tree = decorate_fixture_file(provider, "src/reexports.rs");
+
+    let reexports = decorated_reexports_of(&tree, "facade_core::r#type::Kind");
+
+    assert_eq!(rendered(&reexports), vec!["facade::r#type::Kind"]);
+}
+
 /// A path that already goes through the facade lists the facade itself
 ///
 /// The defining crate is the one left out, not the crate the `use` names,

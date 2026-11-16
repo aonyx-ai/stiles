@@ -7,7 +7,7 @@ use stabby::str::Str;
 use crate::context::{Context, StepFn};
 use crate::decoration_entry::Entry;
 use crate::ts_node::TsNode;
-use crate::{Decoration, DecorationKey, Language, Position, Span};
+use crate::{Decoration, DecorationKey, FileText, Language, Position, Span};
 
 /// A tree-sitter node enriched with semantic decorations
 ///
@@ -542,6 +542,97 @@ impl<'a> DecoratedNode<'a> {
         D::lookup(self)
     }
 
+    /// Returns the text of the file that this node lies in
+    ///
+    /// The offsets of the result count from the start of the file, as a
+    /// span does. A rule that builds a fix reads the lines around a node
+    /// through it, such as the indentation and the line ending.
+    ///
+    /// The node of a snippet that [`DecoratedNode::parse`] returned reads
+    /// the snippet, because the snippet is its file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stiles_types::{DecoratedTree, Language};
+    /// # let source = "fn main() {\n    let x = 1;\n}\n";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// # let tree = DecoratedTree::builder()
+    /// #     .tree(parser.parse(source, None).expect("the source should parse"))
+    /// #     .language(Language::Rust)
+    /// #     .source(source.to_string())
+    /// #     .file("src/main.rs")
+    /// #     .build();
+    /// let function = tree.root_node().named_child(0).expect("the file should hold a function");
+    /// let body = function.child_by_field_name("body").expect("the function should have a body");
+    /// let statement = body.named_child(0).expect("the body should hold a statement");
+    ///
+    /// let indent = statement.file_text().indent(statement.span().start());
+    ///
+    /// assert_eq!(indent, Some("    "));
+    /// ```
+    pub fn file_text(&self) -> FileText<'a> {
+        FileText::of(&self.file_root())
+    }
+
+    /// Reads the decoration `D` from the root node of this node's file
+    ///
+    /// A provider records a fact about a whole file, such as its Cargo
+    /// target, on the root node. This reads it from any node of the file,
+    /// as [`DecoratedNode::get`] reads it from the root. The read goes
+    /// through the same check of the declared reads.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{DecoratedNode, DecoratedTree, Decoration, DecorationKey, Language};
+    ///
+    /// /// The edition of a file
+    /// #[stabby::stabby]
+    /// struct Edition(u16);
+    ///
+    /// impl Decoration for Edition {
+    ///     const KEY: DecorationKey = DecorationKey::new(concat!(module_path!(), "::Edition"));
+    ///
+    ///     type Ref<'a> = Option<&'a Self>;
+    ///
+    ///     fn lookup<'a>(node: &DecoratedNode<'a>) -> Self::Ref<'a> {
+    ///         node.decoration::<Self>()
+    ///     }
+    /// }
+    ///
+    /// # let source = "fn main() { let x = 1; }";
+    /// # let mut parser = tree_sitter::Parser::new();
+    /// # parser.set_language(&tree_sitter_rust::LANGUAGE.into()).expect("the grammar should load");
+    /// let mut tree = DecoratedTree::builder()
+    ///     .tree(parser.parse(source, None).expect("the source should parse"))
+    ///     .language(Language::Rust)
+    ///     .source(source.to_string())
+    ///     .file("src/main.rs")
+    ///     .build();
+    /// let id = tree.root_node().id();
+    /// tree.decorations_mut().insert(id, Edition(2024));
+    /// let function = tree.root_node().named_child(0).expect("the file should hold a function");
+    ///
+    /// let edition = function.file_decoration::<Edition>();
+    ///
+    /// assert_eq!(edition.map(|Edition(year)| *year), Some(2024));
+    /// ```
+    pub fn file_decoration<D: Decoration>(&self) -> D::Ref<'a> {
+        self.file_root().get::<D>()
+    }
+
+    /// Returns the root node of this node's tree
+    fn file_root(&self) -> Self {
+        let mut root = *self;
+        while let Some(parent) = root.parent() {
+            root = parent;
+        }
+
+        root
+    }
+
     /// Returns all named children of this node as a collected vec
     ///
     /// # Examples
@@ -824,7 +915,7 @@ impl std::fmt::Debug for DecoratedNode<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DecoratedTree, DecorationMap};
+    use crate::{ConfineReadsError, DecoratedTree, DecorationMap, ReadKeys};
 
     #[stabby::stabby]
     #[derive(Eq, PartialEq, Debug)]
@@ -999,6 +1090,71 @@ mod tests {
         let end = second.end_position();
 
         assert_eq!(end, Position { row: 1, column: 14 });
+    }
+
+    #[test]
+    fn file_decoration_reads_the_root() {
+        let tree = decorated("fn f() { 1 }", |root, map| {
+            map.insert(root, Value(7));
+        });
+        let literal = tree
+            .root_node()
+            .named_child(0)
+            .and_then(|function| function.child_by_field_name("body"))
+            .and_then(|body| body.named_child(0))
+            .expect("the body should hold a literal");
+
+        let value = literal.file_decoration::<Value>();
+
+        assert_eq!(value, Some(&Value(7)));
+    }
+
+    #[test]
+    fn file_decoration_with_an_undeclared_key_is_refused() {
+        let tree = decorated("fn f() {}", |root, map| {
+            map.insert(root, Value(7));
+        });
+        let function = tree
+            .root_node()
+            .named_child(0)
+            .expect("the file should hold a function");
+
+        let error = tree
+            .confine(&ReadKeys::from_iter([]), || {
+                function.file_decoration::<Value>().is_some()
+            })
+            .expect_err("the read names an undeclared key");
+
+        assert_eq!(error, ConfineReadsError::Undeclared { key: Value::KEY });
+    }
+
+    #[test]
+    fn file_text_of_a_child_reads_the_whole_file() {
+        let tree = tree_of("fn f() {}\nfn g() {}\n");
+        let second = tree
+            .root_node()
+            .named_child(1)
+            .expect("the file should hold two functions");
+
+        let text = second.file_text();
+
+        assert_eq!(text.as_str(), "fn f() {}\nfn g() {}\n");
+    }
+
+    #[test]
+    fn file_text_of_a_snippet_reads_the_snippet() {
+        let tree = tree_of("// fn g() {}\nfn f() {}\n");
+        let comment = tree
+            .root_node()
+            .named_child(0)
+            .expect("the file should hold a comment");
+        let snippet = comment
+            .parse(Language::Rust, "fn g() {}")
+            .expect("the host should parse Rust");
+
+        let text = snippet.file_text();
+
+        assert_eq!(text.as_str(), "fn g() {}");
     }
 
     #[test]

@@ -93,6 +93,18 @@ fn check_fix_names_how_many_findings_it_fixed() {
 }
 
 #[test]
+fn check_fix_with_a_shared_fix_counts_every_finding_it_fixed() {
+    let project = Project::new("sharing_lint_count", Fixes::Share);
+
+    stiles()
+        .args(["check", "--fix"])
+        .arg(project.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("fixed 2 findings in 1 file"));
+}
+
+#[test]
 fn check_fix_with_fixes_that_settle_writes_the_fixed_text() {
     let project = Project::new("settling_lint_text", Fixes::Settle);
 

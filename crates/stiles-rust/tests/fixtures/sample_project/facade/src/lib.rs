@@ -1,5 +1,8 @@
 //! A facade that re-exports a module and an enum of `facade_core`
 //!
+//! It re-exports the module `r#type` under its keyword name, so a path to
+//! it needs a raw identifier.
+//!
 //! It also re-exports the enum `Tint` of `tint-core` at its root, away from
 //! the module that defines it.
 //!
@@ -7,6 +10,7 @@
 //! re-exports `#[doc(hidden)]`, so it offers neither path to its users.
 
 pub use facade_core::Shape;
+pub use facade_core::r#type;
 pub use facade_core::thing;
 pub use tint_core::tint::Tint;
 

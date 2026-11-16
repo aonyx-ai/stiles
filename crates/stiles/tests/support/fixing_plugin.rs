@@ -2,8 +2,9 @@
 //!
 //! Each package flags line comments by how they end, and attaches a fix
 //! that changes the end. One package removes a final period, so its fixes
-//! settle after one round. The other holds two rules that undo each other,
-//! so its fixes never settle.
+//! settle after one round. Another removes every final period of a file
+//! with one fix that each comment of the file carries. The last holds two
+//! rules that undo each other, so its fixes never settle.
 
 use std::path::Path;
 
@@ -12,6 +13,9 @@ use std::path::Path;
 pub(crate) enum Fixes {
     /// One rule removes a final period
     Settle,
+    /// One rule flags every comment of a file that holds a final period,
+    /// and each finding carries the one fix that removes them all
+    Share,
     /// One rule adds a final `!`, and another removes it again
     Fight,
 }
@@ -54,6 +58,7 @@ pub(crate) fn write_fixing_lint_package(directory: &Path, name: &str, fixes: Fix
     };
     let passes = match fixes {
         Fixes::Settle => period.source() + "\nstiles_plugin::export_lints![rust: [Period]];\n",
+        Fixes::Share => SHARE.to_owned() + "\nstiles_plugin::export_lints![rust: [Share]];\n",
         Fixes::Fight => {
             add_bang.source()
                 + &drop_bang.source()
@@ -66,6 +71,66 @@ pub(crate) fn write_fixing_lint_package(directory: &Path, name: &str, fixes: Fix
     std::fs::write(directory.join("src").join("lib.rs"), source)
         .expect("the source should be written");
 }
+
+/// The source of a pass whose findings share one fix
+///
+/// The pass checks a whole file. When a line comment at the top level ends
+/// with a period, it flags every line comment there. Each finding carries
+/// the same fix, which removes every final period.
+const SHARE: &str = r#"
+/// Flags every comment of a file that holds a final period
+pub struct Share;
+
+impl RustLintPass for Share {
+    fn check_source_file(&mut self, node: &DecoratedNode<'_>) -> Vec<Diagnostic> {
+        let comments: Vec<DecoratedNode<'_>> = node
+            .named_children()
+            .into_iter()
+            .filter(|child| child.kind() == "line_comment")
+            .collect();
+        let edits: Vec<Edit> = comments
+            .iter()
+            .filter_map(|comment| {
+                let text = comment.text().trim_end();
+                let end = comment.span().start() + text.len();
+                let span = Span::builder().file(comment.span().file_path().clone()).start(end - 1).end(end).build();
+                text.ends_with('.').then(|| Edit::builder().span(span).replacement("").build())
+            })
+            .collect();
+        if edits.is_empty() {
+            return Vec::new();
+        }
+        let fix = Fix::builder()
+            .message("remove the final periods")
+            .edits(edits)
+            .build()
+            .expect("the fix should build");
+        comments
+            .iter()
+            .map(|comment| {
+                Diagnostic::builder()
+                    .rule_id(RuleId::new("custom.share"))
+                    .severity(Severity::Error)
+                    .message("a comment of the file ends with a period")
+                    .span(comment.span())
+                    .build()
+                    .with_fix(fix.clone())
+                    .expect("the fix should attach")
+            })
+            .collect()
+    }
+}
+
+impl stiles_plugin::DeclaresRules for Share {
+    fn rules(&self) -> Vec<RuleId> {
+        vec![RuleId::new("custom.share")]
+    }
+
+    fn reads(&self) -> stiles_plugin::Reads {
+        stiles_plugin::Reads::none()
+    }
+}
+"#;
 
 /// A pass that changes the last character of a line comment
 ///

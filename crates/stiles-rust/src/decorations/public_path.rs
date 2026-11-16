@@ -19,6 +19,11 @@ use stabby::{string, vec};
 /// The crate is the name the current crate uses for that dependency, so a
 /// dependency that `Cargo.toml` renames appears under its new name.
 ///
+/// The crate and each segment are spelled as the edition of the current
+/// crate writes them. A keyword therefore carries its raw-identifier mark,
+/// as in `facade::r#type::Kind`, and the rendered path compiles where the
+/// rule writes it back.
+///
 /// A rule reads the path out of a decoration the host recorded, so stabby
 /// lays it out. Its segments are stabby's `String`s.
 ///
@@ -44,7 +49,8 @@ pub struct PublicPath {
 impl PublicPath {
     /// Creates a path from a crate name and the segments that follow it
     ///
-    /// The last segment is the item's name.
+    /// The last segment is the item's name. A segment that is a keyword in
+    /// the current edition carries `r#`, as the provider writes it.
     ///
     /// # Examples
     ///

@@ -1,13 +1,14 @@
 use bon::bon;
 use stabby::string;
 
-use crate::Span;
+use crate::{FilePath, Span};
 
 /// A replacement of the text at one span of a file
 ///
 /// An edit is one part of a [`Fix`]. It replaces the text at `span` with
 /// `replacement`. An empty replacement deletes the span, and an empty span
-/// inserts the replacement at its position.
+/// inserts the replacement at its position. [`Edit::delete`] and
+/// [`Edit::insert`] build these two shapes without a [`Span::builder`].
 ///
 /// An edit crosses the plugin boundary inside a [`Diagnostic`], so stabby
 /// lays it out and the replacement is stabby's `String`.
@@ -51,6 +52,49 @@ impl Edit {
         Self {
             span,
             replacement: string::String::from(replacement.as_str()),
+        }
+    }
+
+    /// Creates an edit that deletes the text at `span`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::{Edit, Span};
+    ///
+    /// let span = Span::builder().file("src/lib.rs").start(3).end(4).build();
+    ///
+    /// let edit = Edit::delete(span);
+    ///
+    /// assert_eq!(edit.replacement(), "");
+    /// ```
+    pub fn delete(span: Span) -> Self {
+        Self {
+            span,
+            replacement: string::String::new(),
+        }
+    }
+
+    /// Creates an edit that inserts `text` at `offset` in `file`
+    ///
+    /// The span of the edit is empty and starts at `offset`. An insertion at
+    /// the start of a span that another edit replaces lands before the
+    /// replacement.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stiles_types::Edit;
+    ///
+    /// let edit = Edit::insert().file("src/lib.rs").offset(7).text("\n").build();
+    ///
+    /// assert_eq!(edit.span().start(), edit.span().end());
+    /// ```
+    #[builder(finish_fn = build)]
+    pub fn insert(file: impl Into<FilePath>, offset: usize, #[builder(into)] text: String) -> Self {
+        Self {
+            span: Span::builder().file(file).start(offset).end(offset).build(),
+            replacement: string::String::from(text.as_str()),
         }
     }
 
@@ -155,6 +199,37 @@ mod tests {
             )
             .replacement("x")
             .build()
+    }
+
+    #[test]
+    fn delete_keeps_the_span() {
+        let edit = Edit::delete(span());
+
+        assert_eq!(edit.span(), &span());
+    }
+
+    #[test]
+    fn delete_replaces_with_nothing() {
+        let edit = Edit::delete(span());
+
+        assert_eq!(edit.replacement(), "");
+    }
+
+    #[test]
+    fn insert_has_an_empty_span_at_the_offset() {
+        let edit = Edit::insert().file("test.rs").offset(3).text("x").build();
+
+        assert_eq!(
+            edit.span(),
+            &Span::builder().file("test.rs").start(3).end(3).build()
+        );
+    }
+
+    #[test]
+    fn insert_replaces_with_the_text() {
+        let edit = Edit::insert().file("test.rs").offset(3).text("x").build();
+
+        assert_eq!(edit.replacement(), "x");
     }
 
     #[test]

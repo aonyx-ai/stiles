@@ -21,7 +21,7 @@ use stabby::str::Str;
 
 use super::{Collector, Pending, State};
 use crate::sink_table::SinkTable;
-use crate::{AttachFixError, CollectDiagnosticsError, Edit, Location, RuleId, Severity, Span};
+use crate::{CollectDiagnosticsError, Edit, Location, RuleId, Severity, Span};
 
 /// Returns the table whose functions collect into the collector at `data`
 pub(super) fn table(data: *const c_void) -> SinkTable {
@@ -111,10 +111,7 @@ extern "C" fn fix_message(table: &SinkTable, handle: usize, message: Str<'_>) {
         None => pending.fix_message = Some(message.as_str().to_owned()),
         Some(_) => {
             let rule = pending.rule;
-            state.keep(CollectDiagnosticsError::AttachFix {
-                rule,
-                source: AttachFixError::SecondFix,
-            });
+            state.keep(CollectDiagnosticsError::SecondFix { rule });
         }
     }
 }
@@ -215,12 +212,10 @@ mod tests {
 
         assert_eq!(
             error,
-            CollectDiagnosticsError::AttachFix {
+            CollectDiagnosticsError::OtherFile {
                 rule: RULE,
-                source: AttachFixError::OtherFile {
-                    diagnostic: "test.rs".into(),
-                    fix: "other.rs".into(),
-                },
+                diagnostic: "test.rs".into(),
+                fix: "other.rs".into(),
             }
         );
     }
@@ -318,13 +313,7 @@ mod tests {
         })
         .expect_err("a diagnostic holds one fix");
 
-        assert_eq!(
-            error,
-            CollectDiagnosticsError::AttachFix {
-                rule: RULE,
-                source: AttachFixError::SecondFix,
-            }
-        );
+        assert_eq!(error, CollectDiagnosticsError::SecondFix { rule: RULE });
     }
 
     #[test]
