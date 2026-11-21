@@ -11,8 +11,12 @@ npm ci
 npm run start
 ```
 
-The site is built on every pull request. It is deployed to GitHub Pages when a
-release is published.
+A Cloudflare Worker serves the site from `build`, as `wrangler.jsonc`
+configures it. Every published release deploys the site to `stiles.aonyx.ai`,
+and so does a manual run of the workflow Docs on `main`. Every pull request
+from this repository uploads a preview to
+`https://pr-<number>-stiles.aonyx.workers.dev`, and the pull request links to
+it. Only the team can open a preview.
 
 [docusaurus]: https://docusaurus.io/
 [mise]: https://mise.jdx.dev/
